@@ -116,19 +116,21 @@ def test_scope_rejects_role_outside_europe():
     assert decision.reason == "outside Europe"
 
 
-def test_scope_rejects_missing_location():
+def test_scope_keeps_missing_location_for_review():
     decision = assess_scope("Software Engineering Intern", "Python", None)
     assert not decision.accepted
-    assert decision.reason == "outside Europe"
+    assert decision.requires_review
+    assert decision.code == "scope_ambiguous"
 
 
-def test_scope_accepts_remote_posting():
+def test_scope_keeps_unrestricted_remote_for_review_without_assuming_europe():
     decision = assess_scope(
         "Software Engineering Intern",
         "Python and cloud work for students.",
         "Remote",
     )
-    assert decision.accepted
+    assert not decision.accepted
+    assert decision.requires_review
 
 
 def test_adapter_interface_is_abstract():
