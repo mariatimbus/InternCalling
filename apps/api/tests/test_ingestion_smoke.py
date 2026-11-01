@@ -17,6 +17,8 @@ def test_smoke_run_succeeds_on_healthy_fixtures(capsys):
     assert "accepted=3" in out
     assert "rejected=2" in out
     assert "would_create=3" in out
+    assert "review_required=1" in out  # Bare Remote is retained, not assumed Europe-eligible.
+    assert "scope_ambiguous" in out
 
 
 def test_smoke_fails_on_missing_file(capsys):
