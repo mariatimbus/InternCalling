@@ -17,6 +17,7 @@
     "verify:ingestion": "uv run --directory apps/api python -m opportunity_api.ingestion.smoke",
     "verify:web": "npm --prefix apps/web run lint && npm --prefix apps/web run typecheck && npm --prefix apps/web run build",
     "verify:db": "npm run db:test:fresh && npm run db:test:seed"
+    "db:test:fresh": "node supabase/test-fresh.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.10",
