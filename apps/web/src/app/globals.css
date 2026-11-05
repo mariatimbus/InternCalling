@@ -12,27 +12,44 @@
   --color-navy: #29263b;
   --color-warm-white: #fffbf0;
 
-  --font-sans: Arial, Helvetica, sans-serif;
-  --radius-card: 1rem;
-  --radius-control: 0.5rem;
+  --font-sans: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --radius-card: 1.5rem;
+  --radius-control: 1.5rem;
+  --radius-panel: 2rem;
 }
 
 /* Semantic roles: use these tokens for application UI. */
 @theme inline {
-  --color-background: var(--color-warm-white);
-  --color-surface: var(--color-warm-white);
-  --color-foreground: var(--color-navy);
-  --color-muted: var(--color-violet);
+  --color-background: var(--color-navy);
+  --color-surface: color-mix(in srgb, var(--color-navy) 96%, var(--color-warm-white));
+  --color-elevated: color-mix(in srgb, var(--color-navy) 92%, var(--color-warm-white));
+  --color-card: color-mix(in srgb, var(--color-surface) 88%, var(--color-electric-blue));
+  --color-line: color-mix(in srgb, var(--color-lavender-blue) 18%, transparent);
+  --color-foreground: var(--color-warm-white);
+  --color-muted: var(--color-lavender-blue);
   --color-primary: var(--color-electric-blue);
   --color-primary-hover: var(--color-royal-blue);
   --color-on-primary: var(--color-warm-white);
-  --color-border: var(--color-lavender-blue);
-  --color-focus: var(--color-cobalt-blue);
+  --color-border: color-mix(in srgb, var(--color-lavender-blue) 56%, transparent);
+  --color-focus: var(--color-pale-blue);
+  --color-accent: var(--color-pale-blue);
+  --color-accent-hover: var(--color-warm-white);
 }
 
 @layer base {
   body {
-    @apply bg-background font-sans text-foreground antialiased;
+    @apply relative isolate bg-background font-sans text-foreground antialiased;
+    color-scheme: dark;
+    font-feature-settings: "cv11", "ss01";
+  }
+
+  html {
+    background: var(--color-background);
+    color-scheme: dark;
+  }
+
+  button:not(:disabled), select:not(:disabled) {
+    cursor: pointer;
   }
 
   :focus-visible {
@@ -43,5 +60,38 @@
   ::selection {
     background: var(--color-pale-blue);
     color: var(--color-indigo);
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border) transparent;
+  }
+}
+
+/* The palette stays fixed; only the blue/violet background blend changes with scroll. */
+.scroll-backdrop {
+  --scroll-progress: 0;
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 85% 0%, color-mix(in srgb, var(--color-indigo) 22%, transparent), transparent 60%),
+    linear-gradient(155deg, var(--color-navy) 30%, color-mix(in srgb, var(--color-navy) 94%, var(--color-indigo)) 100%);
+}
+
+.scroll-backdrop-shift {
+  position: absolute;
+  inset: 0;
+  opacity: calc(0.08 + var(--scroll-progress) * 0.34);
+  background:
+    radial-gradient(ellipse at 90% 85%, color-mix(in srgb, var(--color-violet) 85%, transparent), transparent 70%),
+    linear-gradient(145deg, transparent 20%, color-mix(in srgb, var(--color-indigo) 80%, transparent));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scroll-backdrop-shift {
+    opacity: 0.08;
   }
 }

@@ -1,8 +1,8 @@
 {
-  "name": "@opportunity-tracker/web",
+  "name": "@interncalling/web",
   "version": "0.1.0",
   "private": true,
-  "description": "Next.js frontend for the Opportunity Tracker platform",
+  "description": "Next.js frontend for the InternCalling platform",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
