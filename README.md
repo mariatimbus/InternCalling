@@ -1,7 +1,13 @@
-# Opportunity Tracker
+# InternCalling
 
 A Student Opportunity Intelligence Platform: one place to discover, track, and manage
 internships, jobs, scholarships, hackathons, and grants.
+
+## Brand
+
+The application is named **InternCalling**. Frontend branding uses the original InternCalling logo and a dark navy/blue/violet theme with a scroll-responsive gradient. UI strings, metadata, package display names and new documentation use this name.
+
+Existing GitHub URLs, Notion resources, Supabase project identifiers, legacy SQLite filenames and applied SQL migrations retain their actual historical identifiers. They are infrastructure references, not the product's display name. Do not rename or reconnect those resources as part of a visual rebrand.
 
 ## Overview
 

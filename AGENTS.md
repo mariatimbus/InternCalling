@@ -1,16 +1,16 @@
-# AGENTS.md — Opportunity Tracker
+# AGENTS.md — InternCalling
 
 These instructions apply to AI coding agents working in `mariatimbus/Opportunity-Tracker-`. Follow them unless the repository's current files or an explicit human instruction establish a safer, more recent rule. Do not assume that the status documented here proves the current GitHub state; inspect the repository before making changes.
 
 ## 1. Project and ownership
 
-Opportunity Tracker is a platform for Bachelor's and Master's students to discover internships, research programs, scholarships, hackathons, conferences, and academic programs; determine eligibility; rank opportunities; and track applications.
+InternCalling is a platform for Bachelor's and Master's students to discover internships, research programs, scholarships, hackathons, conferences, and academic programs; determine eligibility; rank opportunities; and track applications.
 
 - **Maria:** project lead, architecture, FastAPI/backend, security, AI/matching, integration, releases.
 - **Bianca:** frontend and UX.
 - **Dalia:** ingestion, opportunity data pipelines, Supabase data/schema work.
 - **Target:** beta by **1 December 2026**; feature freeze **28 November 2026**.
-- **Source of tasks:** Notion `Opportunity Tracker — Tasks`. Read the assigned task's goal, acceptance criteria, dependencies, owner, status, and expected branch before implementing.
+- **Source of tasks:** the existing Notion tasks database linked below. Read the assigned task's goal, acceptance criteria, dependencies, owner, status, and expected branch before implementing.
 
 ## 2. Non-negotiable Git rules
 
@@ -154,11 +154,12 @@ If a secret is found: stop, do not push, and report it to Maria immediately with
 
 ## Frontend design system (mandatory)
 
-- Keep every screen minimalist: generous whitespace, clear typography, restrained borders, simple layouts, and few visual accents. Avoid decorative gradients, heavy shadows, and unnecessary animation.
+- The application name is **InternCalling** in UI, metadata, documentation and new code. Existing repository URLs, hosted project identifiers and historical database filenames retain their actual values; a branding change must not silently reconnect services or create a new database.
+- Keep every screen minimalist: generous whitespace, clear typography, restrained borders, simple layouts, and few visual accents. The user explicitly requested a dark theme and a scroll-responsive blue/violet background gradient. Keep that effect restrained and honor reduced-motion preferences. Avoid heavy shadows and unrelated animation.
 - Always respect the supplied brand palette. CSS tokens live in `apps/web/src/app/globals.css`; use semantic Tailwind utilities (`bg-background`, `text-foreground`, `text-muted`, `bg-primary`, `border-border`) instead of hard-coded colors in components.
 - Palette: pale blue / Bleu pal `#C0C9E5`; lavender blue / Bleu lavanda `#B2BCDC`; electric blue / Albastru electric `#2862CF`; cobalt blue / Albastru cobalt `#2E46AA`; royal blue / Albastru regal `#1F3CA3`; indigo `#142A7B`; violet / Mov violet `#4A3F74`; navy / Bleumarin `#29263B`; warm white / Alb cald `#FFFBF0`.
-- Default roles: warm white background/surface, navy main text, violet secondary text, electric blue primary actions, royal blue hover, lavender blue borders, cobalt blue focus ring. Pale/lavender blue are accents, not body text colors on light backgrounds.
-- Preserve readable contrast, visible keyboard focus, semantic HTML, and responsive layouts. Respect reduced-motion preferences when adding animation. Do not introduce another palette or automatic dark theme without an explicit user request.
+- Default roles: navy background, navy/violet surfaces, warm white main text, lavender blue secondary text, electric blue primary actions, royal blue action hover, pale blue inline accents and keyboard focus, translucent lavender borders. Use the original InternCalling logo from apps/web/public/interncalling-logo.jpeg through the shared BrandLogo component.
+- Preserve readable contrast, visible keyboard focus, semantic HTML, and responsive layouts. The theme is consistently dark, including native controls and modal drawers. Reduced motion keeps the background gradient static. Do not add automatic theme switching without a user request.
 
 ## 10. Reference
 
