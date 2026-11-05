@@ -1,7 +1,7 @@
 [project]
 name = "opportunity-api"
 version = "0.1.0"
-description = "FastAPI backend for the Opportunity Tracker platform"
+description = "FastAPI backend for the InternCalling platform"
 requires-python = ">=3.13"
 dependencies = [
     "fastapi>=0.115",

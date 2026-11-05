@@ -16,7 +16,7 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    app_name: str = Field(default="opportunity-api", validation_alias=AliasChoices("APP_NAME"))
+    app_name: str = Field(default="InternCalling", validation_alias=AliasChoices("APP_NAME"))
     debug: bool = Field(default=False, validation_alias=AliasChoices("APP_DEBUG"))
     # Defaults to a local sqlite file so the app and tests boot without Postgres.
     database_url: str = Field(

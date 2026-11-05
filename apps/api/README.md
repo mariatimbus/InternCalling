@@ -1,6 +1,6 @@
 # apps/api
 
-FastAPI backend for the Opportunity Tracker platform.
+FastAPI backend for the InternCalling platform.
 
 ## Setup
 
@@ -17,7 +17,7 @@ uv run uvicorn opportunity_api.main:create_app --factory --reload
 
 Environment variables (see `.env.example` at the repo root):
 
-- `APP_NAME` — application name (default `opportunity-api`)
+- `APP_NAME` — application name (default `InternCalling`)
 - `DEBUG` — debug mode (default `false`)
 - `DATABASE_URL` — SQLAlchemy URL; defaults to a local sqlite file so the app boots
   without Postgres. Point it at your Supabase Postgres for real data.

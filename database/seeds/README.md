@@ -1,6 +1,6 @@
 # Opportunity Seed Dataset (C1)
 
-This directory contains `opportunities_seed.json`, the candidate opportunity dataset for the **Opportunity Tracker** project. The file is a UTF-8 JSON array intended for review, filtering, development, and testing. The project's planned database is **Supabase (managed PostgreSQL)**.
+This directory contains `opportunities_seed.json`, the candidate opportunity dataset for the **InternCalling** project. The file is a UTF-8 JSON array intended for review, filtering, development, and testing. The project's planned database is **Supabase (managed PostgreSQL)**.
 
 
 ## Current dataset snapshot

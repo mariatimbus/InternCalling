@@ -1,5 +1,5 @@
 {
-  "name": "opportunity-tracker-workspace",
+  "name": "interncalling-workspace",
   "private": true,
   "scripts": {
     "supabase": "supabase",
