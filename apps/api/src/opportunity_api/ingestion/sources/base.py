@@ -26,9 +26,10 @@ class SourceAdapter(ABC):
         """Yield raw postings for this source.
 
         Implementations should tolerate individual malformed records by
-        skipping them (with a logged warning) rather than aborting the
-        whole run, and must not raise for transient HTTP failures after
-        the runner's retry policy has been exhausted.
+        yielding valid siblings and then raising a safe parse failure.
+        Fetch retries belong to the adapter transport. Exhausted failures
+        must reach the runner, which records a source failure and continues
+        with the next adapter. Use one adapter per company for isolation.
         """
 
     def parse_record(self, raw: dict[str, Any]) -> RawOpportunity:
