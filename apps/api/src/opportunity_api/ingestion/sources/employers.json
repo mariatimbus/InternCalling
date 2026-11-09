@@ -1,0 +1,194 @@
+[
+  {
+    "name": "Databricks",
+    "provider": "greenhouse",
+    "identifier": "databricks",
+    "careers_url": "https://job-boards.greenhouse.io/databricks",
+    "region": "global",
+    "enabled": true
+  },
+  {
+    "name": "Cloudflare",
+    "provider": "greenhouse",
+    "identifier": "cloudflare",
+    "careers_url": "https://job-boards.greenhouse.io/cloudflare",
+    "region": "global",
+    "enabled": true
+  },
+  {
+    "name": "Stripe",
+    "provider": "greenhouse",
+    "identifier": "stripe",
+    "careers_url": "https://job-boards.greenhouse.io/stripe",
+    "region": "global",
+    "enabled": true
+  },
+  {
+    "name": "MongoDB",
+    "provider": "greenhouse",
+    "identifier": "mongodb",
+    "careers_url": "https://job-boards.greenhouse.io/mongodb",
+    "region": "global",
+    "enabled": true
+  },
+  {
+    "name": "Elastic",
+    "provider": "greenhouse",
+    "identifier": "elastic",
+    "careers_url": "https://job-boards.greenhouse.io/elastic",
+    "region": "global",
+    "enabled": true
+  },
+  {
+    "name": "Datadog",
+    "provider": "greenhouse",
+    "identifier": "datadog",
+    "careers_url": "https://job-boards.greenhouse.io/datadog",
+    "region": "global",
+    "enabled": true
+  },
+  {
+    "name": "Grafana Labs",
+    "provider": "greenhouse",
+    "identifier": "grafanalabs",
+    "careers_url": "https://job-boards.greenhouse.io/grafanalabs",
+    "region": "global",
+    "enabled": true
+  },
+  {
+    "name": "Canonical",
+    "provider": "greenhouse",
+    "identifier": "canonical",
+    "careers_url": "https://job-boards.greenhouse.io/canonical",
+    "region": "global",
+    "enabled": true
+  },
+  {
+    "name": "Palantir",
+    "provider": "lever",
+    "identifier": "palantir",
+    "careers_url": "https://jobs.lever.co/palantir",
+    "region": "global",
+    "enabled": true
+  },
+  {
+    "name": "Spotify",
+    "provider": "lever",
+    "identifier": "spotify",
+    "careers_url": "https://jobs.lever.co/spotify",
+    "region": "global",
+    "enabled": true
+  },
+  {
+    "name": "Mistral AI",
+    "provider": "lever",
+    "identifier": "mistral",
+    "careers_url": "https://jobs.lever.co/mistral",
+    "region": "global",
+    "enabled": false
+  },
+  {
+    "name": "Zoox",
+    "provider": "lever",
+    "identifier": "zoox",
+    "careers_url": "https://jobs.lever.co/zoox",
+    "region": "global",
+    "enabled": true
+  },
+  {
+    "name": "Plaid",
+    "provider": "lever",
+    "identifier": "plaid",
+    "careers_url": "https://jobs.lever.co/plaid",
+    "region": "global",
+    "enabled": false
+  },
+  {
+    "name": "N26",
+    "provider": "lever",
+    "identifier": "n26",
+    "careers_url": "https://jobs.lever.co/n26",
+    "region": "global",
+    "enabled": false
+  },
+  {
+    "name": "Contentsquare",
+    "provider": "lever",
+    "identifier": "contentsquare",
+    "careers_url": "https://jobs.lever.co/contentsquare",
+    "region": "global",
+    "enabled": true
+  },
+  {
+    "name": "QuantumBlack",
+    "provider": "lever",
+    "identifier": "quantumblack",
+    "careers_url": "https://jobs.lever.co/quantumblack",
+    "region": "global",
+    "enabled": false
+  },
+  {
+    "name": "Bosch",
+    "provider": "smartrecruiters",
+    "identifier": "BoschGroup",
+    "careers_url": "https://careers.smartrecruiters.com/BoschGroup",
+    "region": "global",
+    "enabled": true
+  },
+  {
+    "name": "CERN",
+    "provider": "smartrecruiters",
+    "identifier": "CERN",
+    "careers_url": "https://careers.smartrecruiters.com/CERN",
+    "region": "global",
+    "enabled": true
+  },
+  {
+    "name": "Ubisoft",
+    "provider": "smartrecruiters",
+    "identifier": "Ubisoft2",
+    "careers_url": "https://careers.smartrecruiters.com/Ubisoft2",
+    "region": "global",
+    "enabled": true
+  },
+  {
+    "name": "Visa",
+    "provider": "smartrecruiters",
+    "identifier": "Visa",
+    "careers_url": "https://careers.smartrecruiters.com/Visa",
+    "region": "global",
+    "enabled": true
+  },
+  {
+    "name": "Sopra Steria",
+    "provider": "smartrecruiters",
+    "identifier": "SopraSteria1",
+    "careers_url": "https://careers.smartrecruiters.com/SopraSteria1",
+    "region": "global",
+    "enabled": true
+  },
+  {
+    "name": "Ramboll",
+    "provider": "smartrecruiters",
+    "identifier": "Ramboll3",
+    "careers_url": "https://careers.smartrecruiters.com/Ramboll3",
+    "region": "global",
+    "enabled": true
+  },
+  {
+    "name": "Western Digital",
+    "provider": "smartrecruiters",
+    "identifier": "WesternDigital",
+    "careers_url": "https://careers.smartrecruiters.com/WesternDigital",
+    "region": "global",
+    "enabled": true
+  },
+  {
+    "name": "Devoteam",
+    "provider": "smartrecruiters",
+    "identifier": "Devoteam",
+    "careers_url": "https://careers.smartrecruiters.com/Devoteam",
+    "region": "global",
+    "enabled": true
+  }
+]
