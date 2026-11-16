@@ -12,7 +12,162 @@ Default behavior is offline validation only. See
 IDs, atomic upserts, rejection reports and the explicit `--apply` approval gate.
 Do not run hosted imports or publish candidates without Dalia's approval.
 
-## Pipeline (A14 / A15 / C3)
+## C5 command-line ingestion
+
+Run from the **outer repository root**, not a nested checkout. Install the backend's
+locked dependencies with `uv sync --project apps/api --python 3.13 --frozen`.
+
+All enabled ATS companies, through the shared C3/A15 runner:
+
+```sh
+uv run --project apps/api python -m opportunity_api.ingestion.cli --apply --report /tmp/ingestion-apply-001.json
+```
+
+The same configured sources and transformations, with zero database writes:
+
+```sh
+uv run --project apps/api python -m opportunity_api.ingestion.cli --dry-run --report /tmp/ingestion-preview-001.json
+```
+
+Both commands fetch **live public job boards**. Dry-run prevents database writes, not HTTP
+requests. Automated tests substitute the saved C4 responses and never contact live boards.
+For a fully offline fixture smoke check, use the existing smoke command below.
+
+### Configuration and credentials
+
+- `DATABASE_URL` must be explicitly set in the process environment or the root `.env`.
+  The existing `APP_DATABASE_URL` alias is also accepted. No ingestion command falls back
+  to the backend's default SQLite file. Run from the root so settings load that `.env`.
+- Use the existing `postgresql+psycopg://` server-side connection to an already migrated
+  database. Supabase direct/session-pooler connections use TLS (`sslmode=require` or
+  certificate verification). No Supabase service-role API key, Auth JWT or Supabase SDK
+  is required by C5. Database passwords remain server/CI secrets.
+- For development and tests use an existing disposable local SQLite catalogue or local
+  PostgreSQL. The CLI never creates schema. SQLite requires a real existing file; CLI
+  in-memory URLs and custom URI parameters are refused. Test setup creates its own schema.
+- Non-local PostgreSQL persistence additionally requires `--allow-hosted` alongside
+  `--apply`. This acknowledges the target; it does not replace the team's approval of
+  hosted imports. No hosted ingestion was performed during C5 development or tests.
+- Database URLs are not CLI arguments, source configuration or report fields. Never put
+  privileged values in `apps/web`, `NEXT_PUBLIC_*`, committed config, fixtures or logs.
+
+Provider switches live in
+`apps/api/src/opportunity_api/ingestion/sources/providers.json`:
+
+```json
+{"greenhouse": true, "lever": true, "smartrecruiters": true}
+```
+
+Every supported provider must have a JSON boolean; unknown/missing keys and coerced
+strings are rejected. Company switches remain in the adjacent `employers.json` registry.
+A company runs only when **both** its provider and company entry are enabled. Preserve
+existing source keys (`provider.identifier`) and provider IDs across configuration edits.
+The registry currently enables 20 companies; endpoint availability can change.
+
+Override either file with `--providers /path/to/providers.json` and/or
+`--employers /path/to/employers.json`. Overrides follow the same schema and contain no
+headers, API credentials or arbitrary API endpoint URLs. A configuration enabling no
+sources fails before opening the database. Registry construction itself performs no I/O
+beyond reading these local configuration files.
+
+### Architecture, identity and dry-run guarantees
+
+```text
+provider AND employer switches -> shared registry -> C4 adapters -> RawOpportunity
+  -> C3 normalize/clean -> scope -> validate -> final scope -> dedupe
+  -> A15 OpportunityStore (apply) OR read-only preview (dry-run) -> JSON report
+```
+
+C3 stage order and review safeguards are preserved. All roles enter C3, including
+out-of-scope roles. No adapter receives a database session or writes opportunities.
+The seed importer remains a separate reviewed workflow; C5 introduces no second persistence
+implementation, migrations, ingestion HTTP endpoint or scheduler.
+
+A15 updates matched opportunities in place. It retains canonical UUIDs and application
+foreign keys rather than deleting/reinserting rows. Existing identity priority remains
+provider/source ID, canonical URL, then conservative fingerprint. UUID stability means
+stable across imports into the same catalogue, not identical UUIDs across rebuilt databases.
+An unchanged matched replay counts as `updated` for A15 compatibility. Changed/reviewed
+postings remain subject to C3's publication rules; ingestion never auto-publishes.
+
+Dry-run uses the same transformations and `Deduplicator` identity matcher. A detached,
+run-local snapshot carries preceding predicted URL/provider-ID changes across source
+boundaries. If posting A moves from URL X to Y and posting B reuses X, preview reports
+one would-update and one would-create, matching sequential apply. The snapshot reloads
+for each run, preserves existing canonical UUIDs, and gives new predictions no invented
+UUID. It never mutates SQLAlchemy ORM objects. `preview()` distinguishes would-create,
+would-update and cross-source/weak duplicates without upsert, publication holds, flush,
+commit or schema creation.
+SQLite opens with `mode=ro` plus `query_only`; PostgreSQL starts each transaction with
+`SET TRANSACTION READ ONLY`. The configured existing catalogue is read to predict updates;
+the exported JSON is a **local report file**, not a database write. A preview cannot
+predict later concurrent changes, constraint failures or a future source response.
+
+### Failure handling and reports
+
+The CLI emits UTF-8 JSON to stdout and optionally to a new `--report` file. Existing report
+paths are refused before fetching or writing the database. Parent directories must exist.
+The requested report is written and flushed before stdout, so a closed stdout pipe cannot
+prevent artifact export. Stdout failure returns code 1 without rerunning ingestion; a
+broken OS pipe is handled without a second interpreter-shutdown flush error. If file export
+fails, stdout is still attempted independently. Database commits and filesystem exports
+are not one atomic transaction. A setup failure can leave a reserved empty report file;
+use a new filename for the next attempt.
+
+Reports contain run UUID, UTC start/end timestamps, mode, per-source status and counters:
+`fetched`, `accepted`, `created`, `updated`, `duplicates`, `rejected`, `failed`,
+`would_create`, `would_update`, `review_required`, and `source_failures`.
+
+- `failed` counts record-processing failures; `source_failures` counts source fetch/commit
+  failures. A timeout before any records means `fetched=0`, `failed=0`,
+  `source_failures=1`, source status `failed`, and an entry in `failed_sources`.
+- `accepted` retains C3's initial-scope admission meaning, including review records;
+  it is not an additional terminal outcome to sum with created/failed/duplicates.
+- Rejection, validation, duplicate, timeout/HTTP/JSON and commit issues contain controlled
+  reasons and hashed record references. Raw exceptions, URLs and payloads are omitted.
+- Known malformed records skipped inside a C4 parser currently produce a source failure;
+  the runner cannot invent a precise record count for inputs the adapter did not emit.
+
+Existing record savepoints and per-source commits isolate failures. A partial source can
+retain previously yielded valid rows. Failed commits roll back that source, correct
+success counts and allow later sources to complete. Review conflicts stay in the review
+report rather than being merged unsafely. Retain this report for review evidence.
+
+Exit codes: `0` for a completed run without record/source failures; `1` for execution,
+record/source failure or export failure; `2` for argument/configuration errors or an
+unavailable report destination. Rejections/review flags alone do not make the CLI fail.
+A partial failure is reported after healthy sources have completed.
+
+### C5 automated verification
+
+From `apps/api` (all test databases are disposable and local):
+
+```sh
+uv run pytest tests/test_ingestion_integration.py tests/test_ingestion_cli.py tests/test_ingestion_preview.py --no-cov
+uv run pytest
+uv run ruff check .
+uv run python -m opportunity_api.ingestion.smoke
+```
+
+Integration coverage includes all three actual ATS parsers from saved fixtures, repeated
+runs and real updates, stable canonical UUIDs, application FK/status/notes preservation
+with SQLite FK enforcement enabled, provider/company switches, full JSON reporting,
+source-failure isolation and safe errors. Dry-run tests reject attempted SQL DML/DDL and
+flush/commit/upsert calls, compare persisted IDs/values/timestamps, and verify that SQLite
+itself refuses writes. Regression tests cover URL moves/reuse within a batch and across
+sources, repeated previews, native-ID adoption, duplicate classification, preserved UUIDs
+and application links. Stdout write/flush failures and a closed OS pipe must still retain
+the requested JSON artifact, return 1 and ingest only once. Actual connection exceptions
+are injected at a local engine connect event and checked for credential redaction.
+
+A focused test exercises real SQLAlchemy begin events and proves that the PostgreSQL
+`SET TRANSACTION READ ONLY` hook precedes queries in each transaction. It intercepts that
+statement on an in-memory SQLite engine; it is not a PostgreSQL-server test. No local
+PostgreSQL tools or Docker were available during verification, so PostgreSQL write rejection,
+constraints and hosted RLS remain unverified. Database-routing/hosted-apply checks never
+connect to PostgreSQL. No hosted test or additional database dependency was introduced.
+
+## Pipeline (A14 / A15 / C3 / C4 / C5)
 
 The automated ingestion path is distinct from the reviewed C2 seed importer:
 
@@ -22,8 +177,10 @@ adapter -> RawOpportunity -> normalize/clean -> scope -> validate -> final scope
 
 C3 is entirely offline. It adds no database columns, migrations, public endpoints or dependencies.
 `RawOpportunity`, `SourceAdapter`, `NormalizedOpportunity` (still importable from `persistence`)
-and `IngestionRunner.run(adapters)` retain their existing interfaces. Real HTTP adapters belong
-in C4; the registry currently provides the interface and fixture-backed smoke path only.
+and `IngestionRunner.run(adapters)` retain their existing interfaces. C4 provides public ATS
+adapters; C5 assembles them using `registry.build_registry()` and a server-only CLI. The
+legacy `registry.register()`/`resolve()` helpers still manage an explicitly populated registry;
+the CLI uses a fresh configured registry, not import-time global registration.
 
 ### Deterministic normalization
 
@@ -219,10 +376,10 @@ silently discard records before emitting them cannot be counted by the runner.
 ```python
 from opportunity_api.ingestion.persistence import OpportunityStore
 from opportunity_api.ingestion.runner import IngestionRunner
-from opportunity_api.ingestion import registry
+from opportunity_api.ingestion.registry import build_registry
 
 runner = IngestionRunner(OpportunityStore(session), dry_run=True)
-report = runner.run(registry.resolve())
+report = runner.run(build_registry().resolve())
 print(report.render())
 summary = report.to_dict()
 ```
@@ -245,4 +402,5 @@ uv run python -m opportunity_api.ingestion.smoke
 
 The full pytest invocation enforces the project's 80% coverage threshold. Focused tests can run
 with `--no-cov`, but do not replace the full coverage check. Tests use only fixtures and temporary
-SQLite databases. No C4 adapter, Supabase hosted call, schema migration or API change is needed.
+SQLite databases. C5 integration tests exercise the real C4 parsers using saved JSON responses,
+without live HTTP or hosted database calls. No schema migration or public API change is needed.
