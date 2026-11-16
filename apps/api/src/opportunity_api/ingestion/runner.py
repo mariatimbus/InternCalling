@@ -5,6 +5,9 @@ Review records are inactive; records without a usable official URL remain in the
 """
 
 from collections.abc import Callable, Iterable
+from datetime import UTC, datetime
+from json import JSONDecodeError
+from urllib.error import HTTPError, URLError
 
 from pydantic import ValidationError
 
@@ -43,9 +46,16 @@ class IngestionRunner:
     def run(self, adapters: Iterable[SourceAdapter]) -> IngestionReport:
         report = IngestionReport(dry_run=self.dry_run)
         seen = Deduplicator()  # never retain a batch's seen state for the next run
-        for adapter in adapters:
-            self._run_adapter(adapter, report, seen)
-        return report
+        if self.dry_run:
+            self.store.begin_preview()
+        try:
+            for adapter in adapters:
+                self._run_adapter(adapter, report, seen)
+            report.finished_at = datetime.now(UTC).isoformat()
+            return report
+        finally:
+            if self.dry_run:
+                self.store.end_preview()
 
     def _run_adapter(
         self,
@@ -59,7 +69,17 @@ class IngestionRunner:
         pending: list[tuple[NormalizedOpportunity, str]] = []
         created_before, updated_before = source.created, source.updated
 
-        def fetch_failed():
+        def fetch_failed(exc: Exception):
+            source.source_failures += 1
+            reason = "Source fetch or parsing failed; later sources will still run."
+            if isinstance(exc, TimeoutError) or (
+                isinstance(exc, URLError) and isinstance(exc.reason, TimeoutError)
+            ):
+                reason = "Source request timed out; later sources will still run."
+            elif isinstance(exc, HTTPError):
+                reason = "Source returned an HTTP error; later sources will still run."
+            elif isinstance(exc, JSONDecodeError):
+                reason = "Source returned invalid JSON; later sources will still run."
             label = safe_source(name)
             if label not in report.failed_sources:
                 report.failed_sources.append(label)
@@ -68,14 +88,14 @@ class IngestionRunner:
                 None,
                 "fetch",
                 "fetch_failed",
-                "Source iteration failed; later sources will still run.",
+                reason,
                 "failed",
             )
 
         try:
             iterator = iter(adapter.fetch())
-        except Exception:
-            fetch_failed()
+        except Exception as exc:
+            fetch_failed(exc)
             return
         number = 0
         while True:
@@ -83,8 +103,8 @@ class IngestionRunner:
                 raw = next(iterator)
             except StopIteration:
                 break
-            except Exception:
-                fetch_failed()
+            except Exception as exc:
+                fetch_failed(exc)
                 break
             number += 1
             source.fetched += 1
@@ -236,10 +256,21 @@ class IngestionRunner:
                 normalized._review_notices = tuple(notices)
                 stage = "persistence"
                 if self.dry_run:
-                    if self.store.classify(normalized) == "create":
+                    prediction = self.store.preview(normalized)
+                    if prediction == "create":
                         source.would_create += 1
-                    else:
+                    elif prediction == "update":
                         source.would_update += 1
+                    else:
+                        source.duplicates += 1
+                        report.issue(
+                            name,
+                            identity,
+                            stage,
+                            "duplicate_stored_identity",
+                            "Stored weak/cross-source identity retained; fields were not merged.",
+                            "duplicate",
+                        )
                 else:
                     result = self.store.upsert(normalized)
                     if result == "created":
@@ -301,6 +332,7 @@ class IngestionRunner:
                 self.store.rollback()
                 source.created, source.updated = created_before, updated_before
                 source.failed += len(pending)
+                source.source_failures += 1
                 label = safe_source(name)
                 if label not in report.failed_sources:
                     report.failed_sources.append(label)

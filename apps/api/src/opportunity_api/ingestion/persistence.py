@@ -9,8 +9,11 @@ unchanged matched upserts as updates.
 this import path. New postings are inactive pending publication review.
 """
 
+from collections.abc import Iterable
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Literal
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator
 from sqlalchemy import select
@@ -99,37 +102,104 @@ def _row_values(record: NormalizedOpportunity) -> dict[str, object]:
     return record.model_dump(exclude={"source_id", "source", "is_active"})
 
 
+@dataclass(frozen=True)
+class _PreviewRow:
+    """Detached identity facts, never an ORM object or a fabricated canonical ID."""
+
+    id: UUID | None
+    source: str
+    source_id: str | None
+    url: str
+    title: str
+    organization: str | None
+    location: str | None
+    deadline: datetime | None
+    opportunity_type: OpportunityType
+
+    @classmethod
+    def copy(cls, record, *, row_id: UUID | None, source_id: str | None):
+        return cls(
+            id=row_id,
+            source=record.source,
+            source_id=source_id,
+            url=record.url,
+            title=record.title,
+            organization=record.organization,
+            location=record.location,
+            deadline=record.deadline,
+            opportunity_type=record.opportunity_type,
+        )
+
+
+class _PreviewState:
+    """Run-local catalogue simulation using the same Deduplicator as A15 upserts."""
+
+    def __init__(self, rows: Iterable[Opportunity]):
+        self.index = Deduplicator()
+        for row in rows:
+            # Stored URL hashes are fallback identities, not native provider IDs.
+            self.index.remember(_PreviewRow.copy(row, row_id=row.id, source_id=explicit_id(row)))
+
+    def predict(self, record: NormalizedOpportunity) -> Literal["create", "update", "duplicate"]:
+        match = self.index.find(record, allow_update=True)
+        if match is not None:
+            existing = match.record
+            if match.kind == "fingerprint" or existing.source != record.source:
+                return "duplicate"
+            replacement = _PreviewRow.copy(
+                record,
+                row_id=existing.id,
+                source_id=explicit_id(existing) or record.source_id,
+            )
+            self.index.forget(existing)
+            self.index.remember(replacement)
+            return "update"
+        self.index.remember(_PreviewRow.copy(record, row_id=None, source_id=record.source_id))
+        return "create"
+
+
 class OpportunityStore:
     """Session-bound create/update gateway for opportunities."""
 
     def __init__(self, session: Session) -> None:
         self.session = session
         self._index: Deduplicator | None = None
+        self._preview: _PreviewState | None = None
 
     def reset_index(self) -> None:
         self._index = None
+
+    def _identity_rows(self) -> Iterable[Opportunity]:
+        query = select(Opportunity).options(
+            load_only(
+                Opportunity.id,
+                Opportunity.source,
+                Opportunity.source_id,
+                Opportunity.url,
+                Opportunity.title,
+                Opportunity.organization,
+                Opportunity.location,
+                Opportunity.deadline,
+                Opportunity.opportunity_type,
+            )
+        )
+        with self.session.no_autoflush:
+            yield from self.session.scalars(query)
 
     def _identities(self) -> Deduplicator:
         if self._index is None:
             self._index = Deduplicator()
             # One metadata-only snapshot per source, not a full scan per incoming row.
-            query = select(Opportunity).options(
-                load_only(
-                    Opportunity.id,
-                    Opportunity.source,
-                    Opportunity.source_id,
-                    Opportunity.url,
-                    Opportunity.title,
-                    Opportunity.organization,
-                    Opportunity.location,
-                    Opportunity.deadline,
-                    Opportunity.opportunity_type,
-                )
-            )
-            with self.session.no_autoflush:
-                for row in self.session.scalars(query):
-                    self._index.remember(row)
+            for row in self._identity_rows():
+                self._index.remember(row)
         return self._index
+
+    def begin_preview(self) -> None:
+        """Fresh detached catalogue per run; keep it across source index resets."""
+        self._preview = _PreviewState(self._identity_rows())
+
+    def end_preview(self) -> None:
+        self._preview = None
 
     def _find(self, record: NormalizedOpportunity) -> Opportunity | None:
         match = self._identities().find(record, allow_update=True)
@@ -139,9 +209,20 @@ class OpportunityStore:
         """Read-only dry-run decision: would this record create or update?"""
         return "update" if self._find(record) is not None else "create"
 
+    def preview(self, record: NormalizedOpportunity) -> Literal["create", "update", "duplicate"]:
+        """Predict and apply identity changes only to the run-local detached snapshot."""
+        if self._preview is None:
+            self.begin_preview()
+        assert self._preview is not None
+        return self._preview.predict(record)
+
     def opportunity_id(self, record: NormalizedOpportunity) -> str | None:
-        row = self._find(record)
-        return str(row.id) if row is not None else None
+        if self._preview is not None:
+            match = self._preview.index.find(record, allow_update=True)
+            row = match.record if match is not None else None
+        else:
+            row = self._find(record)
+        return str(row.id) if row is not None and row.id is not None else None
 
     def hold_for_review(self, record: NormalizedOpportunity) -> bool:
         """Revoke publication for an identified duplicate without merging its fields."""

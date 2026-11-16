@@ -27,9 +27,11 @@ adapters = registry.resolve()  # enabled companies only
 report = runner.run(adapters)  # existing IngestionRunner; use dry_run=True first
 ```
 
-This explicit factory does not mutate the global default registry or change the
-offline CI smoke command. The caller supplies the existing runner and store.
-No new scheduler, database configuration or schema is introduced.
+C5's shared `registry.build_registry()` wraps this factory with explicit provider switches.
+Use the [ingestion CLI guide](../services/ingestion/README.md#c5-command-line-ingestion)
+for full ingestion/dry-run commands and server-only database configuration. The CLI supplies
+the A15 runner and store. C3 stage order and the offline smoke command are preserved;
+no scheduler or schema is introduced.
 
 When updating employers, verify the public careers identifier and current
 provider/employer terms before collection. Config accepts only provider identifiers
