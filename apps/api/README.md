@@ -50,3 +50,6 @@ See [the team setup guide](../../supabase/README.md). Use the hosted connection 
 
 See [the C4 connector guide](../../docs/ingestion-ats.md) for the employer registry,
 provider behavior, failure isolation and offline fixture validation.
+
+For end-to-end ATS collection, provider switches and read-only previews, see the
+[C5 ingestion CLI guide](../../services/ingestion/README.md#c5-command-line-ingestion).

@@ -10,8 +10,10 @@ import hashlib
 import json
 import re
 from dataclasses import asdict, dataclass, field, replace
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
+from uuid import uuid4
 
 
 class IngestionError(ValueError):
@@ -84,6 +86,7 @@ class SourceReport:
     would_create: int = 0
     would_update: int = 0
     review_required: int = 0
+    source_failures: int = 0
 
     def line(self) -> str:
         parts = [f"fetched={self.fetched}", f"accepted={self.accepted}"]
@@ -96,6 +99,8 @@ class SourceReport:
             f"rejected={self.rejected}",
             f"failed={self.failed}",
         ]
+        if self.source_failures:
+            parts.append(f"source_failures={self.source_failures}")
         if self.review_required:
             parts.append(f"review_required={self.review_required}")
         return f"{self.name}: " + " ".join(parts)
@@ -109,6 +114,9 @@ class IngestionReport:
     failed_sources: list[str] = field(default_factory=list)
     dry_run: bool = False
     issues: list[RecordIssue] = field(default_factory=list)
+    run_id: str = field(default_factory=lambda: str(uuid4()))
+    started_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
+    finished_at: str | None = None
 
     def source(self, name: str) -> SourceReport:
         name = safe_source(name)
@@ -130,6 +138,7 @@ class IngestionReport:
                 "would_create",
                 "would_update",
                 "review_required",
+                "source_failures",
             ):
                 setattr(total, field_name, getattr(total, field_name) + getattr(report, field_name))
         return total
@@ -151,8 +160,19 @@ class IngestionReport:
 
     def to_dict(self) -> dict:
         return {
+            "run_id": self.run_id,
+            "started_at": self.started_at,
+            "finished_at": self.finished_at,
             "dry_run": self.dry_run,
-            "sources": {name: asdict(item) for name, item in self.sources.items()},
+            "sources": {
+                name: {
+                    **asdict(item),
+                    "status": "failed"
+                    if item.failed or name in self.failed_sources
+                    else "completed",
+                }
+                for name, item in self.sources.items()
+            },
             "totals": asdict(self.totals()),
             "failed_sources": list(self.failed_sources),
             "issues": [asdict(item) for item in self.issues],
