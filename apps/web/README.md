@@ -1,49 +1,34 @@
-# Opportunity Tracker web
+# InternCalling web
 
-Next.js App Router, strict TypeScript, Tailwind CSS v4, and ESLint. Requires Node.js 22+ and npm. From `apps/web`:
+Next.js App Router, strict TypeScript, Tailwind CSS v4 and Supabase Auth. Requires Node.js 22+ and npm. From `apps/web`:
 
 ```sh
 npm ci
 npm run dev
 ```
 
-Open http://localhost:3000. No environment variables or backend services are required for this initial page.
+Open http://localhost:3000. The home page and `/explore` read the real API catalog and provide official source links. Legacy `/preview/**` paths redirect to real pages. Configure the API origin to load opportunities; unavailable services show a truthful error state.
 
-On Windows with nvm, run `nvm list` and activate an installed compatible version with `nvm use <version>` if `node --version` reports no active version. The local setup was verified with Node.js 24.22.0 and npm 11.19.1.
+For real accounts, configure the browser-safe Supabase project URL, publishable key and FastAPI origin as described in [B3 authentication and onboarding](docs/B3-auth-onboarding.md). Never expose privileged credentials. No service-role key is needed by this frontend.
+
+Password recovery uses a separate SSR/PKCE session. See [password recovery setup](docs/password-recovery.md) for the exact redirect allowlist, email template, trusted application origin and manual checks.
+
+Both auth pages include Google and LinkedIn through Supabase Auth. Apple remains supported internally but is hidden because it is not configured. LinkedIn uses the `linkedin_oidc` provider; [setup instructions](docs/google-sign-in.md) explain the callback flow. Email sign-in remains available. See [current B3 verification](docs/B3-verification.md) for automated results, user-confirmed manual results and pending checks.
+
+If account creation is throttled, [Auth rate limits](docs/auth-rate-limits.md) explains confirmation-email quotas, checking an existing email and configuring SMTP. Failed sign-ups preserve an earlier confirmation link; the app does not automatically retry throttled requests.
+
+New users enter `/onboarding`, complete their study and location details, optionally add skills, then select **Find my matches**. Returning users with complete profiles go directly to `/jobs`. All authenticated pages share the responsive application shell. Sign-out is available in navigation and Account / Settings.
 
 ```sh
 npm run lint
 npm run typecheck
+node --test tests/auth.test.mjs tests/recovery.test.mjs
 npm run build
 npm start
 ```
 
-`npm start` serves the production build. The initial page is a static introduction; discovery, authentication, and application tracking are not implemented yet.
+The B3 guide also describes the isolated browser suite, failure behavior, API contracts, deployment setup and remaining hosted verification. Local tests never create users in shared Supabase projects.
 
-## API environment configuration
+Shared components remain independent of API and Supabase business logic. The dark InternCalling palette, typography, rounded surfaces and scroll backdrop use semantic tokens in `src/app/globals.css`. Maintain visible keyboard focus, semantic navigation and reduced-motion support.
 
-From `apps/web`, create your local configuration in PowerShell:
-
-```powershell
-Copy-Item -LiteralPath .env.example -Destination .env.local -ErrorAction Stop -Confirm
-```
-
-If `.env.local` already exists, edit it instead of copying over it. The local file is ignored by Git; `.env.example` is the shared template. Next.js loads environment files from `apps/web`, not from the monorepo root or `src`.
-
-Set `NEXT_PUBLIC_API_BASE_URL=http://localhost:8000`, without the `/api/v1` prefix. Future requests will add their endpoint paths, such as `/api/v1/opportunities` or `/health`.
-
-`src/lib/env.ts` exports `API_BASE_URL`. It reads `process.env.NEXT_PUBLIC_API_BASE_URL` directly so Next.js can inline it into browser code, requires an absolute HTTP or HTTPS URL, and removes trailing slashes. Missing, blank, or invalid values throw a clear error when the module is imported; errors do not include the supplied value. The initial page does not import this module or make API requests, so it still runs without configuration or a backend.
-
-The `NEXT_PUBLIC_` prefix makes the value public: never put credentials or secret keys in it. Restart `npm run dev` after changing `.env.local`. For production, set the variable in the build environment before `npm run build`; changing it after the build requires rebuilding the application.
-
-## App shell
-
-`src/app/layout.tsx` provides the shared responsive container, header, main content area, and footer. The application name and the Home link in the main navigation use Next.js `Link` and lead to `/`, the only current page. The keyboard-accessible Skip to content link moves focus to the single `main-content` landmark.
-
-`src/app/page.tsx` contains only the introductory content and its page-specific spacing. The shell fills at least the viewport height, with the footer following the content on taller pages. Styling uses the existing theme tokens and visible keyboard focus styles.
-
-## Theme
-
-`src/app/globals.css` defines the nine brand colors and semantic roles with Tailwind v4 `@theme`. Prefer `bg-background`, `text-foreground`, `text-muted`, `bg-primary`, `text-on-primary`, and `border-border`. Radius tokens: `rounded-card` and `rounded-control`.
-
-Keep the minimalist warm-white and blue theme on every screen. The mandatory palette and accessibility rules are documented in the repository's `AGENTS.md`.
+See [Maria review scope and fresh original-version verification](docs/review-for-maria.md). This frontend reads the configured API catalog; separate local publication data and scripts are not included in the frontend PR.
