@@ -47,6 +47,16 @@ class Settings(BaseSettings):
         default="nomic-embed-text", validation_alias=AliasChoices("APP_OLLAMA_EMBED_MODEL")
     )
 
+    ollama_extract_model: str = Field(
+        default="qwen2.5:7b", validation_alias=AliasChoices("APP_OLLAMA_EXTRACT_MODEL")
+    )
+    ollama_timeout: float = Field(
+        default=30, ge=1, le=120, validation_alias=AliasChoices("APP_OLLAMA_TIMEOUT")
+    )
+    supabase_publishable_key: str = Field(
+        default="", validation_alias=AliasChoices("APP_SUPABASE_PUBLISHABLE_KEY")
+    )
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

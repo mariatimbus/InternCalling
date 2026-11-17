@@ -1,12 +1,14 @@
 """SQLAlchemy models. Importing this package registers all tables on Base.metadata."""
 
 from .application import Application, ApplicationStatus
+from .cv import CVDocument
 from .opportunity import Opportunity, OpportunityDegreeLevel, OpportunityType
 from .profile import DegreeLevel, Profile
 from .skill import Skill, opportunity_skills, user_skills
 from .user import User
 
 __all__ = [
+    "CVDocument",
     "Application",
     "ApplicationStatus",
     "DegreeLevel",

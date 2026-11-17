@@ -12,6 +12,9 @@ dependencies = [
     "pydantic-settings>=2.5",
     "pyjwt[crypto]>=2.9",
     "pydantic[email]>=2.5",
+    "httpx>=0.28.1",
+    "pypdf>=7.1.0",
+    "defusedxml>=0.7.1",
 ]
 
 [dependency-groups]

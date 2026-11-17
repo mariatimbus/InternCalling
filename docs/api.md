@@ -411,3 +411,28 @@ show an error without optimistic success. Concurrent saves reread the existing
 record and show a conflict. Saving an already tracked role keeps its progress.
 Explicit `status: null` on PATCH is rejected with 422; omit status to keep it.
 “Mark Applied” records the student's action; it does not submit to an employer.
+
+### Private CVs (A11)
+
+All `/api/v1/cv` routes require a verified Supabase bearer token. Storage calls
+retain that identity and use only a publishable/anon project key. The private
+bucket and metadata migration must be applied before enabling uploads.
+
+| Method | Path | Result |
+| --- | --- | --- |
+| POST | `/cv?filename=resume.pdf` or `resume.docx` | Raw matching PDF/DOCX bytes, maximum 5 MiB; 201 metadata |
+| GET | `/cv` | Current user's documents/drafts |
+| GET | `/cv/service-health` | Optional model configured/available flags |
+| GET | `/cv/{id}` | Owner metadata, extraction draft and accepted provenance |
+| GET | `/cv/{id}/file` | Private attachment with `Cache-Control: no-store` |
+| POST | `/cv/{id}/extract` | Validated draft; never changes the profile |
+| POST | `/cv/{id}/review` | Accept selected `fields`; rejects profile conflicts |
+| DELETE | `/cv/{id}` | Remove private object then metadata; 204 |
+
+Reviewable fields: headline, location, degree_level, field_of_study, university,
+graduation_year, skills, interests. Missing facts cannot be accepted. Accepting a
+field replaces its current value; clients must show values/evidence before asking
+the student to accept. Foreign document IDs return 404. Other errors: 409 stale
+profile/file or missing extraction, 413 too large, 415 wrong media type, 422 unreadable
+document or invalid/ungrounded AI output, 503 unconfigured/unavailable model/Storage.
+See `services/ai/README.md` for parser limits, setup, retention and hosted test gates.
