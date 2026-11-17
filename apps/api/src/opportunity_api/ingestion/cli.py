@@ -39,6 +39,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--providers", type=Path, help="credential-free provider switches JSON")
     parser.add_argument("--employers", type=Path, help="credential-free employer registry JSON")
     parser.add_argument("--report", type=Path, help="new JSON report path; existing files refused")
+    parser.add_argument(
+        "--freshness",
+        action="store_true",
+        help="assess daily source health and conservative inactivation",
+    )
+    parser.add_argument(
+        "--fail-on-anomaly", action="store_true", help="nonzero exit for source-health warnings"
+    )
     args = parser.parse_args(argv)
     try:
         registry = build_registry(providers=args.providers, employers=args.employers)
@@ -72,7 +80,9 @@ def main(argv: list[str] | None = None) -> int:
                 store = OpportunityStore(session)
                 # Verify an existing schema/connection before requesting live boards.
                 session.execute(select(Opportunity).limit(0))
-                report = IngestionRunner(store, dry_run=args.dry_run).run(adapters)
+                report = IngestionRunner(
+                    store, dry_run=args.dry_run, track_freshness=args.freshness
+                ).run(adapters)
         except Exception:
             print(
                 "Ingestion database or execution failed; sensitive details omitted.",
@@ -106,7 +116,14 @@ def main(argv: list[str] | None = None) -> int:
                         pass  # injected/non-file stdout in embedded callers
                 print("Report stdout failed; check the requested report artifact.", file=sys.stderr)
                 output_failed = True
-            exit_code = 1 if output_failed or report.failed_sources or report.totals().failed else 0
+            anomalies = args.fail_on_anomaly and any(
+                issue.stage == "health" for issue in report.issues
+            )
+            exit_code = (
+                1
+                if output_failed or report.failed_sources or report.totals().failed or anomalies
+                else 0
+            )
     finally:
         if artifact is not None:
             try:

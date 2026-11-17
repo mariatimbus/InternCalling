@@ -404,3 +404,61 @@ The full pytest invocation enforces the project's 80% coverage threshold. Focuse
 with `--no-cov`, but do not replace the full coverage check. Tests use only fixtures and temporary
 SQLite databases. C5 integration tests exercise the real C4 parsers using saved JSON responses,
 without live HTTP or hosted database calls. No schema migration or public API change is needed.
+
+## C8 scheduler and conservative freshness
+
+`scheduled-ingestion.yml` runs fixture-only smoke separately from configured live
+sources. Its daily trigger is **06:17 UTC**; GitHub schedules run the workflow on
+the repository's default branch after release. Manual dispatch defaults to dry-run.
+The live job runs only on main/develop when `INGESTION_ENABLED=true`; it uses the
+`ingestion-production` environment and its `INGESTION_DATABASE_URL` secret. No
+credentials belong in provider JSON, workflow arguments, artifacts or logs.
+
+Before enabling, Maria/Dalia must review/apply the freshness migration, approve
+the exact database target, set the environment's review/access controls and secret,
+review a manual dry-run report, and resolve outstanding C6/C7 source integration.
+This commit prepares existing ATS operation; it does not pretend C6/C7 are merged.
+New/changed opportunities still use the existing inactive publication-review policy.
+
+The same commands are used locally and in Actions (from `apps/api`):
+
+```sh
+uv run python -m opportunity_api.ingestion.cli --dry-run --freshness --fail-on-anomaly --report report-preview-001.json
+# Persistence requires a separately approved target. Never reset the shared DB.
+uv run python -m opportunity_api.ingestion.cli --apply --allow-hosted --freshness --fail-on-anomaly --report report-apply-001.json
+uv run python -m opportunity_api.ingestion.summary report-apply-001.json
+```
+
+Reports use exclusive output paths. Actions retains JSON artifacts for 30 days and
+writes a count/health summary even after a partial failure. Source health notices
+make the job fail with `--fail-on-anomaly`, after healthy-source writes have been
+retained; failures are explicit rather than silently hiding partial operation.
+The existing public HTTP client retries temporary errors at most twice, with
+bounded backoff/Retry-After, response size, timeouts and per-host request spacing.
+Parser failures are not retried indefinitely. Sources remain isolated by company.
+
+Freshness behavior:
+
+- `last_seen_at` records positive source evidence, including canonical rows still
+  observed in records rejected by current scope rules. It is never backfilled.
+- `missing_runs` advances once per healthy complete UTC-day snapshot for that
+  source. Empty feeds, parse/fetch failures and a drop below 20% of a prior healthy
+  volume (baseline >=10) never count as missing. Prior positive baselines survive
+  outages. Three healthy missing snapshots inactivate with `source_missing`.
+- Known past deadlines inactivate with `deadline_expired`; null deadlines remain
+  unknown. These reasons record the inactivation event. Returning rows reset
+  missing counts but never reactivate automatically; publication requires review.
+- No opportunity is deleted. Dry-run predicts freshness effects without writes.
+  Source baselines are server-only and RLS/grants deny browser access.
+- New high rejection (>95%) or duplicate (>80%) ratios at volume >=20 are flagged;
+  an established baseline must worsen by >20 percentage points to alert again.
+- Reports count seen/missing/freshness inactivation, duplicates/rejections/failures
+  and missing critical fields. They explicitly say official links were **not**
+  checked. A broken link needs a separate audit/review, never blind deletion.
+
+To disable a provider, change its boolean in `providers.json`; to disable one
+company, set `enabled:false` in `employers.json`. Disabled companies do not consume
+missing-run allowances. To stop all scheduled writes, set `INGESTION_ENABLED=false`.
+After a parser/source fix, inspect the retained report, rerun a fresh dry-run with a
+new report filename, then reprocess only the approved provider/company configuration.
+There is no automatic reactivation or schema creation in the CLI.

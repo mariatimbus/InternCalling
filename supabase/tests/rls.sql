@@ -89,3 +89,21 @@ DO $$ BEGIN
 END $$;
 ROLLBACK;
 SELECT 'PASS: Auth synchronization, two-user isolation, anonymous/catalog permissions and deletion cascades' AS result;
+
+-- Source-health state is server-only; no browser role can read or forge baselines.
+BEGIN;
+SET LOCAL ROLE authenticated;
+DO $$ BEGIN
+ BEGIN
+  PERFORM * FROM public.ingestion_source_state;
+  RAISE EXCEPTION 'Client source-state read allowed';
+ EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+END $$;
+SET LOCAL ROLE anon;
+DO $$ BEGIN
+ BEGIN
+  PERFORM * FROM public.ingestion_source_state;
+  RAISE EXCEPTION 'Anonymous source-state read allowed';
+ EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+END $$;
+ROLLBACK;

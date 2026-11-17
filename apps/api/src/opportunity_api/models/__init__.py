@@ -2,6 +2,7 @@
 
 from .application import Application, ApplicationStatus
 from .cv import CVDocument
+from .ingestion_state import IngestionSourceState
 from .opportunity import Opportunity, OpportunityDegreeLevel, OpportunityType
 from .profile import DegreeLevel, Profile
 from .skill import Skill, opportunity_skills, user_skills
@@ -9,6 +10,7 @@ from .user import User
 
 __all__ = [
     "CVDocument",
+    "IngestionSourceState",
     "Application",
     "ApplicationStatus",
     "DegreeLevel",

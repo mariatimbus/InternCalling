@@ -12,6 +12,7 @@ from urllib.error import HTTPError, URLError
 from pydantic import ValidationError
 
 from .dedupe import Deduplicator
+from .freshness import FreshnessTracker
 from .models import RawOpportunity
 from .normalize import clean_text
 from .normalize import normalize as default_normalize
@@ -36,12 +37,14 @@ class IngestionRunner:
         validate: Validate = validate_record,
         dedupe: Dedupe | None = None,
         dry_run: bool = False,
+        track_freshness: bool = False,
     ) -> None:
         self.store = store
         self.normalizer = normalizer
         self.validate = validate
         self.dedupe = dedupe
         self.dry_run = dry_run
+        self.freshness = FreshnessTracker(store.session) if track_freshness else None
 
     def run(self, adapters: Iterable[SourceAdapter]) -> IngestionReport:
         report = IngestionReport(dry_run=self.dry_run)
@@ -97,6 +100,7 @@ class IngestionRunner:
         except Exception as exc:
             fetch_failed(exc)
             return
+        observations = []
         number = 0
         while True:
             try:
@@ -157,6 +161,8 @@ class IngestionRunner:
             try:
                 if not isinstance(raw, RawOpportunity):
                     raw = RawOpportunity.model_validate(raw)
+                if raw.source == name:
+                    observations.append((raw.source_id, raw.source_url))
                 stage = "normalize"
                 prepared = self.normalizer(raw)
                 if isinstance(prepared, NormalizedOpportunity):
@@ -349,3 +355,24 @@ class IngestionRunner:
                 # Failed source writes must not suppress a later source's valid records.
                 for record, _ in pending:
                     seen.forget(record)
+
+        if self.freshness is not None:
+            previous_freshness = (source.seen, source.missing, source.inactivated)
+            try:
+                self.freshness.assess(name, observations, source, report, dry_run=self.dry_run)
+            except Exception:
+                self.store.rollback()
+                source.seen, source.missing, source.inactivated = previous_freshness
+                source.freshness_skipped += 1
+                source.source_failures += 1
+                label = safe_source(name)
+                if label not in report.failed_sources:
+                    report.failed_sources.append(label)
+                report.issue(
+                    name,
+                    None,
+                    "freshness",
+                    "freshness_failed",
+                    "Freshness transaction failed; no expiry changes committed.",
+                    "failed",
+                )
