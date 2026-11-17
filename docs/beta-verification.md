@@ -25,7 +25,7 @@ own reviewed task. Optional CV extraction must remain owner-only, schema-validat
 and subject to student review; semantic matching needs a measured benchmark.
 
 CI changes add post-merge checks on develop/main and a separate browser core-flow
-job. They have not run on GitHub until these commits are pushed and reviewed.
+job. Task-branch publication alone does not run those PR/protected-branch checks.
 Branch protection and production hosting remain administrator configuration.
 
 Deployment must specify web/API hosting, server-only database credentials, allowed
@@ -34,6 +34,12 @@ resources, prepare the exact config diff and obtain the repository-required
 approval. Run health and core-flow checks after deployment. Roll back application
 releases separately from additive database changes; do not reset the shared DB.
 
-Next.js was patched to 16.4.6. Production dependency audit passed locally. Seven
-moderate development-tooling advisories remain; the requested automatic audit fix
-was declined. Review those separately before asserting a clean dependency audit.
+Next.js was patched to 16.4.6. Production dependency audit passed locally. A scoped
+minimatch override resolves its advisory; 14 high affected tooling packages remain
+through unpatched picomatch. See `docs/audits/2026-11-17-web-dependencies.md`.
+The full dependency audit and security CI are not clean.
+
+For read-only duplicate/expiry/freshness/eligibility and bounded official ATS link
+checks, use `scripts/catalog_audit.py` as documented in `docs/catalog-audit.md`.
+A partial public API page cannot certify the catalog; offline success does not
+certify live link health. No hosted catalog audit has been performed.
