@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import type { Opportunity, Match } from "@/lib/api/types";
+import type { Opportunity, Match, Eligibility } from "@/lib/api/types";
 import { JobCard, type JobSummary } from "@/components/jobs/job-card";
 import { MatchScore } from "@/components/jobs/match-score";
 import { EligibilityBadge } from "@/components/jobs/eligibility-badge";
@@ -9,7 +9,7 @@ import { Drawer } from "@/components/ui/drawer";
 import { EmptyState } from "@/components/ui/empty-state";
 import { opportunitySummary } from "@/lib/opportunities";
 
-export type RankedOpportunity = { opportunity: Opportunity; match: Match | null };
+export type RankedOpportunity = { opportunity: Opportunity; match: Match | null; eligibility?: Eligibility };
 function summary({ opportunity: job, match }: RankedOpportunity): JobSummary {
   return { ...opportunitySummary(job), matchScore: match?.score ?? null, eligibility: match?.eligibility ?? "unknown" };
 }
@@ -25,6 +25,8 @@ function Brief({ item }: { item: RankedOpportunity }) {
     <section><h3 className="text-sm font-medium">About the opportunity</h3><p className="mt-3 whitespace-pre-line break-words text-sm leading-7 text-muted">{job.description || "No description provided. Check the original opportunity for details."}</p></section>
     {job.skills.length > 0 && <section><h3 className="mb-3 text-sm font-medium">Skills</h3><div className="flex flex-wrap gap-2">{job.skills.map((skill) => <Badge key={skill.id}>{skill.name}</Badge>)}</div></section>}
     <section><h3 className="text-sm font-medium">Your match</h3>{match ? <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-muted">{match.reasons.map((reason, index) => <li key={index}>{reason}</li>)}</ul> : <p className="mt-3 text-sm leading-6 text-muted">Your match is currently unavailable. You can still review the opportunity.</p>}</section>
+    {match && <section><h3 className="text-sm font-medium">Score breakdown</h3><p className="mt-2 text-xs text-muted">Profile relevance, not an acceptance probability.</p><dl className="mt-3 grid grid-cols-2 gap-3 text-sm">{Object.entries(match.components).map(([name, points]) => <div key={name}><dt className="text-muted">{name.replaceAll("_", " ")}</dt><dd>{points} points</dd></div>)}</dl></section>}
+    {item.eligibility && <section><h3 className="text-sm font-medium">Eligibility requirements</h3><p className="mt-2 text-xs text-muted">Unknown requirements need confirmation from the official source.</p><ul className="mt-3 space-y-3 text-sm text-muted">{item.eligibility.reasons.map((rule) => <li key={rule.rule}><EligibilityBadge status={rule.status} /><p className="mt-1">{rule.reason}</p></li>)}</ul></section>}
     {job.deadline && <p className="border-t border-line pt-5 text-xs text-muted">Deadline: {new Date(job.deadline).toLocaleDateString("en-GB", { timeZone: "UTC" })}</p>}
   </article>;
 }

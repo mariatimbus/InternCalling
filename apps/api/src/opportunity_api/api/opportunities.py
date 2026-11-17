@@ -1,6 +1,6 @@
 """Opportunity catalog endpoints: paginated list with filters and detail by id."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from functools import lru_cache
 from typing import Annotated
 from uuid import UUID
@@ -19,6 +19,7 @@ from ..models import Opportunity, OpportunityDegreeLevel, OpportunityType, Profi
 from ..schemas import OpportunityResponse, PaginatedOpportunityResponse
 from ..schemas.eligibility import EligibilityResult, StudentInput
 from ..schemas.matching import MatchingOpportunity, MatchingProfile, MatchResult
+from ..schemas.recommendation import Recommendation, RecommendationPage
 from .deps import get_current_user
 
 router = APIRouter(prefix="/opportunities", tags=["opportunities"])
@@ -195,6 +196,69 @@ def _to_matching_opportunity(opportunity: Opportunity) -> MatchingOpportunity:
         degree_level=opportunity.degree_level,
         study_year=opportunity.study_year,
         skills=[skill.name for skill in opportunity.skills],
+    )
+
+
+@router.get("/recommended", response_model=RecommendationPage)
+def recommended_opportunities(
+    db: Db,
+    user: Annotated[User, Depends(get_current_user)],
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=MAX_PAGE_SIZE)] = 20,
+    opportunity_type: OpportunityType = OpportunityType.internship,
+    degree_level: OpportunityDegreeLevel | None = None,
+    study_year: Annotated[int | None, Query(ge=1, le=6)] = None,
+    location: Annotated[str | None, Query(max_length=255)] = None,
+    search: Annotated[str | None, Query(max_length=200)] = None,
+    deadline_after: datetime | None = None,
+    deadline_before: datetime | None = None,
+) -> RecommendationPage:
+    """Filter all active, unexpired candidates, score, sort, then paginate.
+
+    Missing requirements stay visible. Confirmed mismatches are excluded.
+    UUID breaks score ties so pagination is deterministic for an unchanged catalog.
+    No external model calls are required for this deterministic ranking.
+    """
+    stmt = _apply_filters(
+        select(Opportunity),
+        opportunity_type=opportunity_type,
+        degree_level=degree_level,
+        location=location,
+        is_active=True,
+        deadline_after=deadline_after,
+        deadline_before=deadline_before,
+        search=search,
+    ).where(or_(Opportunity.deadline.is_(None), Opportunity.deadline >= datetime.now(UTC)))
+    stmt = stmt.options(selectinload(Opportunity.skills))
+    profile = _to_matching_profile(user)
+    student = _to_student_input(user.profile)
+    ranked = []
+    for opportunity in db.scalars(stmt):
+        if study_year is not None and (
+            not opportunity.study_year or study_year not in opportunity.study_year
+        ):
+            continue
+        inputs = _to_matching_opportunity(opportunity)
+        match = score_match(profile, inputs)
+        if match.eligibility == "not_eligible":
+            continue
+        ranked.append(
+            Recommendation(
+                opportunity=OpportunityResponse.model_validate(opportunity),
+                match=match,
+                eligibility=evaluate_eligibility(student, to_opportunity_input(inputs)),
+            )
+        )
+    ranked.sort(
+        key=lambda item: (
+            item.match.eligibility != "eligible",
+            -item.match.score,
+            str(item.opportunity.id),
+        )
+    )
+    start = (page - 1) * page_size
+    return RecommendationPage(
+        items=ranked[start : start + page_size], total=len(ranked), page=page, page_size=page_size
     )
 
 

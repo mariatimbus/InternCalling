@@ -378,3 +378,25 @@ Apply `20261117120000_profile_v2.sql` before deploying this API. The migration i
 additive, backfills no facts, and retains existing owner-only RLS policies/grants.
 Run `npm run db:test:fresh` for disposable PostgreSQL migration and two-user RLS
 checks; hosted verification still requires an approved development environment.
+
+### Global recommendations
+
+Authenticated `GET /api/v1/opportunities/recommended` filters the entire active,
+unexpired catalog before scoring and pagination. Default type: `internship`.
+Parameters: `page`, `page_size` (1–100), `opportunity_type`, `degree_level`,
+`study_year` (1–6), `location`, `search` (up to 200 characters), `deadline_after`,
+`deadline_before`. Filters use catalog semantics; explicit year filters require
+known matching years. Missing deadlines are retained unless a deadline filter is set.
+
+Response: `{items: [{opportunity, match, eligibility}], page, page_size, total}`.
+`match` includes score, components and reasons; `eligibility` includes every rule's
+status/evidence (including unknown requirements). Confirmed mismatches are excluded;
+unknown/possible eligibility remains visible. Confirmed matches sort first, then
+score descending, then UUID ascending. Pagination is stable for unchanged data;
+new data or profile edits can change placement. Matching is deterministic with no
+per-candidate Ollama calls. Relevance is not acceptance probability.
+
+The `/jobs` workspace consumes this order directly and displays component scores
+and full eligibility evidence rather than sorting one catalog page in the browser.
+The current implementation scores candidates in memory, suitable for beta volumes;
+measure latency before introducing indexed candidate retrieval or cached scores.
