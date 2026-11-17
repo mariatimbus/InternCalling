@@ -5,7 +5,8 @@ export type OnboardingErrors = Partial<Record<keyof OnboardingDraft, string>>;
 export type OnboardingPayload = { degree_level: DegreeLevel; university: string; field_of_study: string; graduation_year: number; location: string };
 
 /** Completion is derived from persisted supported fields, never from client storage or user metadata. */
-export function isProfileComplete(profile: Profile): boolean {
+export type OnboardingCompletionProfile = Pick<Profile, "degree_level" | "university" | "field_of_study" | "graduation_year" | "location">;
+export function isProfileComplete(profile: OnboardingCompletionProfile): boolean {
   return ["bachelor", "master"].includes(profile.degree_level ?? "")
     && [profile.university, profile.field_of_study, profile.location].every((value) => !!value?.trim() && value.trim().length <= 255)
     && Number.isInteger(profile.graduation_year) && Number(profile.graduation_year) >= 1900 && Number(profile.graduation_year) <= 2100;
