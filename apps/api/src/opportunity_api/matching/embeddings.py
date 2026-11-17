@@ -10,6 +10,8 @@ from typing import Protocol
 
 import httpx
 
+from opportunity_api.ai.client import AIInvalidOutput, AIUnavailable, OllamaClient
+
 
 class Embedder(Protocol):
     """Text → dense vectors. ``None`` means „unavailable, use fallback"."""
@@ -18,44 +20,24 @@ class Embedder(Protocol):
 
 
 class OllamaEmbedder:
-    """Talks to a local Ollama server's /api/embeddings endpoint."""
+    """Compatibility adapter over the shared optional-model client."""
 
     def __init__(
-        self,
-        base_url: str,
-        model: str,
-        *,
-        timeout: float = 5.0,
-        client: httpx.Client | None = None,
+        self, base_url: str, model: str, *, timeout: float = 5.0, client: httpx.Client | None = None
     ) -> None:
-        self._url = f"{base_url.rstrip('/')}/api/embeddings"
         self._model = model
-        self._timeout = timeout
-        self._client = client or httpx.Client(timeout=timeout)
+        try:
+            self._client = OllamaClient(base_url, timeout=timeout, client=client)
+        except AIUnavailable:
+            self._client = None
 
     def embed(self, texts: list[str]) -> list[list[float]] | None:
-        vectors: list[list[float]] = []
+        if self._client is None:
+            return None
         try:
-            for text in texts:
-                response = self._client.post(
-                    self._url,
-                    json={"model": self._model, "input": text},
-                )
-                response.raise_for_status()
-                payload = response.json()
-                batch = payload.get("embeddings")
-                if not batch:
-                    return None
-                # Single-string input yields one embedding per response.
-                vectors.append([float(value) for value in batch[0]])
-        except (httpx.HTTPError, ValueError, KeyError, TypeError):
+            return self._client.embed(self._model, texts)
+        except (AIUnavailable, AIInvalidOutput):
             return None
-        if not vectors or any(not vector for vector in vectors):
-            return None
-        width = len(vectors[0])
-        if any(len(vector) != width for vector in vectors):
-            return None
-        return vectors
 
 
 class StaticEmbedder:
