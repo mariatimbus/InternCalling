@@ -1,8 +1,8 @@
 # GitHub publication checkpoint — 17 November 2026
 
-Eight task branches are prepared for the explicitly authorized GitHub push to
-`mariatimbus/InternCalling`. Publication is verified separately against remote
-commit IDs; this document does not assert a merge, deployment or hosted migration.
+Eight task branches were pushed to `mariatimbus/InternCalling`; all remote heads
+were verified against the scanned local commit IDs. Neither main nor develop
+changed. This is branch publication, not a merge, deployment or hosted migration.
 Earlier sections below describe the historical local checkpoints.
 
 - Full local release verification: all ten checks passed (470 backend tests,
@@ -27,6 +27,10 @@ These are dependent task branches, not eight independent changesets. Review the
 independent security fix first, then profile → recommendations → tracker →
 hardening → CV → scheduler → benchmark, refreshing dependent branches as
 prerequisites merge. Ordinary PRs target develop; none has been opened by this run.
+
+A13 follow-up adds `scripts/catalog_audit.py`, read-only structural data-quality
+checks and opt-in bounded official ATS HEAD checks. See `docs/catalog-audit.md`.
+The task remains In Progress; hosted catalog quality is unverified.
 
 Remaining blockers: hosted Supabase connection/approved Auth and Storage checks,
 C6/C7 integration and source remediation, final live data/link QA, upstream tooling
