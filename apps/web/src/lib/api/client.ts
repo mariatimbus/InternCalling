@@ -3,6 +3,8 @@ export class ApiError extends Error {
   constructor(public readonly status: number, public readonly code: string) {
     super(status === 401 ? "Your session could not be verified. Sign out and sign in again."
       : status === 403 ? "This account cannot access the application."
+      : status === 404 ? "This record is no longer available. Refresh the page and try again."
+      : status === 409 ? "This opportunity changed in another request. Refresh to see its current progress."
       : status === 429 ? "Too many requests. Wait a moment and try again."
       : status === 422 ? "Some details were not accepted. Review your answers and try again."
       : "We could not reach the application. Check your connection and try again.");

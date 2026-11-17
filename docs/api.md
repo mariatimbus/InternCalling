@@ -400,3 +400,14 @@ The `/jobs` workspace consumes this order directly and displays component scores
 and full eligibility evidence rather than sorting one catalog page in the browser.
 The current implementation scores candidates in memory, suitable for beta volumes;
 measure latency before introducing indexed candidate retrieval or cached scores.
+
+### Application tracker integration
+
+`/jobs` details expose Save and Mark Applied. `/applications` reloads owner-scoped
+records from A8 and supports Saved/Applied views, status edits, notes, and removal.
+Server actions recheck authentication and resolve the current user's canonical
+record before POST/PATCH/DELETE. Successful writes revalidate both views; failures
+show an error without optimistic success. Concurrent saves reread the existing
+record and show a conflict. Saving an already tracked role keeps its progress.
+Explicit `status: null` on PATCH is rejected with 422; omit status to keep it.
+“Mark Applied” records the student's action; it does not submit to an employer.
