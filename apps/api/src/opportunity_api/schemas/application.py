@@ -3,7 +3,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from opportunity_api.models.application import ApplicationStatus
 from opportunity_api.models.opportunity import OpportunityType
@@ -32,6 +32,13 @@ class ApplicationUpdate(BaseModel):
     status: ApplicationStatus | None = None
     notes: str | None = None
     applied_at: datetime | None = None
+
+    @field_validator("status")
+    @classmethod
+    def status_cannot_be_null(cls, value: ApplicationStatus | None) -> ApplicationStatus:
+        if value is None:
+            raise ValueError("status cannot be null")
+        return value
 
 
 class ApplicationResponse(BaseModel):

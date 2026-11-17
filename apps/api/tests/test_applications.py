@@ -261,3 +261,38 @@ def test_invalid_status_returns_422(client: TestClient, db_factory):
     )
 
     assert response.status_code == 422
+
+
+def test_tracker_full_flow_persists_and_is_owner_only(client, db_factory):
+    job = make_opportunity()
+    seed(db_factory, job)
+    users = UserFactory(client, db_factory)
+    owner, _ = users.get("tracker-owner@example.invalid")
+    other, _ = users.get("tracker-other@example.invalid")
+    created = client.post(URL, headers=owner, json={"opportunity_id": str(job.id)})
+    assert created.status_code == 201
+    application_id = created.json()["id"]
+    assert client.post(URL, headers=owner, json={"opportunity_id": str(job.id)}).status_code == 409
+    for status in ["applied", "interview", "offer", "rejected"]:
+        updated = client.patch(
+            f"{URL}/{application_id}",
+            headers=owner,
+            json={"status": status, "notes": f"Reached {status}"},
+        )
+        assert updated.status_code == 200
+        persisted = client.get(URL, headers=owner).json()["items"][0]
+        assert persisted["status"] == status
+        assert persisted["notes"] == f"Reached {status}"
+        assert persisted["applied_at"] is not None
+    assert client.get(URL, headers=other).json()["items"] == []
+    assert (
+        client.patch(f"{URL}/{application_id}", headers=other, json={"notes": "stolen"}).status_code
+        == 404
+    )
+    assert client.delete(f"{URL}/{application_id}", headers=other).status_code == 404
+    assert (
+        client.patch(f"{URL}/{application_id}", headers=owner, json={"status": None}).status_code
+        == 422
+    )
+    assert client.delete(f"{URL}/{application_id}", headers=owner).status_code == 204
+    assert client.get(URL, headers=owner).json()["total"] == 0

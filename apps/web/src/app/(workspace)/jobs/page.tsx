@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireCompletedAccount } from "@/lib/auth/account";
-import type { RecommendationPage } from "@/lib/api/types";
+import type { Application, RecommendationPage } from "@/lib/api/types";
 import { RecommendedJobs } from "@/components/workspace/recommended-jobs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -19,12 +19,13 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
   if (search.trim()) params.set("search", search.trim());
   const result = await api.request<RecommendationPage>(`/api/v1/opportunities/recommended?${params}`);
   const items = result.items;
+  const applications = await api.request<{ items: Application[] }>("/api/v1/applications");
   function href(next: number) { return `/jobs?${new URLSearchParams({ q: search, type, page: String(next) })}`; }
   return <div className="mx-auto max-w-7xl px-5 py-7 sm:px-8"><div className="flex flex-wrap items-end justify-between gap-5"><div><h1 className="text-3xl tracking-tight">Find your next step.</h1><p className="mt-3 text-sm text-muted">Opportunities, matched to your profile.</p></div><Link href="/profile" className="text-sm text-accent underline underline-offset-4">Your profile</Link></div>
     <nav aria-label="Job lists" className="my-7 flex flex-wrap gap-2 text-sm"><Link href="/jobs" aria-current="page" className="rounded-full bg-elevated px-5 py-3">Recommended</Link><Link href="/applications?view=saved" className="rounded-full px-5 py-3 text-muted hover:bg-surface">Liked / Saved</Link><Link href="/applications?view=applied" className="rounded-full px-5 py-3 text-muted hover:bg-surface">Applied</Link></nav>
     <form action="/jobs" className="mb-7 grid items-end gap-3 sm:grid-cols-[1fr_auto_auto]"><Input label="Search opportunities" name="q" type="search" maxLength={200} defaultValue={search} wrapperClassName="min-w-0 flex-1" /><Select label="Opportunity type" name="type" defaultValue={type}><option value="">Internships</option>{opportunityTypes.map((value) => <option key={value} value={value}>{opportunityTypeLabel(value)}</option>)}</Select><Button type="submit">Search</Button></form>
     <p className="mb-5 text-xs leading-6 text-muted">{result.total} opportunities. Ranked across all matching opportunities.</p>
-    <RecommendedJobs key={`${page}:${search}:${type}`} items={items} />
+    <RecommendedJobs key={`${page}:${search}:${type}`} items={items} applications={applications.items} />
     <nav aria-label="Results pages" className="mt-7 flex justify-between text-sm text-accent">{page > 1 ? <Link href={href(page - 1)}>Previous page</Link> : <span />}{page * result.page_size < result.total && <Link href={href(page + 1)}>Next page</Link>}</nav>
   </div>;
 }

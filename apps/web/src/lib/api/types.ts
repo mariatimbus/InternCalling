@@ -24,6 +24,7 @@ export type Match = {
 };
 export type Application = {
   id: string; opportunity_id: string; status: "saved" | "applied" | "interview" | "offer" | "rejected";
+  notes: string | null; applied_at: string | null; updated_at: string;
   created_at: string;
   opportunity: { id: string; title: string; organization: string | null; deadline: string | null };
 };
