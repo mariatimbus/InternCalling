@@ -13,6 +13,7 @@ from opportunity_api.schemas.matching import MatchingOpportunity, MatchingProfil
 from .embeddings import Embedder
 
 AI_CAP = 25
+TEXT_TEMPLATE_VERSION = "matching-v2"
 
 
 def cosine_similarity(a: list[float], b: list[float]) -> float:
@@ -27,13 +28,24 @@ def cosine_similarity(a: list[float], b: list[float]) -> float:
 
 
 def profile_text(profile: MatchingProfile) -> str:
-    parts = [profile.field_of_study or "", *profile.skills, *profile.interests]
-    return ", ".join(part for part in parts if part)
+    parts = [
+        profile.field_of_study or "",
+        *sorted(set(profile.skills)),
+        *sorted(set(profile.interests)),
+        *sorted(set(profile.preferred_tech_domains)),
+    ]
+    return ", ".join(part.strip() for part in parts if part.strip())
 
 
 def opportunity_text(opportunity: MatchingOpportunity) -> str:
     return " ".join(
-        part for part in (opportunity.title, opportunity.description or "") if part
+        part
+        for part in (
+            opportunity.title,
+            opportunity.description or "",
+            ", ".join(sorted(set(opportunity.skills))),
+        )
+        if part
     )
 
 
@@ -58,5 +70,7 @@ class AIScorer:
         if vectors is None or len(vectors) != 2:
             return 0, None
         similarity = cosine_similarity(vectors[0], vectors[1])
-        points = round(similarity * AI_CAP)
+        if not math.isfinite(similarity):
+            return 0, None
+        points = max(0, min(AI_CAP, round(similarity * AI_CAP)))
         return points, f"AI similarity: {similarity:.2f} (embeddings)"

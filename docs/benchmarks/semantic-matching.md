@@ -1,0 +1,56 @@
+# A12 benchmark and storage decision — 17 November 2026
+
+The optional embedding component already existed. This task adds evaluation and
+reproducibility controls; it does not enable semantic global ranking or add pgvector.
+
+## Dataset and recorded result
+
+`apps/api/tests/fixtures/matching/golden-ranking.json` contains four synthetic
+student profiles and eight synthetic internship descriptions, including paraphrase
+pairs and a hard degree mismatch. Labels are deliberately authored relevance
+expectations (0 unrelated through 3 strong), **not team-reviewed empirical judgments**.
+It is a regression set, not a representative product-quality benchmark.
+
+Recorded deterministic A10 baseline at k=3:
+
+- Mean NDCG@3: **0.7791092035**.
+- Mean Precision@3 (label >=2): **0.5**.
+- Hard-ineligible master-only candidates are excluded for the bachelor profiles.
+
+The local semantic attempt exited 2 with `semantic.status=unavailable` because
+`nomic-embed-text` was not installed. Local Ollama exposed completion models, not
+the configured embedding model. No semantic metric/delta or improvement is claimed.
+JSON artifacts record the actual baseline and unavailable result beside this file.
+
+```sh
+cd apps/api
+uv run python -m opportunity_api.matching.benchmark
+# After an operator installs/approves an embedding model:
+uv run python -m opportunity_api.matching.benchmark --semantic --model nomic-embed-text
+```
+
+`--output <new-file>` retains results without overwriting earlier evidence. Dataset
+validation rejects missing/extra candidate judgments and scores outside 0–3. Tests
+verify metric math, deterministic order, model-failure behavior, and eligibility gates.
+
+## Versioning, caching and pgvector
+
+Canonical embedding text uses `matching-v2`: field/skills/interests/domains for the
+profile, title/description/skills for the internship, with stable list ordering.
+Changing this template or the exact model digest requires regeneration. The CLI
+records the model digest obtained from the local model inventory before measuring.
+
+The benchmark's bounded in-memory cache keys exact model digest + text-template
+version + SHA-256 of text; it never stores raw profiles or CVs on disk. It is scoped
+to a benchmark run, not a production persistence/cache design. Missing embeddings
+mark the comparison incomplete rather than silently reporting baseline as AI gain.
+The AI bonus is bounded to [0,25], including negative/non-finite similarity cases,
+and cannot rescue a hard not-eligible result.
+
+**Decision: defer pgvector and persistent embeddings.** First expand and independently
+review the relevance set across degree/year/location/unknown-requirement cases,
+run A10 versus A10+semantic with an installed pinned embedding model, and measure
+ranking quality and latency. Enable only after repeatable quality improvement and
+acceptable operational cost. Any future persistence needs a reviewed migration,
+index/dimension choice, exact model/template identity, canonical content hashes,
+background regeneration, and explicit invalidation after model/data changes.
