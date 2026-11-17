@@ -1,7 +1,7 @@
 """Synthetic CV parsing, model validation and explicit owner review."""
 
 from io import BytesIO
-from zipfile import ZipFile
+from zipfile import ZipFile, ZipInfo
 
 import pytest
 from pydantic import ValidationError
@@ -24,7 +24,7 @@ def docx(text=TEXT):
     buffer = BytesIO()
     with ZipFile(buffer, "w") as archive:
         archive.writestr(
-            "word/document.xml",
+            ZipInfo("word/document.xml", date_time=(1980, 1, 1, 0, 0, 0)),
             '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>'
             + escape(text)
             + "</w:t></w:r></w:p></w:body></w:document>",

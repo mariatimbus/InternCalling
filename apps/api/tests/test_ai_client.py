@@ -27,6 +27,7 @@ def test_generate_sends_schema_and_rejects_partial_or_unknown_fields():
     result = client_for(handler).generate("fixture-model", "Synthetic CV", CVExtraction)
     assert result.university.value == "Fixture University"
     assert requests[0]["stream"] is False
+    assert requests[0]["think"] is False
     assert requests[0]["format"]["additionalProperties"] is False
     for value in [
         {"skills": []},
