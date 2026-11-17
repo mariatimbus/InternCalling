@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { getAccountState } from "@/lib/auth/account";
-import { isProfileComplete } from "@/lib/onboarding";
 import { AppShell } from "@/components/layout/app-shell";
 import { AuthBoundary } from "@/components/auth/auth-boundary";
 import { AccountProblem } from "@/components/auth/account-problem";
@@ -19,6 +18,6 @@ export default async function WorkspaceLayout({ children }: { children: React.Re
   const account = await getAccountState();
   if (account.kind === "guest" || account.kind === "not-configured") redirect("/sign-in");
   if (account.kind !== "ready") return <AccountProblem message={account.kind === "profile-error" ? account.message : undefined} />;
-  if (!isProfileComplete(account.profile)) redirect("/onboarding");
+  // Each data page enforces completion where required. Profile stays editable after nullable details are cleared.
   return <AuthBoundary config={account.config} userId={account.user.id}><AppShell navigation={navigation} account={<div><p className="truncate text-xs text-muted" title={account.user.email}>{account.user.email}</p><SignOutButton /></div>}>{children}</AppShell></AuthBoundary>;
 }

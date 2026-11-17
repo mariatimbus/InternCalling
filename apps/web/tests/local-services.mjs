@@ -5,7 +5,7 @@ import { randomUUID, createHash } from "node:crypto";
 const users = new Map(), tokens = new Map(), refreshTokens = new Map(), codes = new Map();
 const events = [];
 let mode = {};
-const blank = (id) => ({ id: `profile-${id}`, user_id: id, degree_level: null, university: null, field_of_study: null, graduation_year: null, location: null });
+const blank = (id) => ({ id: `profile-${id}`, user_id: id, headline: null, bio: null, resume_url: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), degree_level: null, university: null, field_of_study: null, graduation_year: null, location: null });
 function userBody(user) { return { id: user.id, aud: "authenticated", role: "authenticated", email: user.email, email_confirmed_at: new Date().toISOString(), phone: "", app_metadata: { provider: user.provider ?? "email", providers: [user.provider ?? "email"] }, user_metadata: {}, identities: [], created_at: new Date().toISOString(), updated_at: new Date().toISOString() }; }
 function session(user, lifetime = 3600) {
   const expires = Math.floor(Date.now() / 1000) + lifetime;
@@ -51,9 +51,9 @@ async function handler(request, response) {
   if (url.pathname === "/__test") {
     if (request.method === "POST") {
       mode = { ...mode, ...input };
-      if (input.reset) { users.clear(); tokens.clear(); refreshTokens.clear(); codes.clear(); events.length = 0; mode = {}; }
+      if (input.reset) { users.clear(); tokens.clear(); refreshTokens.clear(); codes.clear(); events.length = 0; skillList.splice(4); mode = {}; }
       if (input.seed) {
-        const user = { id: randomUUID(), email: input.seed.email, passwordHash: createHash("sha256").update(input.seed.password).digest("hex"), skills: [], profile: null };
+        const user = { id: randomUUID(), email: input.seed.email, passwordHash: createHash("sha256").update(input.seed.password).digest("hex"), skills: (input.seed.skills ?? []).map((name, index) => ({ id: `seed-skill-${index}`, name })), profile: null };
         user.profile = input.seed.completed ? { ...blank(user.id), degree_level: "master", university: "Second Test University", field_of_study: "Mathematics", graduation_year: 2026, location: "Paris, France" } : blank(user.id);
         users.set(user.email, user);
       }
@@ -99,14 +99,36 @@ async function handler(request, response) {
   events.push({ type: request.method, path: url.pathname, user: user.id });
   if (mode.apiOffline) return error(response, 503, "unavailable");
   if (url.pathname === "/api/v1/profile") {
-    if (request.method === "PATCH") { if (mode.failProfile) return error(response, 503, "unavailable"); user.profile = { ...user.profile, ...input }; }
+    if (request.method === "PATCH") { events.push({ type: "profile-patch", fields: Object.keys(input), body: input }); if (mode.profileDelay) await new Promise((resolve) => setTimeout(resolve, 700)); if (mode.failProfile) return error(response, 503, "unavailable"); user.profile = { ...user.profile, ...input, updated_at: new Date().toISOString() }; }
     reply(response, 200, mode.wrongOwner ? { ...user.profile, user_id: "other-user" } : user.profile); return;
   }
-  if (url.pathname === "/api/v1/profile/skills") {
-    if (request.method === "PUT") { if (mode.failSkills) return error(response, 503, "unavailable"); user.skills = input.names.map((name, index) => ({ id: `user-skill-${index}`, name })); }
+  if (url.pathname === "/api/v1/profile/skills" || url.pathname.startsWith("/api/v1/profile/skills/")) {
+    if (request.method === "GET" && mode.skillsReadOffline) return error(response, 503, "unavailable");
+    if (["POST", "PUT", "DELETE"].includes(request.method)) {
+      events.push({ type: "skill-mutation", method: request.method, path: url.pathname, body: input });
+      if (mode.skillsDelay) await new Promise((resolve) => setTimeout(resolve, 700));
+      if (mode.failSkills) return error(response, 503, "unavailable");
+      if (request.method === "PUT") user.skills = input.names.map((name, index) => ({ id: "user-skill-" + index, name: name.trim().toLowerCase() }));
+      if (request.method === "POST") {
+        const name = input.name.trim().toLowerCase();
+        if (!name || name.length > 100) return error(response, 422, "invalid_skill");
+        let skill = skillList.find((item) => item.name === name);
+        if (!skill) { skill = { id: randomUUID(), name }; skillList.push(skill); }
+        if (!user.skills.some((item) => item.name === name)) user.skills.push(skill);
+      }
+      if (request.method === "DELETE") {
+        const name = decodeURIComponent(url.pathname.split("/").at(-1)).trim().toLowerCase();
+        if (!user.skills.some((item) => item.name === name)) return error(response, 404, "skill_not_found");
+        user.skills = user.skills.filter((item) => item.name !== name);
+      }
+    }
     reply(response, 200, user.skills); return;
   }
-  if (url.pathname === "/api/v1/skills") { reply(response, 200, skillList); return; }
+  if (url.pathname === "/api/v1/skills") {
+    if (mode.catalogDelay) await new Promise((resolve) => setTimeout(resolve, 700));
+    if (mode.catalogOffline) return error(response, 503, "unavailable");
+    reply(response, 200, [...skillList].sort((a, b) => a.name.localeCompare(b.name))); return;
+  }
   if (url.pathname === "/api/v1/opportunities") { const items = jobs.filter((job) => job.title.toLowerCase().includes((url.searchParams.get("search") ?? "").toLowerCase())); reply(response, 200, { items, page: 1, page_size: 12, total: items.length }); return; }
   if (url.pathname.endsWith("/match")) { if (mode.failMatch) return error(response, 503, "unavailable"); reply(response, 200, { score: 84, eligibility: "possibly_eligible", components: { skills: 80, field_fit: 90, interests: 0, location: 60, ai: 0 }, reasons: ["Your study field matches this internship."] }); return; }
   if (url.pathname === "/api/v1/applications") { reply(response, 200, { items: [], total: 0 }); return; }

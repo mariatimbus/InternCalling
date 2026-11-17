@@ -13,7 +13,7 @@ const { publicAuthConfig } = await load("../src/lib/auth/config.ts");
 const { isProfile } = await load("../src/lib/api/types.ts");
 const { createApiClient, ApiError } = await load("../src/lib/api/client.ts");
 const draft = { degree_level: "bachelor", university: "Test University", field_of_study: "Computer Science", graduation_year: "2027", location: "Bucharest, Romania", skills: [] };
-const profile = { id: "profile-test", user_id: "user-test", ...onboardingPayload(draft) };
+const profile = { id: "profile-test", user_id: "user-test", headline: null, bio: null, resume_url: null, created_at: "2026-11-01T00:00:00Z", updated_at: "2026-11-01T00:00:00Z", ...onboardingPayload(draft) };
 
 test("completion requires all five persisted fields but skills are optional", () => {
   assert.equal(isProfileComplete(profile), true);
@@ -27,6 +27,8 @@ test("runtime profile guard rejects incorrect field types", () => {
   assert.equal(isProfile({ ...profile, user_id: 1 }), false);
   assert.equal(isProfile({ ...profile, graduation_year: "2027" }), false);
   assert.equal(isProfile({ ...profile, degree_level: "doctorate" }), false);
+  for (const field of ["headline", "bio", "resume_url"]) assert.equal(isProfile({ ...profile, [field]: 123 }), false);
+  for (const field of ["created_at", "updated_at"]) assert.equal(isProfile({ ...profile, [field]: "invalid-date" }), false);
 });
 test("server validation rejects unsupported degrees, blank answers, fractional years and oversized skills", () => {
   const errors = validateOnboarding({ ...draft, degree_level: "other", university: " ", graduation_year: "2027.5", skills: ["x".repeat(101)] });
