@@ -1,8 +1,8 @@
 {
-  "name": "@opportunity-tracker/web",
+  "name": "@interncalling/web",
   "version": "0.1.0",
   "private": true,
-  "description": "Next.js frontend for the Opportunity Tracker platform",
+  "description": "Next.js frontend for the InternCalling platform",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -10,8 +10,12 @@
     "lint": "eslint . --max-warnings=0",
     "typecheck": "next typegen && tsc --noEmit"
   },
-  "engines": { "node": ">=22.0.0" },
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "dependencies": {
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.119.0",
     "next": "^16.4.2",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
