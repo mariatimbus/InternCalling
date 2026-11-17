@@ -15,14 +15,16 @@ const steps = [
   { key: "skills", title: "What skills would you like to put to work?", help: "Search or add your own. You can skip this and add skills later.", label: "Skills" },
 ] as const;
 
-export function OnboardingFlow({ initial, suggestions }: { initial: OnboardingDraft; suggestions: string[] }) {
+export type OnboardingFlowProps = { initial: OnboardingDraft; suggestions: string[]; submitAction?: (previous:ActionState, form:FormData)=>Promise<ActionState>; onPendingChange?:(pending:boolean)=>void; demo?:boolean };
+export function OnboardingFlow({ initial, suggestions, submitAction = finishOnboarding, onPendingChange, demo=false }: OnboardingFlowProps) {
   const [draft, setDraft] = useState(initial);
   const [step, setStep] = useState(0);
   const [query, setQuery] = useState("");
   const [error, setError] = useState("");
-  const [state, action, pending] = useActionState(finishOnboarding, {} as ActionState);
+  const [state, action, pending] = useActionState(submitAction, {} as ActionState);
   const title = useRef<HTMLHeadingElement>(null);
   useEffect(() => { title.current?.focus(); }, [step]);
+  useEffect(() => { onPendingChange?.(pending); }, [pending,onPendingChange]);
   const current = steps[step];
   const summary = step === steps.length;
   function go(next: number) { setError(""); setStep(next); }
@@ -40,12 +42,12 @@ export function OnboardingFlow({ initial, suggestions }: { initial: OnboardingDr
   return <div className="mx-auto w-full max-w-2xl px-5 pb-16 pt-6 sm:pt-12">
     <div className="mb-10"><div className="mb-3 flex justify-between text-xs text-muted"><span>Your internship profile</span><span>Step {step + 1} of 7</span></div><progress aria-label="Onboarding progress" value={step + 1} max={7} className="h-1.5 w-full overflow-hidden rounded-full accent-primary" /></div>
     <section className="rounded-panel bg-card p-6 sm:p-10">
-      <h1 ref={title} tabIndex={-1} className="text-3xl leading-tight tracking-tight outline-none sm:text-4xl">{summary ? "Ready to find your matches?" : current.title}</h1>
-      <p className="mt-4 max-w-lg text-sm leading-7 text-muted">{summary ? "Review your details. We will save this profile and use it to match you with internships." : current.help}</p>
-      {summary ? <form action={action} className="mt-7 space-y-6">
+      <h1 ref={title} tabIndex={-1} className="text-3xl leading-tight tracking-tight outline-none sm:text-4xl">{summary ? (demo?"Confirm your sample answers":"Ready to find your matches?") : current.title}</h1>
+      <p className="mt-4 max-w-lg text-sm leading-7 text-muted">{summary ? (demo?"Review these demonstration answers. Confirmation updates demo memory only, never your real account.":"Review your details. We will save this profile and use it to match you with internships.") : current.help}</p>
+      {summary ? <form action={action} onSubmit={()=>onPendingChange?.(true)} className="mt-7 space-y-6">
         {steps.map(({ key, label }, index) => <div key={key} className="flex items-start justify-between gap-4 border-b border-line pb-4"><input type="hidden" name={key} value={key === "skills" ? JSON.stringify(draft.skills) : draft[key]} /><div className="min-w-0"><p className="text-xs text-muted">{label}</p><p className="mt-1 break-words text-sm">{key === "skills" ? draft.skills.join(", ") || "No skills added" : key === "degree_level" ? (draft[key] === "bachelor" ? "Bachelor's" : "Master's") : draft[key]}</p>{state.fields?.[key] && <p className="mt-2 text-sm" role="alert">{state.fields[key]}</p>}</div><Button variant="ghost" size="sm" disabled={pending} onClick={() => go(index)} aria-label={`Edit ${label.toLowerCase()}`}>Edit</Button></div>)}
         {state.error && <p role="alert" className="text-sm leading-6">{state.error}</p>}
-        <div className="flex flex-wrap justify-between gap-3"><Button variant="ghost" disabled={pending} onClick={() => go(step - 1)}>Back</Button><Button type="submit" disabled={pending}>{pending ? "Saving your profile…" : "Find my matches"}</Button></div>
+        <div className="flex flex-wrap justify-between gap-3"><Button variant="ghost" disabled={pending} onClick={() => go(step - 1)}>Back</Button><Button type="submit" disabled={pending}>{pending ? (demo?"Confirming sample answers...":"Saving your profile…") : demo?"Confirm sample answers":"Find my matches"}</Button></div>
       </form> : <form className="mt-8 space-y-6" noValidate onSubmit={(event) => { event.preventDefault(); if (current.key === "skills" && query.trim()) addSkill(query); else advance(); }}>
         {current.key === "degree_level" ? <fieldset><legend className="sr-only">Degree level</legend><div className="grid gap-3 sm:grid-cols-2">{([['bachelor', "Bachelor's"], ['master', "Master's"]] as const).map(([value, label]) => <label key={value} className={`flex min-h-20 cursor-pointer items-center gap-3 rounded-card border px-5 ${draft.degree_level === value ? "border-accent bg-primary/15" : "border-border bg-surface"}`}><input type="radio" name="degree_level" value={value} checked={draft.degree_level === value} onChange={() => { setDraft({ ...draft, degree_level: value }); setError(""); }} className="size-4 accent-primary" required aria-describedby={error ? "step-error" : undefined} /><span>{label}</span></label>)}</div></fieldset>
         : current.key === "skills" ? <div className="space-y-5">
@@ -57,6 +59,6 @@ export function OnboardingFlow({ initial, suggestions }: { initial: OnboardingDr
         <div className="flex flex-wrap items-center justify-between gap-3 pt-3"><Button variant="ghost" disabled={step === 0} onClick={() => go(step - 1)}>Back</Button><div className="flex gap-2">{current.key === "skills" && <Button variant="ghost" onClick={() => go(step + 1)}>Skip</Button>}<Button type="submit">Continue</Button></div></div>
       </form>}
     </section>
-    <p className="mt-6 text-center text-xs leading-6 text-muted">Your answers are saved when you select Find my matches.</p>
+    <p className="mt-6 text-center text-xs leading-6 text-muted">{demo?"Sample answers stay in demo memory. Your real account is unchanged.":"Your answers are saved when you select Find my matches."}</p>
   </div>;
 }
