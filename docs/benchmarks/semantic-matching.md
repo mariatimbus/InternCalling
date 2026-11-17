@@ -17,10 +17,19 @@ Recorded deterministic A10 baseline at k=3:
 - Mean Precision@3 (label >=2): **0.5**.
 - Hard-ineligible master-only candidates are excluded for the bachelor profiles.
 
-The local semantic attempt exited 2 with `semantic.status=unavailable` because
-`nomic-embed-text` was not installed. Local Ollama exposed completion models, not
-the configured embedding model. No semantic metric/delta or improvement is claimed.
-JSON artifacts record the actual baseline and unavailable result beside this file.
+The first local attempt exited 2 with `semantic.status=unavailable` because
+`nomic-embed-text` was not installed. That attempt is retained as historical evidence.
+After installing the configured model locally, the actual comparison measured:
+
+- Mean NDCG@3: **0.9001123311**, delta **+0.1210031276** versus A10.
+- Mean Precision@3: **0.6666666667**, versus 0.5 for A10.
+- Exact model digest: `0a109f422b47e3a30ba2b10eca18548e944e8a23073ee3f3e947efcf3c45e59f`.
+- 52 cache hits across repeated profile/opportunity texts.
+
+The baseline, initial unavailable attempt and subsequent measured result are retained
+as separate JSON artifacts beside this file. The improvement is on this small
+synthetic set only; no real-world quality, acceptance-probability, latency or scale
+claim follows from it. Global recommendations remain deterministic by default.
 
 ```sh
 cd apps/api

@@ -1,3 +1,61 @@
+# Continuation status — 17 November 2026
+
+The newest combined local stack is in `/private/tmp/opportunity-semantic-benchmark`
+on `feature/maria-semantic-matching`. The original checkout's code edits remain
+preserved. Nothing has been pushed, merged, deployed or applied to shared Supabase.
+
+## Additional local task commits
+
+- A11: `30f7a16` adds the shared Ollama client, private CV upload/download/deletion,
+  bounded process-isolated PDF/DOCX extraction, strict grounded drafts, explicit
+  selected-field review, conflict protection and provenance. Follow-up `3a91661`
+  on the A11 branch fixes prompt/thinking behavior and deterministic test archives;
+  it is replayed as `3c53f7d` in this combined stack.
+- C8: `b508f02` adds guarded daily/manual ingestion, source health, reports/artifacts,
+  and conservative last-seen/missing/expiry tracking. Scheduled hosted execution
+  remains disabled pending target/secrets/migration approval and C6/C7 integration.
+- A12: `03bf273` adds synthetic golden ranking metrics, model/template identity,
+  bounded per-run embedding caching, and semantic bonus bounds. Actual local model
+  results are recorded in `docs/benchmarks/semantic-matching.md`. No pgvector or
+  semantic global ranking was enabled.
+
+## Verification
+
+- 470 backend tests passed, 93.36% coverage; Ruff and diff checks passed.
+- All ten combined local release checks passed, including fresh disposable
+  PostgreSQL migrations, two-user CV Storage/metadata RLS, source-state privacy,
+  seed replay, frontend lint/types/26 unit tests/build, and 4 desktop/mobile
+  Playwright/axe tests.
+- Locked production Python dependencies: pip-audit found no known vulnerabilities.
+  Previous web production audit was clean; seven moderate tooling advisories remain
+  from the previously declined automatic fix.
+- A synthetic CV was extracted and schema/evidence-validated by the installed
+  local `qwen3.5:4b-mlx` model; no real CV or profile writes were used for that smoke.
+- Real `nomic-embed-text` comparison on the synthetic set improved mean NDCG@3
+  from 0.7791 to 0.9001 and Precision@3 from 0.50 to 0.67. It needs independent
+  review/expansion before any production quality or storage decision.
+- Local history was checked for private-key/live-token signatures; none matched.
+  This limited check does not replace the required full gitleaks/security pass
+  before a future push. No push was performed.
+
+## Live-source findings and remaining gates
+
+Read `docs/audits/2026-11-17-live-ats.md`: Databricks yielded 893 postings / 11
+candidates, Palantir 303 / 46. Databricks also had two oversized location values;
+BoschGroup's SmartRecruiters endpoint was disallowed by robots. The CLI correctly
+reported partial/source failure. No hosted data changed, and failed sources did
+not consume missing-run allowances. Live ingestion is not declared healthy.
+
+A11/A12/C8 were set to In Progress in Notion; no task was marked Done. Still needed:
+approved hosted Storage/Auth/RLS verification; retention/orphan cleanup policy and
+CV frontend review integration; C6/C7 completion and ATS source remediation; a
+representative reviewed ranking benchmark; final data/link QA; GitHub review/checks
+and branch protections; deployment targets/configuration and release approval.
+
+---
+
+The earlier core-integration handoff follows for branch history.
+
 # Core integration status — 17 November 2026
 
 Local work is ready for review, pending the hosted checks below. Nothing has been
