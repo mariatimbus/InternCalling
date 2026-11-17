@@ -1,5 +1,5 @@
 {
-  "status": "proposal-only; do not stage automatically",
+  "status": "reviewed scope committed as abd16d5; merged with develop as 6d4003b; no publication",
   "branch": "feature/bianca-profile-resume-hub",
   "base_head": "7392bf3afb41874f3678e66607dd11e73423cf77",
   "recommended_review_base": "develop; B3 PR #42 squash-merged and patch/content equivalence verified after authorized fetch",
@@ -221,5 +221,19 @@
     "remaining_unique_advisory": "GHSA-fc5q-39xc-vjpf; picomatch; no published patch",
     "remaining_affected_dev_entries": 14,
     "production_audit_vulnerabilities": 0
+  },
+  "authorized_integration": {
+    "delivery_commit": "abd16d5",
+    "merge_commit": "6d4003b",
+    "develop": "201ac8dbedf46afb08a9e358c484872601d2918c",
+    "method": "normal merge preserving both histories",
+    "routine_conflicts_resolved": 13,
+    "conflict_evidence": "Every incoming conflicted blob equaled original B3; committed B4 blobs retained; newer colleague ingestion changes preserved.",
+    "pr_diff_paths": 140,
+    "excluded_files_restored_and_hash_verified": 14,
+    "external_snapshot_files": 157,
+    "verification": "Complete detached committed worktree; exact final SHA and actual checks reported separately",
+    "pushed": false,
+    "pr_created": false
   }
 }

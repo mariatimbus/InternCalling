@@ -1,6 +1,6 @@
 # B4 expanded frontend delivery
 
-Original complete `InternCalling-B3` worktree; branch `feature/bianca-profile-resume-hub`. Final verification: 18 November 2026. Status: **frontend ready for commit/review, with browser smoke checks pending**. Backend capabilities below are Maria/Dalia integration dependencies, not missing frontend implementations. No commit, staging, push or PR is performed by this delivery-preparation task.
+Original complete `InternCalling-B3` worktree; branch `feature/bianca-profile-resume-hub`. Delivery preparation: 18 November 2026. Status: **frontend committed locally and normally merged with develop; browser smoke checks remain pending**. Backend capabilities below are Maria/Dalia integration dependencies, not missing frontend implementations. The authorized integration record below supersedes earlier preparation-only statements. No push or PR creation is performed.
 
 ## Delivered scope and connection status
 
@@ -114,7 +114,7 @@ Maria/Dalia must reconcile project/environment documentation before future share
 
 Further implementation/evidence: [profile editing](B4-profile-editing.md), [compact completion](B4-profile-completion.md), [profile skills](B4-profile-skills.md), [matching freshness](B4-matching-freshness.md), [Next security update](B4-next-security-update.md). Earlier subtask documents are dated snapshots; this delivery matrix supersedes their obsolete pending-import or initial neutral-card descriptions.
 
-## Proposed commit scope and review base
+## Reviewed scope and preparation history
 
 The exact path manifest is [B4-commit-manifest.json](B4-commit-manifest.json): **140 included paths**, comprising 13 modified tracked paths and 127 new paths; **14 unrelated untracked paths explicitly excluded**. The five-path approved skills-catalog/importer exception is marked separately. The status-only `src/lib/env.ts` modification is additionally preserved/excluded because it has no textual diff. Generated `next-env.d.ts` changes are excluded/restored. All changes remain unstaged. Do not use a blanket `git add apps/web` or `git add .`.
 
@@ -150,3 +150,15 @@ Excluded unrelated work is enumerated in the manifest: opportunity publication d
 7. Exercise tailoring decisions/reorder/edit/save/approve/download. Editing must invalidate approval/export. Sample PDF must remain labelled unrelated to edited content. Check failure/retry/cancel/stale revisions and the preserved real Jobs action.
 
 Missing future backend/storage/AI capabilities are documented integration work, not unfinished frontend scope. The frontend is ready for a scoped commit/review with disclosed limitations. Remaining final-signoff items are fresh browser/device/screen-reader/PDF visual checks, later develop synchronization/integration testing, and Maria's review of the remaining unpatched picomatch development-tooling advisory; do not mark those passed or call the feature merged/Done.
+
+## Authorized commit and integration record
+
+On 18 November, the user authorized selective commits and a normal develop merge, without publication. Before staging, a recoverable external snapshot captured all 157 existing modified/untracked/configuration files, their byte hashes, working/index patches, index and status. Secret values were never printed; the backup is outside the repository and commit scope. Fourteen excluded files were temporarily held there during integration, restored afterward and verified byte-for-byte. The status-only env module and ignored environment configuration also matched their snapshot hashes.
+
+- Delivery commit: `abd16d5` — `feat(web): deliver expanded B4 profile and resume hub`. Exactly 140 manifest paths were committed: 13 reviewed tracked-file patches and 127 explicit new paths. No blanket staging, real environment file, generated import-path change, unrelated publication data/script or historical excluded document/demo was included.
+- Merge commit: `6d4003b` — `merge: synchronize B4 with develop after B3 squash merge`, with parents preserving B4 and fetched develop `201ac8dbedf46afb08a9e358c484872601d2918c`.
+- The merge produced 13 routine frontend conflicts because B3 was squash-merged. For **every** conflict, the incoming blob was proven byte-identical to the original B3 blob at `7392bf3`; retaining the committed B4 blob therefore preserved B4 and did not omit newer colleague frontend content. Develop's 34 newer ingestion-related paths were retained unchanged. No ambiguous product conflict was encountered.
+- The resulting diff against develop contains exactly the 140 approved paths, with no repeated B3-only changes and no unrelated colleague ingestion changes. `origin/develop` is now an ancestor, so the PR base remains **develop** and the earlier synchronization prerequisite is satisfied.
+- Final verification is performed from a separate detached worktree of the complete committed repository, after this integration-record commit. It contains no excluded local sources or real environment files. Frontend dependencies are installed from the committed lockfile; existing Python dependencies may be reused with imports explicitly directed to the verification worktree's integrated source. Tests use controlled/disposable databases and synthetic process-only build configuration. Exact final commit SHA and command outcomes are reported in the completion report and retained with local verification logs; pre-integration test evidence above is not substituted for that run.
+
+Remaining publication/signoff limitations are the documented **unpatched picomatch advisory**, pending real browser/device/accessibility/PDF smoke checks and future Maria/Dalia backend integration. No dependency downgrade, security suppression, shared database write, hosted-setting change, push, PR or review request is authorized/performed by this step. Historical preparation paragraphs above describe the pre-commit snapshot and are superseded here for commit/integration status.
