@@ -1,6 +1,6 @@
 /** Isolated protocol doubles. Run only on loopback; never import into application code. */
 import http from "node:http";
-import { randomUUID, createHash } from "node:crypto";
+import { randomUUID, createHash, createHmac } from "node:crypto";
 
 const users = new Map(), tokens = new Map(), refreshTokens = new Map(), codes = new Map();
 const events = [];
@@ -10,7 +10,14 @@ function userBody(user) { return { id: user.id, aud: "authenticated", role: "aut
 function session(user, lifetime = 3600) {
   const expires = Math.floor(Date.now() / 1000) + lifetime;
   // Unsigned JWT-shaped strings exist only inside this local protocol double. The real app uses the Supabase SDK.
-  const token = `${Buffer.from('{"alg":"none"}').toString("base64url")}.${Buffer.from(JSON.stringify({ sub: user.id, aud: "authenticated", exp: expires, role: "authenticated" })).toString("base64url")}.${randomUUID()}`;
+  let token = `${Buffer.from('{"alg":"none"}').toString("base64url")}.${Buffer.from(JSON.stringify({ sub: user.id, aud: "authenticated", exp: expires, role: "authenticated" })).toString("base64url")}.${randomUUID()}`;
+  if (process.env.E2E_SIGNED_AUTH === "1") {
+    const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
+    const payload = Buffer.from(JSON.stringify({ sub: user.id, aud: "authenticated", exp: expires,
+      iss: "http://127.0.0.1:8300/auth/v1", email: user.email, role: "authenticated" })).toString("base64url");
+    // Synthetic signing key shared only with e2e-api.py; never a hosted credential.
+    token = `${header}.${payload}.${createHmac("sha256", "local-e2e-fixture-signing-key-only-0000").update(`${header}.${payload}`).digest("base64url")}`;
+  }
   const refresh = randomUUID(); tokens.set(token, user); refreshTokens.set(refresh, user);
   return { access_token: token, token_type: "bearer", expires_in: lifetime, expires_at: expires, refresh_token: refresh, user: userBody(user) };
 }
