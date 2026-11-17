@@ -1,20 +1,17 @@
-"""Registry of available source adapters.
+"""Shared registries for explicit adapters and configured C4 ATS sources.
 
-The registry is the single place that knows which sources exist and which
-are active. Scheduled runs (GitHub Actions) resolve sources by name:
-
-    registry.resolve()                          # all active sources
-    registry.resolve(["greenhouse", "lever"])   # explicit subset
-
-Adding a new adapter (Dalia, C4) is one line:
-
-    registry.register(GreenhouseAdapter())
-
-The runner never imports adapter classes itself; it only sees what the
-registry hands it.
+``build_registry().resolve()`` is the C5 entry point. It creates a fresh registry
+and shared HTTP client, without fetching or opening a database. The legacy
+``register``/``resolve`` helpers retain their explicit, initially empty registry.
 """
 
+from pathlib import Path
+from typing import TYPE_CHECKING
+
 from .sources.base import SourceAdapter
+
+if TYPE_CHECKING:
+    from .sources.http import PublicJSONClient
 
 
 class AdapterRegistry:
@@ -57,3 +54,19 @@ def register(adapter: SourceAdapter) -> None:
 
 def resolve(selection: list[str] | tuple[str, ...] | None = None) -> list[SourceAdapter]:
     return default_registry.resolve(selection)
+
+
+def build_registry(
+    *,
+    providers: Path | None = None,
+    employers: Path | None = None,
+    client: "PublicJSONClient | None" = None,
+) -> AdapterRegistry:
+    """Register all supported C4 adapters whose provider AND employer are enabled."""
+    # Local imports avoid the employers -> AdapterRegistry import cycle.
+    from .config import PROVIDERS, load_providers
+    from .sources.employers import REGISTRY, employer_registry, load_employers
+
+    config = load_providers(providers if providers is not None else PROVIDERS)
+    companies = load_employers(employers if employers is not None else REGISTRY)
+    return employer_registry([e for e in companies if config.enabled(e.provider)], client)

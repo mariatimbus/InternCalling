@@ -1,0 +1,149 @@
+{
+  "checked_at": "2026-11-09T14:57:34.266170+00:00",
+  "sources": [
+    {
+      "provider": "greenhouse",
+      "identifier": "databricks",
+      "endpoint": "https://boards-api.greenhouse.io/v1/boards/databricks/jobs",
+      "result": "verified"
+    },
+    {
+      "provider": "greenhouse",
+      "identifier": "cloudflare",
+      "endpoint": "https://boards-api.greenhouse.io/v1/boards/cloudflare/jobs",
+      "result": "verified"
+    },
+    {
+      "provider": "greenhouse",
+      "identifier": "stripe",
+      "endpoint": "https://boards-api.greenhouse.io/v1/boards/stripe/jobs",
+      "result": "verified"
+    },
+    {
+      "provider": "greenhouse",
+      "identifier": "mongodb",
+      "endpoint": "https://boards-api.greenhouse.io/v1/boards/mongodb/jobs",
+      "result": "verified"
+    },
+    {
+      "provider": "greenhouse",
+      "identifier": "elastic",
+      "endpoint": "https://boards-api.greenhouse.io/v1/boards/elastic/jobs",
+      "result": "verified"
+    },
+    {
+      "provider": "greenhouse",
+      "identifier": "datadog",
+      "endpoint": "https://boards-api.greenhouse.io/v1/boards/datadog/jobs",
+      "result": "verified"
+    },
+    {
+      "provider": "greenhouse",
+      "identifier": "grafanalabs",
+      "endpoint": "https://boards-api.greenhouse.io/v1/boards/grafanalabs/jobs",
+      "result": "verified"
+    },
+    {
+      "provider": "greenhouse",
+      "identifier": "canonical",
+      "endpoint": "https://boards-api.greenhouse.io/v1/boards/canonical/jobs",
+      "result": "verified"
+    },
+    {
+      "provider": "lever",
+      "identifier": "palantir",
+      "endpoint": "https://api.lever.co/v0/postings/palantir?mode=json&limit=1",
+      "result": "verified"
+    },
+    {
+      "provider": "lever",
+      "identifier": "spotify",
+      "endpoint": "https://api.lever.co/v0/postings/spotify?mode=json&limit=1",
+      "result": "verified"
+    },
+    {
+      "provider": "lever",
+      "identifier": "mistral",
+      "endpoint": "https://api.lever.co/v0/postings/mistral?mode=json&limit=1",
+      "result": "HTTPError"
+    },
+    {
+      "provider": "lever",
+      "identifier": "zoox",
+      "endpoint": "https://api.lever.co/v0/postings/zoox?mode=json&limit=1",
+      "result": "verified"
+    },
+    {
+      "provider": "lever",
+      "identifier": "plaid",
+      "endpoint": "https://api.lever.co/v0/postings/plaid?mode=json&limit=1",
+      "result": "HTTPError"
+    },
+    {
+      "provider": "lever",
+      "identifier": "n26",
+      "endpoint": "https://api.lever.co/v0/postings/n26?mode=json&limit=1",
+      "result": "HTTPError"
+    },
+    {
+      "provider": "lever",
+      "identifier": "contentsquare",
+      "endpoint": "https://api.lever.co/v0/postings/contentsquare?mode=json&limit=1",
+      "result": "verified"
+    },
+    {
+      "provider": "lever",
+      "identifier": "quantumblack",
+      "endpoint": "https://api.lever.co/v0/postings/quantumblack?mode=json&limit=1",
+      "result": "HTTPError"
+    },
+    {
+      "provider": "smartrecruiters",
+      "identifier": "BoschGroup",
+      "endpoint": "https://api.smartrecruiters.com/v1/companies/BoschGroup/postings?limit=1",
+      "result": "verified"
+    },
+    {
+      "provider": "smartrecruiters",
+      "identifier": "CERN",
+      "endpoint": "https://api.smartrecruiters.com/v1/companies/CERN/postings?limit=1",
+      "result": "verified"
+    },
+    {
+      "provider": "smartrecruiters",
+      "identifier": "Ubisoft2",
+      "endpoint": "https://api.smartrecruiters.com/v1/companies/Ubisoft2/postings?limit=1",
+      "result": "verified"
+    },
+    {
+      "provider": "smartrecruiters",
+      "identifier": "Visa",
+      "endpoint": "https://api.smartrecruiters.com/v1/companies/Visa/postings?limit=1",
+      "result": "verified"
+    },
+    {
+      "provider": "smartrecruiters",
+      "identifier": "SopraSteria1",
+      "endpoint": "https://api.smartrecruiters.com/v1/companies/SopraSteria1/postings?limit=1",
+      "result": "verified"
+    },
+    {
+      "provider": "smartrecruiters",
+      "identifier": "Ramboll3",
+      "endpoint": "https://api.smartrecruiters.com/v1/companies/Ramboll3/postings?limit=1",
+      "result": "verified"
+    },
+    {
+      "provider": "smartrecruiters",
+      "identifier": "WesternDigital",
+      "endpoint": "https://api.smartrecruiters.com/v1/companies/WesternDigital/postings?limit=1",
+      "result": "verified"
+    },
+    {
+      "provider": "smartrecruiters",
+      "identifier": "Devoteam",
+      "endpoint": "https://api.smartrecruiters.com/v1/companies/Devoteam/postings?limit=1",
+      "result": "verified"
+    }
+  ]
+}
