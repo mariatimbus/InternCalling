@@ -1,3 +1,40 @@
+# GitHub publication checkpoint — 17 November 2026
+
+Eight task branches are prepared for the explicitly authorized GitHub push to
+`mariatimbus/InternCalling`. Publication is verified separately against remote
+commit IDs; this document does not assert a merge, deployment or hosted migration.
+Earlier sections below describe the historical local checkpoints.
+
+- Full local release verification: all ten checks passed (470 backend tests,
+  93.36% coverage, migrations/two-user RLS, seed replay, frontend checks and four
+  desktop/mobile browser tests).
+- Gitleaks scans covered each new branch history and exact develop-to-head diff;
+  no secrets were found. Original uncommitted user changes are excluded.
+- Root npm audit and locked production Python pip-audit were clean.
+- A scoped minimatch override resolves its tooling advisory. Production web npm
+  audit is clean; full tooling audit still reports 14 high affected packages
+  through the unpatched picomatch advisory. See
+  `docs/audits/2026-11-17-web-dependencies.md`; security CI remains a review gate.
+- CI/config review found read-only workflow token permissions, secret references
+  instead of credentials, and guarded/disabled hosted ingestion. No deployment
+  was enabled and no privileged browser key was introduced.
+
+Branches: `feature/maria-profile-v2`, `feature/maria-global-recommendations`,
+`feature/bianca-job-tracker`, `fix/maria-web-security`,
+`fix/maria-release-hardening`, `feature/maria-ollama-service`,
+`feature/dalia-ingestion-schedule`, `feature/maria-semantic-matching`.
+These are dependent task branches, not eight independent changesets. Review the
+independent security fix first, then profile → recommendations → tracker →
+hardening → CV → scheduler → benchmark, refreshing dependent branches as
+prerequisites merge. Ordinary PRs target develop; none has been opened by this run.
+
+Remaining blockers: hosted Supabase connection/approved Auth and Storage checks,
+C6/C7 integration and source remediation, final live data/link QA, upstream tooling
+security fix, human reviews, deployment configuration and release approval.
+No task is marked Done from local tests or branch publication alone.
+
+---
+
 # Continuation status — 17 November 2026
 
 The newest combined local stack is in `/private/tmp/opportunity-semantic-benchmark`
