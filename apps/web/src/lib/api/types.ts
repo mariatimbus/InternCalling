@@ -1,5 +1,9 @@
 export type DegreeLevel = "bachelor" | "master";
+export type StudyYear = "first" | "second" | "third" | "fourth" | "fifth" | "sixth";
 export type Profile = {
+  study_year?: StudyYear | null; interests?: string[] | null;
+  preferred_tech_domains?: string[] | null; preferred_locations?: string[] | null;
+  remote_preferred?: boolean | null;
   id: string; user_id: string; degree_level: DegreeLevel | null;
   university: string | null; field_of_study: string | null;
   graduation_year: number | null; location: string | null;

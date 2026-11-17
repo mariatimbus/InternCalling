@@ -82,7 +82,18 @@ def score_field_fit(
 def score_interests(
     profile: MatchingProfile, opportunity: MatchingOpportunity
 ) -> tuple[int, list[str]]:
-    matched = _matched_terms(profile.interests, _haystack(profile, opportunity))
+    terms = list(
+        dict.fromkeys(
+            profile.interests
+            + [domain.replace("_", " ") for domain in profile.preferred_tech_domains]
+        )
+    )
+    haystack = _haystack(profile, opportunity)
+    matched = [
+        term
+        for term in terms
+        if re.search(r"(?<!\w)" + re.escape(term.strip().lower()) + r"(?!\w)", haystack)
+    ]
     points = min(INTERESTS_CAP, INTEREST_POINTS * len(matched))
     reasons = []
     if matched:
@@ -97,7 +108,13 @@ def score_location(
     if not location:
         return 0, []
     if "remote" in location:
+        if profile.remote_preferred is True:
+            return LOCATION_MATCH_POINTS, ["Matches remote work preference"]
         return LOCATION_REMOTE_POINTS, ["Remote-friendly location"]
+    if any(
+        pref.strip().lower() in location for pref in profile.preferred_locations if pref.strip()
+    ):
+        return LOCATION_MATCH_POINTS, ["Location matches a preferred location"]
     student_location = (profile.location or "").strip().lower()
     if student_location and student_location in location:
         return LOCATION_MATCH_POINTS, ["Location matches the student's preference"]

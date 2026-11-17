@@ -362,3 +362,19 @@ against them now. They mirror the SQLAlchemy models in `apps/api/src/opportunity
   `study_year` and `interests` are not profile fields yet, so the study-year
   rule stays `unknown` and the interests component is always 0 until the
   profile schema grows; pending B/C sign-off.
+
+
+### Profile v2
+
+GET/PUT/PATCH `/api/v1/profile` additionally accept/return nullable `study_year`
+(`first`, `second`, `third`, `fourth`, `fifth`, `sixth`), `interests`,
+`preferred_tech_domains`, `preferred_locations` (up to 50 nonempty strings, each
+up to 100 characters), and `remote_preferred` (boolean). PATCH changes only sent
+fields; PUT clears omitted fields. NULL study year remains unknown. Preferences
+influence relevance, never hard eligibility. Remote false is a soft preference,
+not a prohibition. Tech domains use descriptive text (e.g. `backend`, `data science`).
+
+Apply `20261117120000_profile_v2.sql` before deploying this API. The migration is
+additive, backfills no facts, and retains existing owner-only RLS policies/grants.
+Run `npm run db:test:fresh` for disposable PostgreSQL migration and two-user RLS
+checks; hosted verification still requires an approved development environment.

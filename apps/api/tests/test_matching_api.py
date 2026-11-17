@@ -110,9 +110,7 @@ def test_match_returns_explainable_components(client, db_factory, headers):
 
 
 def test_match_unknown_opportunity_is_404(client, headers):
-    response = client.get(
-        f"{URL}/00000000-0000-0000-0000-000000000000/match", headers=headers
-    )
+    response = client.get(f"{URL}/00000000-0000-0000-0000-000000000000/match", headers=headers)
     assert response.status_code == 404
 
 
@@ -121,3 +119,25 @@ def test_eligibility_unknown_opportunity_is_404(client, headers):
         f"{URL}/00000000-0000-0000-0000-000000000000/eligibility", headers=headers
     )
     assert response.status_code == 404
+
+
+def test_declared_study_year_reaches_eligibility(client, db_factory, headers):
+    job = make_opportunity(
+        degree_level=OpportunityDegreeLevel.both, study_year=[3], location="Remote"
+    )
+    seed(db_factory, job)
+    set_profile(client, headers, degree_level="bachelor", study_year="second")
+    result = client.get(f"{URL}/{job.id}/eligibility", headers=headers).json()
+    assert result["status"] == "not_eligible"
+    set_profile(client, headers, degree_level="bachelor", study_year="third")
+    result = client.get(f"{URL}/{job.id}/eligibility", headers=headers).json()
+    assert next(r for r in result["reasons"] if r["rule"] == "study_year")["status"] == "eligible"
+
+
+def test_profile_preferences_reach_matching(client, db_factory, headers):
+    job = make_opportunity(title="Data science intern", location="Remote")
+    seed(db_factory, job)
+    set_profile(client, headers, preferred_tech_domains=["data_science"], remote_preferred=True)
+    result = client.get(f"{URL}/{job.id}/match", headers=headers).json()
+    assert result["components"]["interests"] == 5
+    assert result["components"]["location"] == 10
