@@ -1,7 +1,7 @@
 "use client";
 import { ApplicationControls } from "@/components/applications/application-controls";
 import type { Application } from "@/lib/api/types";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import type { Opportunity, Match, Eligibility } from "@/lib/api/types";
 import { JobCard, type JobSummary } from "@/components/jobs/job-card";
 import { MatchScore } from "@/components/jobs/match-score";
@@ -33,10 +33,13 @@ function Brief({ item, application }: { item: RankedOpportunity; application?: A
     {job.deadline && <p className="border-t border-line pt-5 text-xs text-muted">Deadline: {new Date(job.deadline).toLocaleDateString("en-GB", { timeZone: "UTC" })}</p>}
   </article>;
 }
+const subscribeHydration = () => () => {};
+
 export function RecommendedJobs({ items, applications = [] }: { items: RankedOpportunity[]; applications?: Application[] }) {
+  const hydrated = useSyncExternalStore(subscribeHydration, () => true, () => false);
   const [selected, setSelected] = useState(items[0]?.opportunity.id);
   const [open, setOpen] = useState(false);
   const current = items.find((item) => item.opportunity.id === selected) ?? items[0];
   if (!current) return <EmptyState title="No opportunities found" description="Try another search or come back later for new opportunities." />;
-  return <><div className="grid items-start gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]"><div className="space-y-4" aria-label="Recommended opportunities">{items.map((item) => <JobCard key={item.opportunity.id} job={summary(item)} density="compact" selected={current.opportunity.id === item.opportunity.id} onSelect={() => { setSelected(item.opportunity.id); setOpen(true); }} />)}</div><div className="sticky top-6 hidden max-h-[calc(100dvh-10rem)] overflow-y-auto rounded-panel bg-surface/60 p-4 xl:block" aria-label="Selected opportunity"><Brief item={current} application={applications.find((item) => item.opportunity_id === current.opportunity.id)} /></div></div><Drawer open={open} onClose={() => setOpen(false)} title="Opportunity details" size="detail" closeAt="(min-width: 1280px)"><Brief item={current} application={applications.find((item) => item.opportunity_id === current.opportunity.id)} /></Drawer></>;
+  return <><div className="grid items-start gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]"><div className="space-y-4" aria-label="Recommended opportunities">{items.map((item) => <JobCard key={item.opportunity.id} job={summary(item)} density="compact" disabled={!hydrated} selected={current.opportunity.id === item.opportunity.id} onSelect={() => { setSelected(item.opportunity.id); setOpen(true); }} />)}</div><div className="sticky top-6 hidden max-h-[calc(100dvh-10rem)] overflow-y-auto rounded-panel bg-surface/60 p-4 xl:block" aria-label="Selected opportunity"><Brief item={current} application={applications.find((item) => item.opportunity_id === current.opportunity.id)} /></div></div><Drawer open={open} onClose={() => setOpen(false)} title="Opportunity details" size="detail" closeAt="(min-width: 1280px)"><Brief item={current} application={applications.find((item) => item.opportunity_id === current.opportunity.id)} /></Drawer></>;
 }

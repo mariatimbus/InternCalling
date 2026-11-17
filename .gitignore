@@ -32,3 +32,8 @@ npm-debug.log*
 .idea/
 .vscode/
 *.swp
+
+# Browser verification artifacts
+apps/web/playwright-report/
+apps/web/test-results/
+release-check.json
