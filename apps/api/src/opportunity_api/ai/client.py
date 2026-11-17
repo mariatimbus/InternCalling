@@ -70,6 +70,17 @@ class OllamaClient:
         except (AIUnavailable, AIInvalidOutput):
             return False
 
+    def model_digest(self, model: str) -> str | None:
+        models = self._request("/api/tags").get("models")
+        if not isinstance(models, list):
+            raise AIInvalidOutput("Invalid model inventory")
+        for item in models:
+            if isinstance(item, dict) and item.get("name") in {model, model + ":latest"}:
+                digest = item.get("digest")
+                if isinstance(digest, str) and len(digest) == 64:
+                    return digest
+        return None
+
     def generate(self, model: str, text: str, schema: type[BaseModel]) -> BaseModel:
         result = self._request(
             "/api/generate",
