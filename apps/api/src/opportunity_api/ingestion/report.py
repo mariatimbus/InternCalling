@@ -87,6 +87,10 @@ class SourceReport:
     would_update: int = 0
     review_required: int = 0
     source_failures: int = 0
+    seen: int = 0
+    missing: int = 0
+    inactivated: int = 0
+    freshness_skipped: int = 0
 
     def line(self) -> str:
         parts = [f"fetched={self.fetched}", f"accepted={self.accepted}"]
@@ -98,6 +102,9 @@ class SourceReport:
             f"duplicates={self.duplicates}",
             f"rejected={self.rejected}",
             f"failed={self.failed}",
+            f"seen={self.seen}",
+            f"missing={self.missing}",
+            f"inactivated={self.inactivated}",
         ]
         if self.source_failures:
             parts.append(f"source_failures={self.source_failures}")
@@ -139,6 +146,10 @@ class IngestionReport:
                 "would_update",
                 "review_required",
                 "source_failures",
+                "seen",
+                "missing",
+                "inactivated",
+                "freshness_skipped",
             ):
                 setattr(total, field_name, getattr(total, field_name) + getattr(report, field_name))
         return total
@@ -177,6 +188,20 @@ class IngestionReport:
             "failed_sources": list(self.failed_sources),
             "issues": [asdict(item) for item in self.issues],
             "review_records": self.review_records(),
+            "quality": {
+                "missing_critical_fields": sum(
+                    issue.code
+                    in {
+                        "missing_official_url",
+                        "invalid_title",
+                        "invalid_raw_title",
+                        "invalid_raw_identity",
+                    }
+                    for issue in self.issues
+                ),
+                "source_health_alerts": sum(issue.stage == "health" for issue in self.issues),
+                "official_links_checked": False,
+            },
         }
 
     def export_json(self, path: str | Path) -> Path:

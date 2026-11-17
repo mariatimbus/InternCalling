@@ -422,3 +422,25 @@ sys.exit(cli.main(sys.argv[1:]))
         process.stderr.close()
     finally:
         engine.dispose()
+
+
+def test_cli_freshness_dry_run_is_read_only_and_apply_tracks_health(tmp_path, monkeypatch, capsys):
+    from sqlalchemy.orm import Session
+
+    from opportunity_api.models import IngestionSourceState
+
+    engine, url = local_database(tmp_path)
+    monkeypatch.setenv("DATABASE_URL", url)
+    offline_cli(monkeypatch)
+    try:
+        assert cli.main(command_args(tmp_path, "--dry-run") + ["--freshness"]) == 0
+        with Session(engine) as session:
+            assert session.query(IngestionSourceState).count() == 0
+        capsys.readouterr()
+        assert cli.main(command_args(tmp_path, "--apply") + ["--freshness"]) == 0
+        payload = json.loads(capsys.readouterr().out)
+        assert payload["totals"]["seen"] == 3
+        with Session(engine) as session:
+            assert session.query(IngestionSourceState).count() == 3
+    finally:
+        engine.dispose()
