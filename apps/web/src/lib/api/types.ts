@@ -37,3 +37,7 @@ export function isProfile(value: unknown): value is Profile {
     && ["university", "field_of_study", "location"].every((key) => p[key] === null || typeof p[key] === "string")
     && (p.graduation_year === null || (Number.isInteger(p.graduation_year) && Number(p.graduation_year) >= 1900 && Number(p.graduation_year) <= 2100));
 }
+
+export type Eligibility = { status: Match["eligibility"]; reasons: { rule: string; status: Match["eligibility"]; reason: string }[] };
+export type Recommendation = { opportunity: Opportunity; match: Match; eligibility: Eligibility };
+export type RecommendationPage = { items: Recommendation[]; page: number; page_size: number; total: number };
