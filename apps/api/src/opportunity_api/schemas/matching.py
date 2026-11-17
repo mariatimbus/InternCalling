@@ -43,6 +43,9 @@ class MatchingProfile(BaseModel):
     field_of_study: str | None = Field(default=None, max_length=255)
     skills: list[str] = Field(default_factory=list)
     interests: list[str] = Field(default_factory=list)
+    preferred_tech_domains: list[str] = Field(default_factory=list)
+    preferred_locations: list[str] = Field(default_factory=list)
+    remote_preferred: bool | None = None
 
 
 class MatchingOpportunity(BaseModel):

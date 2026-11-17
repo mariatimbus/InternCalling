@@ -156,9 +156,15 @@ def _get_opportunity_or_404(db: Session, opportunity_id: UUID) -> Opportunity:
     return opportunity
 
 
+def _study_year(profile: Profile) -> int | None:
+    years = ["first", "second", "third", "fourth", "fifth", "sixth"]
+    return years.index(profile.study_year) + 1 if profile.study_year in years else None
+
+
 def _to_student_input(profile: Profile) -> StudentInput:
-    # study_year is not part of the profile schema yet; it stays unknown.
+
     return StudentInput(
+        study_year=_study_year(profile),
         degree_level=profile.degree_level,
         graduation_year=profile.graduation_year,
         location=profile.location,
@@ -168,11 +174,16 @@ def _to_student_input(profile: Profile) -> StudentInput:
 def _to_matching_profile(user: User) -> MatchingProfile:
     profile = user.profile
     return MatchingProfile(
+        study_year=_study_year(profile),
         degree_level=profile.degree_level,
         graduation_year=profile.graduation_year,
         location=profile.location,
         field_of_study=profile.field_of_study,
         skills=[skill.name for skill in user.skills],
+        interests=profile.interests or [],
+        preferred_tech_domains=profile.preferred_tech_domains or [],
+        preferred_locations=profile.preferred_locations or [],
+        remote_preferred=profile.remote_preferred,
     )
 
 
