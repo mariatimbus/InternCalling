@@ -24,7 +24,8 @@ APP_OLLAMA_TIMEOUT=30
 ```
 
 The configured extraction model must support structured JSON output. The client
-uses non-streaming `/api/generate` with a JSON schema, rejects incomplete/malformed
+uses non-streaming `/api/generate` with a JSON schema and thinking disabled so
+reasoning cannot consume the structured-output budget. It rejects incomplete/malformed
 results, sets temperature zero and caps response size. Embeddings use `/api/embed`.
 See [Ollama structured generation](https://docs.ollama.com/api/generate) and
 [embedding API](https://docs.ollama.com/api/embed). Offline/invalid model calls
@@ -82,3 +83,12 @@ facts remain null; unsupported keys/partial output are rejected. Low-confidence
 or ungrounded output goes to review and must never publish automatically. Reuse
 existing normalization, canonical URL, dedupe and inactive-review persistence.
 The client is available; Dalia's C7 adapter integration remains a separate task.
+
+### Local model smoke recorded
+
+The installed `qwen3.5:4b-mlx` model was exercised with a synthetic, labeled CV.
+With thinking disabled and the explicit extraction prompt, strict schema and exact
+quotation/value grounding passed for location, degree, field, university, graduation
+year and skills. No profile or hosted Storage writes were attempted. Set
+`APP_OLLAMA_EXTRACT_MODEL=qwen3.5:4b-mlx` to use that installed model; this observation
+is a compatibility smoke test, not evidence of general CV extraction accuracy.
