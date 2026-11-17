@@ -45,3 +45,11 @@ OpenAPI docs at `/docs` when the server is running.
 ## Shared database
 
 See [the team setup guide](../../supabase/README.md). Use the hosted connection for team development and run commands from the repository root with `uv run --project apps/api ...` so the root `.env` is loaded. Alembic is historical; apply schema changes through committed Supabase SQL migrations.
+
+## Public ATS ingestion
+
+See [the C4 connector guide](../../docs/ingestion-ats.md) for the employer registry,
+provider behavior, failure isolation and offline fixture validation.
+
+For end-to-end ATS collection, provider switches and read-only previews, see the
+[C5 ingestion CLI guide](../../services/ingestion/README.md#c5-command-line-ingestion).

@@ -1,0 +1,45 @@
+{
+  "greenhouse": {
+    "url": "https://boards-api.greenhouse.io/v1/boards/databricks/jobs?content=true",
+    "captured_at": "2026-11-09T14:59:58.737989+00:00",
+    "retained_fields": [
+      "id",
+      "title",
+      "absolute_url",
+      "location",
+      "content"
+    ],
+    "title": "Software Engineering Intern (2027 Start) - Amsterdam",
+    "sanitization": "Retained parser fields only; public contact emails redacted. Empty/malformed fixtures are synthetic."
+  },
+  "lever": {
+    "url": "https://api.lever.co/v0/postings/palantir?mode=json",
+    "captured_at": "2026-11-09T14:54:07.401401+00:00",
+    "retained_fields": [
+      "id",
+      "text",
+      "categories",
+      "descriptionPlain",
+      "description",
+      "lists",
+      "additional",
+      "applyUrl",
+      "hostedUrl"
+    ],
+    "title": "Deployment Strategist, Internship",
+    "sanitization": "Retained parser fields only; public contact emails redacted. Empty/malformed fixtures are synthetic."
+  },
+  "smartrecruiters": {
+    "url": "https://api.smartrecruiters.com/v1/companies/BoschGroup/postings/744000160555829",
+    "captured_at": "2026-11-09T14:59:59.113595+00:00",
+    "retained_fields": [
+      "id",
+      "name",
+      "location",
+      "applyUrl",
+      "jobAd"
+    ],
+    "title": "Internship in GenAI Knowledge Assistant for Engineering",
+    "sanitization": "Retained parser fields only; public contact emails redacted. Empty/malformed fixtures are synthetic."
+  }
+}
