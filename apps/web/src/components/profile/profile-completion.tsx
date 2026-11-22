@@ -9,7 +9,7 @@ export function ProfileCompletion({ profile, skills, pending, onRetry }: {
 }) {
   const completion = profileCompletion(profile, skills);
   return <section className="mt-6 rounded-card bg-card px-5 py-4 sm:px-6" aria-labelledby="profile-completion-title" aria-busy={pending}>
-    <h2 id="profile-completion-title" className="text-sm font-medium" aria-live="polite">Profile completion{completion ? ": " + completion.percentage + "%" : ""}</h2>
+    <h2 id="profile-completion-title" className="card-title" aria-live="polite">Profile completion{completion ? ": " + completion.percentage + "%" : ""}</h2>
     {completion ? <>
       <progress aria-label="Profile completion" value={completion.percentage} max={100} className="mt-3 block h-2 w-full overflow-hidden rounded-full accent-primary" />
       <span className="sr-only">{completion.completed} of 8 profile items completed</span>

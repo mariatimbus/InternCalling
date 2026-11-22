@@ -46,8 +46,8 @@ export function ResumeEditor({ initialResumeUrl }: { initialResumeUrl: string | 
     finally { inFlight.current = false; setPending(false); }
   }
   return <section className="mt-8 rounded-panel bg-card p-6 sm:p-9" aria-labelledby="resume-title">
-    <h2 id="resume-title" ref={heading} tabIndex={-1} className="text-lg outline-none">Resume</h2>
-    <p className="mt-3 text-sm leading-6 text-muted">Store a link to your resume. Access permissions are managed by the hosting service. We do not check whether the file is accessible.</p>
+    <h2 id="resume-title" ref={heading} tabIndex={-1} className="section-title">Resume</h2>
+    <p className="reading-text mt-3">Store a link to your resume. Access permissions are managed by the hosting service. We do not check whether the file is accessible.</p>
     {success && <p role="status" className="mt-4 text-sm">{success}</p>}
     {editing ? <form className="mt-5 space-y-4" noValidate aria-busy={pending} onSubmit={submit}>
       <Input ref={input} label="Resume URL" name="resume_url" type="url" inputMode="url" autoComplete="off" maxLength={512} value={draft} disabled={pending} error={error || undefined} hint="Use a full HTTP or HTTPS link without login credentials. Leave blank and Save to remove it." onChange={(event) => { setDraft(event.target.value); setError(""); }} />
@@ -58,6 +58,6 @@ export function ResumeEditor({ initialResumeUrl }: { initialResumeUrl: string | 
       {!present ? <p className="text-sm text-muted">No resume link added</p> : safe ? <div className="space-y-2"><p className="text-sm">Resume link added</p><a href={safe} target="_blank" rel="noopener noreferrer" className="inline-block rounded-control py-2 text-sm text-accent underline underline-offset-4">Open resume<span className="sr-only"> (opens in a new tab)</span></a></div> : <div role="alert" className="text-sm leading-6">The saved value is not a safe HTTP/HTTPS resume link. Replace or remove it; it will not be opened.</div>}
       <div className="flex flex-wrap gap-3"><Button variant="secondary" onClick={() => edit()}>{present ? "Replace link" : "Add resume link"}</Button>{saved !== null && <Button variant="ghost" onClick={() => edit(true)}>Remove link</Button>}</div>
     </div>}
-    <div className="mt-6 border-t border-border pt-5"><h3 className="text-sm">Future resume tools</h3><p className="mt-2 text-xs leading-6 text-muted">Upload, parsing and tailoring: Not available yet.</p><p className="mt-2 text-xs leading-6 text-muted">This feature stores a link only. Your resume is not uploaded, parsed, analyzed or used in matching. Resume links do not count toward Profile Completion.</p></div>
+    <div className="mt-6 border-t border-border pt-5"><h3 className="card-title">Future resume tools</h3><p className="mt-2 metadata-text">Upload, parsing and tailoring: Not available yet.</p><p className="mt-2 metadata-text">This feature stores a link only. Your resume is not uploaded, parsed, analyzed or used in matching. Resume links do not count toward Profile Completion.</p></div>
   </section>;
 }

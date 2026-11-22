@@ -14,8 +14,8 @@ export function PasswordRecoveryForm({ mode }: { mode: "request" | "reset" }) {
   const [signOutState, signOutAction, signingOut] = useActionState(finishPasswordRecovery, {} as ActionState);
   const finishing = resetting && !!state.success;
   return <section className="mx-auto w-full max-w-md rounded-panel bg-card p-6 sm:p-10">
-    <h1 className="text-3xl leading-tight tracking-tight">{resetting ? "Reset your password" : "Forgot your password?"}</h1>
-    <p className="mt-3 text-sm leading-6 text-muted">{resetting ? "Choose a new password that meets your account’s password policy." : "Enter your email and we’ll send you a password reset link."}</p>
+    <h1 className="page-title">{resetting ? "Reset your password" : "Forgot your password?"}</h1>
+    <p className="reading-text mt-3">{resetting ? "Choose a new password that meets your account’s password policy." : "Enter your email and we’ll send you a password reset link."}</p>
     {state.success && <p role="status" className="mt-6 text-sm leading-6 font-semibold">{state.success}</p>}
     {finishing ? <form action={signOutAction} className="mt-6 space-y-5">
       {(signOutState.error || state.error) && <ErrorState variant="danger" title="Sign-out could not finish" description={signOutState.error || state.error} />}
