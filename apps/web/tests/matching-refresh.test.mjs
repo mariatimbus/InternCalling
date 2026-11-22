@@ -25,7 +25,7 @@ function nodes(tree) { return !tree || typeof tree !== "object" ? [] : [tree, ..
 test("confirmed profile/skill writes feed fresh Jobs requests and the real scorer without stale client results", { timeout: 30000 }, async () => {
   const windowsPython = new URL("../../api/.venv/Scripts/python.exe", import.meta.url);
   const python = existsSync(windowsPython) ? windowsPython : new URL("../../api/.venv/bin/python", import.meta.url);
-  const child = spawn(fileURLToPath(python), [fileURLToPath(new URL("./matching_backend_fixture.py", import.meta.url))], {
+  const child = spawn(process.env.B5_TEST_PYTHON ?? fileURLToPath(python), [fileURLToPath(new URL("./matching_backend_fixture.py", import.meta.url))], {
     cwd: fileURLToPath(new URL("../../../", import.meta.url)), stdio: ["pipe", "pipe", "pipe"],
   });
   const waiting = [];
@@ -63,8 +63,10 @@ test("confirmed profile/skill writes feed fresh Jobs requests and the real score
     const { default: JobsPage } = await load("../src/app/(workspace)/jobs/page.tsx", {
       "react/jsx-runtime": runtime, "next/link": "Link", "@/lib/auth/account": { requireCompletedAccount: account },
       "@/components/workspace/recommended-jobs": { RecommendedJobs: "RecommendedJobs" },
-      "@/components/ui/input": { Input: "Input" }, "@/components/ui/button": { Button: "Button" }, "@/components/ui/select": { Select: "Select" },
-      "@/lib/opportunities": opportunityHelpers,
+      "@/components/jobs/jobs-search": { JobsSearch: "JobsSearch" }, "@/components/ui/button": { Button: "Button" },
+      "@/components/ui/empty-state": { EmptyState: "EmptyState" }, "@/components/ui/error-state": { ErrorState: "ErrorState" },
+      "./save-action": { saveOpportunity() {} },
+      "@/lib/jobs-url": await load("../src/lib/jobs-url.ts"),
     });
     const searchParams = Promise.resolve({ q: "Python", type: "internship", page: "1" });
     const visit = async () => nodes(await JobsPage({ searchParams })).find(n => n.type === "RecommendedJobs").props.items;
@@ -100,8 +102,13 @@ test("confirmed profile/skill writes feed fresh Jobs requests and the real score
       "react/jsx-runtime": runtime, "@/lib/opportunities": opportunityHelpers,
       "@/components/jobs/job-card": { JobCard: "JobCard" }, "@/components/jobs/match-score": { MatchScore: "MatchScore" },
       "@/components/jobs/eligibility-badge": { EligibilityBadge: "EligibilityBadge" }, "@/components/ui/badge": { Badge: "Badge" },
-      "@/components/ui/drawer": { Drawer: "Drawer" }, "@/components/ui/empty-state": { EmptyState: "EmptyState" },
+      "@/components/ui/drawer": { Drawer: "Drawer" }, "@/components/ui/button": { Button: "Button" },
       "@/components/jobs/tailoring-entry-point": { TailoringEntryPoint: "TailoringEntryPoint" },
+      "@/components/jobs/opportunity-details": await load("../src/components/jobs/opportunity-details.tsx", {
+        "react/jsx-runtime": runtime, "@/components/ui/badge": { Badge: "Badge" },
+      }),
+      "next/link": { default: "Link" },
+      "@/components/jobs/company-avatar": { CompanyAvatar: "CompanyAvatar" }, "@/components/ui/icon": { Icon: "Icon" },
     });
     RecommendedJobs({ items: before }); cursor = 0;
     const rendered = RecommendedJobs({ items: after });

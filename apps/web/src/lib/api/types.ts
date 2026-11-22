@@ -23,7 +23,7 @@ export type Match = {
 export type Application = {
   id: string; opportunity_id: string; status: "saved" | "applied" | "interview" | "offer" | "rejected";
   created_at: string;
-  opportunity: { id: string; title: string; organization: string | null; deadline: string | null };
+  opportunity: Pick<Opportunity, "id" | "title" | "organization" | "deadline" | "opportunity_type">;
 };
 
 /** Validate the fields used for access decisions before trusting an API profile. */

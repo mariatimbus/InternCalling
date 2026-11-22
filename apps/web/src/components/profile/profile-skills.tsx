@@ -66,7 +66,7 @@ export function ProfileSkills({ initialSkills, persistedSkills, onConfirmed, onU
   }
   return <section ref={section} className="mt-8 rounded-panel bg-card p-6 sm:p-9" aria-labelledby="profile-skills-title" aria-busy={pending}>
     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-      <div className="min-w-0"><h2 id="profile-skills-title" className="text-lg">Skills</h2><p aria-live="polite" className="mt-1 text-xs text-muted">{skills === null ? "Saved skills unavailable" : skills.length + " saved skills"}</p></div>
+      <div className="min-w-0"><h2 id="profile-skills-title" className="section-title">Skills</h2><p aria-live="polite" className="metadata-text mt-1">{skills === null ? "Saved skills unavailable" : skills.length + " saved skills"}</p></div>
       <div className="flex max-w-full flex-wrap items-center gap-2 sm:justify-end">
         <Button data-add-skills onClick={() => setDrawerOpen(true)} disabled={skills === null}>Add skills</Button>
         <Button variant="ghost" size="sm" disabled={pending} onClick={() => { void refreshSkills(); }}>Refresh skills</Button>
