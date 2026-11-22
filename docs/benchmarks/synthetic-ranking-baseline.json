@@ -1,0 +1,72 @@
+{
+  "dataset_version": "synthetic-ranking-v1",
+  "team_reviewed": false,
+  "text_template": "matching-v2",
+  "k": 3,
+  "baseline": {
+    "profiles": [
+      {
+        "profile_id": "backend-student",
+        "ranking": [
+          "backend",
+          "web",
+          "ml",
+          "api-platform",
+          "forecast",
+          "interface",
+          "mechanical"
+        ],
+        "ndcg_at_k": 0.706919359254722,
+        "precision_at_k": 0.6666666666666666
+      },
+      {
+        "profile_id": "data-student",
+        "ranking": [
+          "ml",
+          "backend",
+          "api-platform",
+          "forecast",
+          "interface",
+          "mechanical",
+          "web"
+        ],
+        "ndcg_at_k": 0.7271926019583823,
+        "precision_at_k": 0.6666666666666666
+      },
+      {
+        "profile_id": "web-student",
+        "ranking": [
+          "web",
+          "backend",
+          "api-platform",
+          "forecast",
+          "interface",
+          "mechanical",
+          "ml"
+        ],
+        "ndcg_at_k": 0.6823248527112125,
+        "precision_at_k": 0.3333333333333333
+      },
+      {
+        "profile_id": "mechanical-student",
+        "ranking": [
+          "mechanical",
+          "backend",
+          "web",
+          "api-platform",
+          "forecast",
+          "interface",
+          "ml"
+        ],
+        "ndcg_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333
+      }
+    ],
+    "mean_ndcg_at_k": 0.7791092034810791,
+    "mean_precision_at_k": 0.5
+  },
+  "semantic": {
+    "status": "not_requested"
+  },
+  "pgvector_decision": "deferred_until_representative_benchmark"
+}

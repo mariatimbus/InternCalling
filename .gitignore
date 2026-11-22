@@ -25,9 +25,15 @@ node_modules/
 out/
 .vercel/
 npm-debug.log*
+*.tsbuildinfo
 
 # OS / editors
 .DS_Store
 .idea/
 .vscode/
 *.swp
+
+# Browser verification artifacts
+apps/web/playwright-report/
+apps/web/test-results/
+release-check.json

@@ -21,7 +21,17 @@ SELECT set_config('request.jwt.claim.sub', 'c1000000-0000-4000-8000-000000000001
 DO $$ BEGIN
  IF (SELECT count(*) FROM public.users) <> 1 OR (SELECT count(*) FROM public.profiles) <> 1
  THEN RAISE EXCEPTION 'User A isolation failed'; END IF;
- UPDATE public.profiles SET headline = 'Owner edit' WHERE user_id = auth.uid();
+ UPDATE public.profiles SET headline = 'Owner edit', study_year = 'third',
+ interests = '["AI"]', preferred_tech_domains = '["backend"]',
+ preferred_locations = '["Berlin"]', remote_preferred = true WHERE user_id = auth.uid();
+ IF NOT EXISTS (SELECT 1 FROM public.profiles WHERE user_id = auth.uid()
+ AND study_year = 'third' AND interests = '["AI"]'::jsonb
+ AND preferred_locations = '["Berlin"]'::jsonb AND remote_preferred)
+ THEN RAISE EXCEPTION 'Profile v2 owner persistence failed'; END IF;
+ BEGIN
+  UPDATE public.profiles SET interests = '[123]' WHERE user_id = auth.uid();
+  RAISE EXCEPTION 'Invalid preference value accepted';
+ EXCEPTION WHEN check_violation THEN NULL; END;
  INSERT INTO public.applications (user_id, opportunity_id) VALUES
  (auth.uid(), 'c1000000-0000-4000-8000-000000000004');
  INSERT INTO public.user_skills VALUES (auth.uid(), 'c1000000-0000-4000-8000-000000000003');
@@ -44,7 +54,7 @@ DO $$ BEGIN
  IF (SELECT count(*) FROM public.users) <> 1 OR (SELECT count(*) FROM public.profiles) <> 1
  OR (SELECT count(*) FROM public.applications) <> 0 OR (SELECT count(*) FROM public.user_skills) <> 0
  THEN RAISE EXCEPTION 'User B isolation failed'; END IF;
- UPDATE public.profiles SET headline = 'Stolen' WHERE user_id = 'c1000000-0000-4000-8000-000000000001';
+ UPDATE public.profiles SET headline = 'Stolen', study_year = 'first', interests = '[]', remote_preferred = false WHERE user_id = 'c1000000-0000-4000-8000-000000000001';
  IF FOUND THEN RAISE EXCEPTION 'Cross-user profile update allowed'; END IF;
  DELETE FROM public.applications;
  IF FOUND THEN RAISE EXCEPTION 'Cross-user delete allowed'; END IF;
@@ -79,3 +89,21 @@ DO $$ BEGIN
 END $$;
 ROLLBACK;
 SELECT 'PASS: Auth synchronization, two-user isolation, anonymous/catalog permissions and deletion cascades' AS result;
+
+-- Source-health state is server-only; no browser role can read or forge baselines.
+BEGIN;
+SET LOCAL ROLE authenticated;
+DO $$ BEGIN
+ BEGIN
+  PERFORM * FROM public.ingestion_source_state;
+  RAISE EXCEPTION 'Client source-state read allowed';
+ EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+END $$;
+SET LOCAL ROLE anon;
+DO $$ BEGIN
+ BEGIN
+  PERFORM * FROM public.ingestion_source_state;
+  RAISE EXCEPTION 'Anonymous source-state read allowed';
+ EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+END $$;
+ROLLBACK;

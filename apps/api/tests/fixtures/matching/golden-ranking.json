@@ -1,0 +1,278 @@
+{
+  "version": "synthetic-ranking-v1",
+  "provenance": "Agent-authored synthetic relevance judgments for regression testing; requires team review and expansion before product-quality claims.",
+  "team_reviewed": false,
+  "opportunities": [
+    {
+      "id": "backend",
+      "opportunity": {
+        "title": "Backend Software Engineering Intern",
+        "description": "Computer Science. Build Python APIs with SQL.",
+        "location": "Remote",
+        "degree_level": "both",
+        "study_year": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "skills": [
+          "Python",
+          "SQL"
+        ]
+      }
+    },
+    {
+      "id": "ml",
+      "opportunity": {
+        "title": "Machine Learning Research Intern",
+        "description": "Data Science. Python statistics and machine learning research.",
+        "location": "Remote",
+        "degree_level": "both",
+        "study_year": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "skills": [
+          "Python",
+          "statistics"
+        ]
+      }
+    },
+    {
+      "id": "web",
+      "opportunity": {
+        "title": "Frontend Engineering Intern",
+        "description": "Computer Science. Build TypeScript React interfaces.",
+        "location": "Remote",
+        "degree_level": "both",
+        "study_year": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "skills": [
+          "TypeScript",
+          "React"
+        ]
+      }
+    },
+    {
+      "id": "mechanical",
+      "opportunity": {
+        "title": "Mechanical Engineering Intern",
+        "description": "Mechanical Engineering. CAD design and automotive systems.",
+        "location": "Remote",
+        "degree_level": "both",
+        "study_year": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "skills": [
+          "CAD"
+        ]
+      }
+    },
+    {
+      "id": "masters",
+      "opportunity": {
+        "title": "Graduate Research Intern",
+        "description": "Master research in machine learning and Python.",
+        "location": "Remote",
+        "degree_level": "master",
+        "study_year": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "skills": [
+          "Python"
+        ]
+      }
+    },
+    {
+      "id": "api-platform",
+      "opportunity": {
+        "title": "Server-side Systems Intern",
+        "description": "Build HTTP services, relational queries and request handlers.",
+        "location": "Remote",
+        "degree_level": "both",
+        "study_year": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "skills": [
+          "REST",
+          "PostgreSQL"
+        ]
+      }
+    },
+    {
+      "id": "interface",
+      "opportunity": {
+        "title": "Interface Developer Intern",
+        "description": "Build interactive client applications and accessible components.",
+        "location": "Remote",
+        "degree_level": "both",
+        "study_year": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "skills": [
+          "JavaScript",
+          "CSS"
+        ]
+      }
+    },
+    {
+      "id": "forecast",
+      "opportunity": {
+        "title": "Predictive Analytics Intern",
+        "description": "Explore statistical learning, train forecasting models and evaluate experiments.",
+        "location": "Remote",
+        "degree_level": "both",
+        "study_year": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "skills": [
+          "R",
+          "forecasting"
+        ]
+      }
+    }
+  ],
+  "profiles": [
+    {
+      "id": "backend-student",
+      "profile": {
+        "degree_level": "bachelor",
+        "study_year": 3,
+        "location": "Remote",
+        "field_of_study": "Computer Science",
+        "skills": [
+          "Python",
+          "SQL"
+        ],
+        "interests": [
+          "backend"
+        ]
+      },
+      "relevance": {
+        "backend": 3,
+        "ml": 2,
+        "web": 1,
+        "mechanical": 0,
+        "masters": 0,
+        "api-platform": 3,
+        "interface": 1,
+        "forecast": 1
+      }
+    },
+    {
+      "id": "data-student",
+      "profile": {
+        "degree_level": "bachelor",
+        "study_year": 3,
+        "location": "Remote",
+        "field_of_study": "Data Science",
+        "skills": [
+          "Python",
+          "statistics"
+        ],
+        "interests": [
+          "research"
+        ]
+      },
+      "relevance": {
+        "backend": 2,
+        "ml": 3,
+        "web": 0,
+        "mechanical": 0,
+        "masters": 0,
+        "api-platform": 1,
+        "interface": 0,
+        "forecast": 3
+      }
+    },
+    {
+      "id": "web-student",
+      "profile": {
+        "degree_level": "bachelor",
+        "study_year": 3,
+        "location": "Remote",
+        "field_of_study": "Computer Science",
+        "skills": [
+          "TypeScript",
+          "React"
+        ],
+        "interests": [
+          "frontend"
+        ]
+      },
+      "relevance": {
+        "backend": 1,
+        "ml": 0,
+        "web": 3,
+        "mechanical": 0,
+        "masters": 0,
+        "api-platform": 1,
+        "interface": 3,
+        "forecast": 0
+      }
+    },
+    {
+      "id": "mechanical-student",
+      "profile": {
+        "degree_level": "bachelor",
+        "study_year": 3,
+        "location": "Remote",
+        "field_of_study": "Mechanical Engineering",
+        "skills": [
+          "CAD"
+        ],
+        "interests": [
+          "automotive"
+        ]
+      },
+      "relevance": {
+        "backend": 0,
+        "ml": 0,
+        "web": 0,
+        "mechanical": 3,
+        "masters": 0,
+        "api-platform": 0,
+        "interface": 0,
+        "forecast": 0
+      }
+    }
+  ]
+}

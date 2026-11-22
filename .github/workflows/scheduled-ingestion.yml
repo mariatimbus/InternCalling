@@ -1,0 +1,72 @@
+name: Daily ingestion and quality report
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Read-only preview or approved persistence
+        type: choice
+        options: [dry-run, apply]
+        default: dry-run
+permissions:
+  contents: read
+concurrency:
+  group: daily-ingestion
+  cancel-in-progress: false
+jobs:
+  fixture-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86
+        with:
+          python-version: "3.13"
+      - run: uv sync --project apps/api --locked
+      - name: Independent fixture-only dry-run smoke
+        working-directory: apps/api
+        run: uv run python -m opportunity_api.ingestion.smoke
+  configured-sources:
+    needs: fixture-smoke
+    # A repository owner must approve migrations/target/secrets before enabling.
+    if: vars.INGESTION_ENABLED == 'true' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    environment: ingestion-production
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      DATABASE_URL: ${{ secrets.INGESTION_DATABASE_URL }}
+      REPORT_PATH: ${{ github.workspace }}/ingestion-${{ github.run_id }}-${{ github.run_attempt }}.json
+      RUN_MODE: ${{ github.event.inputs.mode || 'apply' }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86
+        with:
+          python-version: "3.13"
+      - run: uv sync --project apps/api --locked
+      - name: Fetch, normalize, dedupe, validate, persist, assess freshness and report
+        working-directory: apps/api
+        shell: bash
+        run: |
+          if [ "$RUN_MODE" = apply ]; then
+            uv run python -m opportunity_api.ingestion.cli --apply --allow-hosted --freshness --fail-on-anomaly --report "$REPORT_PATH"
+          else
+            uv run python -m opportunity_api.ingestion.cli --dry-run --freshness --fail-on-anomaly --report "$REPORT_PATH"
+          fi
+      - name: Human-readable quality summary
+        if: always()
+        working-directory: apps/api
+        shell: bash
+        run: |
+          if [ -s "$REPORT_PATH" ]; then
+            uv run python -m opportunity_api.ingestion.summary "$REPORT_PATH" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No usable ingestion report was produced; inspect the failed setup/execution step." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ingestion-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ingestion-*.json
+          if-no-files-found: warn
+          retention-days: 30
