@@ -54,7 +54,7 @@ export function Drawer({ id, open, onClose, title, description, children, closeA
       className={`fixed inset-y-0 right-0 left-auto m-0 h-dvh max-h-dvh w-full rounded-l-panel bg-surface p-0 text-foreground backdrop:bg-background/75 ${size === "skills" ? "max-w-none rounded-none sm:max-w-[460px] sm:rounded-l-panel" : size === "detail" ? "max-w-2xl" : "max-w-sm"}`}>
       <div className="flex h-full min-h-0 flex-col">
         <div className="flex shrink-0 items-start justify-between gap-4 p-5">
-          <div><h2 id={titleId} className="text-lg font-semibold">{title}</h2>{description && <p id={descriptionId} className="mt-1 text-sm text-muted">{description}</p>}</div>
+          <div><h2 id={titleId} className="section-title">{title}</h2>{description && <p id={descriptionId} className="mt-1 text-sm text-muted">{description}</p>}</div>
           <Button data-drawer-close variant="secondary" onClick={onClose} aria-label={`Close ${title}`}>{size === "skills" ? "\u00d7" : "Close"}</Button>
         </div>
         <div className={size === "skills" ? "flex min-h-0 flex-1 flex-col overflow-hidden [@media(max-height:400px)]:overflow-y-auto" : "min-h-0 flex-1 overflow-y-auto overscroll-contain p-4"}>{(open || keepMounted) && children}</div>

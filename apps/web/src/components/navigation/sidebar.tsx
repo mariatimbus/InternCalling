@@ -18,10 +18,10 @@ export function Sidebar({ items, activePath, onNavigate, account }: SidebarProps
           const active = activePath === item.href || activePath.startsWith(`${item.href}/`);
           return (
             <Link key={item.href} href={item.href} onClick={onNavigate} aria-current={active ? "page" : undefined}
-              className={`group flex min-h-11 items-center gap-3 rounded-control px-3 py-2.5 text-sm font-medium ${active ? "bg-primary/15 text-foreground" : "text-muted hover:bg-elevated/60 hover:text-foreground"}`}>
-              <Icon name={item.icon} className={active ? "text-accent" : "opacity-75"} />
+              className={`group flex min-h-11 items-center gap-3 rounded-control px-3 py-2.5 text-sm font-medium ${active ? "bg-primary font-semibold text-on-primary" : "text-muted hover:bg-elevated/60 hover:text-foreground"}`}>
+              <Icon name={item.icon} className={active ? "text-on-primary" : "opacity-75"} />
               <span>{item.label}</span>
-              {active && <span aria-hidden="true" className="ml-auto size-1.5 rounded-full bg-accent" />}
+              {active && <span aria-hidden="true" className="ml-auto size-1.5 rounded-full bg-on-primary" />}
             </Link>
           );
         })}

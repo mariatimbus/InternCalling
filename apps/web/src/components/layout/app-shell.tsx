@@ -17,7 +17,7 @@ export function AppShell({ children, navigation, notice, account }: AppShellProp
   const [navigationOpen, setNavigationOpen] = useState(false);
   return (
     <div className="flex h-dvh min-h-0 flex-col overflow-hidden lg:flex-row lg:gap-3 lg:p-3 xl:gap-5 xl:p-5">
-      <aside className="hidden w-52 shrink-0 rounded-panel bg-surface/60 px-4 py-6 lg:block xl:w-56">
+      <aside className="hidden w-52 shrink-0 rounded-panel border border-line bg-surface/80 px-4 py-6 lg:block xl:w-56">
         <Sidebar items={navigation} activePath={pathname} account={account} />
       </aside>
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">

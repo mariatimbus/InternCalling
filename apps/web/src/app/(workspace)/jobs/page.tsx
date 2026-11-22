@@ -1,31 +1,100 @@
 import Link from "next/link";
 import { requireCompletedAccount } from "@/lib/auth/account";
-import type { Match, OpportunityPage } from "@/lib/api/types";
-import { RecommendedJobs } from "@/components/workspace/recommended-jobs";
-import { Input } from "@/components/ui/input";
+import type { Application, Match, OpportunityPage } from "@/lib/api/types";
+import { RecommendedJobs, type RankedOpportunity } from "@/components/workspace/recommended-jobs";
+import { JobsSearch } from "@/components/jobs/jobs-search";
 import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/select";
-import { opportunityTypes, opportunityTypeLabel } from "@/lib/opportunities";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/error-state";
+import { jobsParams, readJobsQuery, type JobsQuery, type JobsView } from "@/lib/jobs-url";
+import { saveOpportunity } from "./save-action";
 
-export const metadata = { title: "Recommended opportunities | InternCalling" };
-export default async function JobsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+const views = {
+  recommended: { label: "Recommended", empty: "No opportunities found", help: "Try another search or come back later for new opportunities.", error: "Recommended opportunities could not be loaded." },
+  saved: { label: "Saved", empty: "No saved opportunities yet", help: "Save an opportunity from Recommended to find it here.", error: "Saved opportunities could not be loaded." },
+  applied: { label: "Applied", empty: "No applications yet", help: "Tracked applications appear here as they progress.", error: "Applied opportunities could not be loaded." },
+} as const;
+export const metadata = { title: "Jobs | InternCalling" };
+
+export default async function JobsPage({ searchParams }: { searchParams: Promise<JobsQuery> }) {
   const { api } = await requireCompletedAccount();
-  const query = await searchParams;
-  const search = typeof query.q === "string" ? query.q.slice(0, 200) : "";
-  const type = typeof query.type === "string" && opportunityTypes.some((value) => value === query.type) ? query.type : "";
-  const page = typeof query.page === "string" && /^\d+$/.test(query.page) ? Math.min(10000, Math.max(1, Number(query.page))) : 1;
-  const params = new URLSearchParams({ is_active: "true", page: String(page), page_size: "12" });
-  if (type) params.set("opportunity_type", type);
+  const state = readJobsQuery(await searchParams);
+  const { view, search, location, degree, year, page, filters } = state;
+
+  function urlParams(target: JobsView, next: number) {
+    return jobsParams({ ...state, view: target, page: next });
+  }
+
+  function href(target: JobsView, next = page) {
+    return "/jobs?" + urlParams(target, next);
+  }
+
+  const params = new URLSearchParams(filters);
+  params.set("opportunity_type", "internship");
+  params.set("is_active", "true");
+  params.set("page", String(page));
+  params.set("page_size", "12");
   if (search.trim()) params.set("search", search.trim());
-  const result = await api.request<OpportunityPage>(`/api/v1/opportunities?${params}`);
-  const matches = await Promise.allSettled(result.items.map((job) => api.request<Match>(`/api/v1/opportunities/${encodeURIComponent(job.id)}/match`)));
-  const items = result.items.map((opportunity, index) => ({ opportunity, match: matches[index].status === "fulfilled" ? matches[index].value : null })).sort((a, b) => (b.match?.score ?? -1) - (a.match?.score ?? -1));
-  function href(next: number) { return `/jobs?${new URLSearchParams({ q: search, type, page: String(next) })}`; }
-  return <div className="mx-auto max-w-7xl px-5 py-7 sm:px-8"><div className="flex flex-wrap items-end justify-between gap-5"><div><h1 className="text-3xl tracking-tight">Find your next step.</h1><p className="mt-3 text-sm text-muted">Opportunities, matched to your profile.</p></div><Link href="/profile" className="text-sm text-accent underline underline-offset-4">Your profile</Link></div>
-    <nav aria-label="Job lists" className="my-7 flex flex-wrap gap-2 text-sm"><Link href="/jobs" aria-current="page" className="rounded-full bg-elevated px-5 py-3">Recommended</Link><Link href="/applications?view=saved" className="rounded-full px-5 py-3 text-muted hover:bg-surface">Liked / Saved</Link><Link href="/applications?view=applied" className="rounded-full px-5 py-3 text-muted hover:bg-surface">Applied</Link></nav>
-    <form action="/jobs" className="mb-7 grid items-end gap-3 sm:grid-cols-[1fr_auto_auto]"><Input label="Search opportunities" name="q" type="search" maxLength={200} defaultValue={search} wrapperClassName="min-w-0 flex-1" /><Select label="Opportunity type" name="type" defaultValue={type}><option value="">All opportunities</option>{opportunityTypes.map((value) => <option key={value} value={value}>{opportunityTypeLabel(value)}</option>)}</Select><Button type="submit">Search</Button></form>
-    <p className="mb-5 text-xs leading-6 text-muted">{result.total} opportunities. Matches are ordered within this page of results.</p>
-    <RecommendedJobs key={`${page}:${search}:${type}`} items={items} />
-    <nav aria-label="Results pages" className="mt-7 flex justify-between text-sm text-accent">{page > 1 ? <Link href={href(page - 1)}>Previous page</Link> : <span />}{page * result.page_size < result.total && <Link href={href(page + 1)}>Next page</Link>}</nav>
+  const [tracker, catalog] = await Promise.allSettled([
+    api.request<{ items: Application[]; total: number }>("/api/v1/applications"),
+    view === "recommended" ? api.request<OpportunityPage>("/api/v1/opportunities?" + params) : null,
+  ]);
+
+  let items: RankedOpportunity[] = [];
+  const result = catalog.status === "fulfilled" ? catalog.value : null;
+  const failed = tracker.status === "rejected" || catalog.status === "rejected";
+  if (tracker.status === "fulfilled" && !failed) {
+    if (result) {
+      const statuses = new Map(tracker.value.items.map((row) => [row.opportunity_id, row.status]));
+      const matches = await Promise.allSettled(result.items.map((job) => api.request<Match>("/api/v1/opportunities/" + encodeURIComponent(job.id) + "/match")));
+      items = result.items.map((opportunity, index) => ({
+        opportunity,
+        match: matches[index].status === "fulfilled" ? matches[index].value : null,
+        status: statuses.get(opportunity.id),
+      })).sort((a, b) => (b.match?.score ?? -1) - (a.match?.score ?? -1));
+    } else {
+      items = tracker.value.items
+        .filter((row) => (row.status === "saved") === (view === "saved"))
+        .map(({ opportunity, status }) => ({ opportunity, status, match: null }));
+    }
+  }
+  const copy = views[view];
+  return <div className="mx-auto max-w-7xl px-5 py-7 sm:px-8">
+    <div className="flex flex-wrap items-end justify-between gap-5">
+      <div>
+        <h1 className="page-title">Find your next step.</h1>
+        <p className="reading-text mt-3">Find internships and track your applications.</p>
+      </div>
+      <Link href="/profile" className="text-sm text-accent underline underline-offset-4">Your profile</Link>
+    </div>
+    {view === "recommended" && <div className="mt-6">
+      <JobsSearch search={search} applied={{ location, degree_level: degree, study_year: year }} navigationKey={href(view)} />
+    </div>}
+    <nav aria-label="Job lists" className={`segmented-track mb-5 ${view === "recommended" ? "" : "mt-6"}`}>
+      {(Object.keys(views) as JobsView[]).map((target) => <Link key={target} href={href(target)} prefetch={false}
+        aria-current={target === view ? "page" : undefined}
+        className="segmented-link">
+        {views[target].label}
+      </Link>)}
+    </nav>
+    {failed ? <ErrorState title={copy.error} action={<form action="/jobs">
+      {Array.from(urlParams(view, page), ([name, value]) => <input key={name} type="hidden" name={name} value={value} />)}
+      <Button type="submit">Try again</Button>
+    </form>} /> : <>
+      <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <p className="text-sm font-semibold tabular-nums text-foreground">
+          {result?.total ?? items.length} {(result?.total ?? items.length) === 1 ? "opportunity" : "opportunities"}
+        </p>
+        {result && <p className="metadata-text">Matches are ordered within this page of results.</p>}
+      </div>
+      {items.length ? <RecommendedJobs key={href(view)} items={items}
+        detailContext={urlParams(view, page).toString()} label={copy.label + " opportunities"}
+        saveAction={view === "recommended" ? saveOpportunity : undefined} />
+        : <EmptyState title={copy.empty} description={copy.help} />}
+      {result && <nav aria-label="Results pages" className="mt-7 flex justify-between text-sm text-accent">
+        {page > 1 ? <Link href={href("recommended", page - 1)}>Previous page</Link> : <span />}
+        {page * result.page_size < result.total && <Link href={href("recommended", page + 1)}>Next page</Link>}
+      </nav>}
+    </>}
   </div>;
 }
