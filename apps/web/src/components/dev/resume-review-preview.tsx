@@ -1,0 +1,9 @@
+"use client";
+import { useState } from "react";
+import { ResumeReviewFlow } from "@/components/profile/resume-review-flow";
+import { createResumeReviewPreviewService } from "@/lib/resume-review-preview-service";
+import { Button } from "@/components/ui/button";
+export function ResumeReviewPreview(){
+  const [service]=useState(createResumeReviewPreviewService),[source,setSource]=useState(service.getSource),[notice,setNotice]=useState("");
+  return <main id="main-content" className="mx-auto max-w-5xl px-5 py-8"><h1 className="text-2xl">Resume review development preview</h1><p className="mt-3 text-sm leading-6 text-muted">Synthetic fixtures only, authored for this preview. They were not extracted from your PDF. Confirmation changes temporary memory only; no real profile or skills endpoint is called. Reload resets all data.</p><div className="mt-4 flex flex-wrap gap-3">{(["processing","result","missing","invalid","save","uncertain"] as const).map(kind=><Button key={kind} variant="secondary" onClick={()=>{service.failNext(kind);setNotice("Next synthetic "+kind+" scenario armed.");}}>Simulate {kind==="uncertain"?"lost confirmation response":kind}</Button>)}<Button variant="secondary" onClick={()=>{service.changeProfile();setNotice("Synthetic profile revision changed. Existing reviews must conflict before any write.");}}>Change profile revision</Button><Button variant="secondary" onClick={()=>{service.changeResume();setNotice("Synthetic resume revision changed. Existing reviews must conflict before any write.");}}>Change resume revision</Button><Button variant="secondary" onClick={()=>{setSource(service.getSource());setNotice("Using the latest synthetic resume. A source revision change discards this local review draft.");}}>Use latest synthetic resume</Button></div>{notice&&<p role="status" className="mt-3 text-sm text-muted">{notice}</p>}<ResumeReviewFlow service={service} source={source}/></main>;
+}

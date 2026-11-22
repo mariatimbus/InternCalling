@@ -2,7 +2,7 @@
 
 import enum
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
@@ -80,6 +80,13 @@ class Opportunity(TimestampMixin, Base):
     study_year: orm.Mapped[list[int] | None] = orm.mapped_column(
         sa.JSON().with_variant(postgresql.JSONB, "postgresql"), nullable=True
     )
+
+    last_seen_at: orm.Mapped[datetime | None] = orm.mapped_column(
+        sa.DateTime(timezone=True), nullable=True
+    )
+    last_checked_on: orm.Mapped[date | None] = orm.mapped_column(sa.Date, nullable=True)
+    missing_runs: orm.Mapped[int] = orm.mapped_column(sa.Integer, default=0, server_default="0")
+    inactive_reason: orm.Mapped[str | None] = orm.mapped_column(sa.String(40), nullable=True)
 
     skills: orm.Mapped[list["Skill"]] = orm.relationship(
         secondary="opportunity_skills", back_populates="opportunities"
