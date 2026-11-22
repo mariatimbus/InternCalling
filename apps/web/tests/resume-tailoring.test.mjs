@@ -33,5 +33,93 @@ const text=tree=>JSON.stringify(tree),button=(tree,label)=>nodes(tree).find(n=>n
 async function component(service){const values=[],refs=[],effects=[];let index=0,refIndex=0;const react={useId:()=>"tailor",useRef(current){const slot=refIndex++;return refs[slot]??={current};},useEffect(effect){effects.push(effect);},useState(initial){const slot=index++;if(!(slot in values))values[slot]=typeof initial==="function"?initial():initial;return[values[slot],next=>{values[slot]=typeof next==="function"?next(values[slot]):next;}];}};class Fast extends ResumeTailoringController{constructor(jobId,service,preview){super(jobId,service,preview,0);}}const opportunities=await load("../src/lib/opportunities.ts");const {ResumeTailoringFlow}=await load("../src/components/profile/resume-tailoring-flow.tsx",{react,"react/jsx-runtime":runtime,"@/lib/resume-tailoring-controller":{...controller,ResumeTailoringController:Fast},"@/lib/resume-tailoring":model,"@/lib/opportunities":opportunities,"@/components/ui/button":{Button:"Button"},"@/components/ui/drawer":{Drawer:"Drawer"},"@/components/ui/input":{Input:"Input"},"@/components/ui/select":{Select:"Select"},"@/components/ui/field":{fieldControl:""}});const render=()=>{index=0;refIndex=0;return ResumeTailoringFlow({jobId:"sample-job",service,preview:true});};render();const cleanup=effects[0]();return{render,cleanup};}
 test("component exposes side-by-side text-only sources, editing, selection, approval and fixed sample disclaimer",async()=>{const service=preview.createTailoringPreviewService({delayMs:0}),f=await component(service);await tick();button(f.render(),"Request tailored draft").props.onClick();for(let i=0;i<30&&!nodes(f.render()).some(n=>n.type==="textarea");i++)await tick();let tree=f.render();assert.match(text(tree),/Source information/);assert.match(text(tree),/Proposed wording/);assert.match(text(tree),/Not supported by the source/);const textarea=nodes(tree).find(n=>n.type==="textarea");textarea.props.onChange({target:{value:"<script>User text, not HTML</script>"}});tree=f.render();assert.match(text(tree),/User-provided wording/);assert.equal(nodes(tree).some(n=>n.props.dangerouslySetInnerHTML),false);for(let i=0;i<4;i++){const accept=nodes(f.render()).filter(n=>n.type==="Button"&&n.props.children==="Accept item")[i];accept.props.onClick();}button(f.render(),"Save tailored draft").props.onClick();assert.equal(button(f.render(),"Save tailored draft").props.disabled,true);await tick();button(f.render(),"Approve this revision").props.onClick();await tick();assert.match(text(f.render()),/not an export of your edited draft/);button(f.render(),"Discard local draft").props.onClick();assert.equal(nodes(f.render()).find(n=>n.type==="Drawer").props.open,true);const modal=nodes(f.render()).find(n=>n.type==="Drawer");modal.props.onClose();assert.equal(nodes(f.render()).find(n=>n.type==="Drawer").props.open,false);f.cleanup();service.dispose();});
 test("unconnected flow and real entry make no requests; preview notice persists outside all flow states",async()=>{const f=await component();assert.match(text(f.render()),/Tailoring is not available yet/);assert.equal(button(f.render(),"Request tailored draft"),undefined);f.cleanup();const {TailoringEntryPoint}=await load("../src/components/jobs/tailoring-entry-point.tsx",{"react/jsx-runtime":runtime});const entry=TailoringEntryPoint({title:"Role",organization:"Organization"});assert.match(text(entry),/not available yet/);assert.equal(nodes(entry).filter(n=>n.type==="a").length,1);assert.equal(nodes(entry).find(n=>n.type==="a").props.href,"/profile");const {ResumeTailoringPreview}=await load("../src/components/dev/resume-tailoring-preview.tsx",{react:{useState(initial){return[typeof initial==="function"?initial():initial,()=>{}];}},"react/jsx-runtime":runtime,"@/components/ui/button":{Button:"Button"},"@/components/profile/resume-tailoring-flow":{ResumeTailoringFlow:"Flow"},"@/lib/resume-tailoring-preview-service":preview});const tree=ResumeTailoringPreview();assert.ok(nodes(tree).some(n=>n.type==="aside"&&n.props.children==="Demo mode — no AI generation or real account changes. The resume and job below use sample data."));assert.ok(nodes(tree).some(n=>n.type==="Flow"&&n.props.preview));});
-test("real Jobs retains original safe application action and all existing details",async()=>{const opportunities=await load("../src/lib/opportunities.ts");const {RecommendedJobs}=await load("../src/components/workspace/recommended-jobs.tsx",{react:{useState:v=>[v,()=>{}]},"react/jsx-runtime":runtime,"@/components/jobs/job-card":{JobCard:"JobCard"},"@/components/jobs/match-score":{MatchScore:"MatchScore"},"@/components/jobs/eligibility-badge":{EligibilityBadge:"EligibilityBadge"},"@/components/ui/badge":{Badge:"Badge"},"@/components/ui/drawer":{Drawer:"Drawer"},"@/components/ui/empty-state":{EmptyState:"EmptyState"},"@/lib/opportunities":opportunities,"@/components/jobs/tailoring-entry-point":{TailoringEntryPoint:"Entry"}});for(const url of ["https://example.com/apply","http://example.com/apply","javascript:alert(1)","https://user:pass@example.com/apply"]){const job={id:"job",title:"Role",organization:"Org",url,skills:[],description:"Original description",location:"City"},tree=RecommendedJobs({items:[{opportunity:job,match:null}]}),brief=nodes(tree).find(n=>typeof n.type==="function"&&n.type.name==="Brief"),detail=brief.type(brief.props),links=nodes(detail).filter(n=>n.type==="a");assert.equal(links.length,/^https?:\/\/example/.test(url)?1:0);for(const link of links){assert.equal(link.props.rel,"noopener noreferrer");assert.equal(link.props.target,"_blank");}assert.match(text(detail),/Original description/);assert.match(text(detail),/Your match/);assert.ok(nodes(detail).some(n=>n.type==="Entry"));}});
+test("Jobs briefs keep source and detail links independent and place tailoring after the listing content", async () => {
+  const badge = { Badge: "Badge" };
+  const detailUi = await load("../src/components/jobs/opportunity-details.tsx", {
+    "react/jsx-runtime": runtime, "@/components/ui/badge": badge,
+  });
+  const { RecommendedJobs } = await load("../src/components/workspace/recommended-jobs.tsx", {
+    react: { useState: (value) => [value, () => {}] }, "react/jsx-runtime": runtime,
+    "next/link": { default: "Link" }, "@/components/jobs/job-card": { JobCard: "JobCard" },
+    "@/components/jobs/match-score": { MatchScore: "MatchScore" }, "@/components/jobs/company-avatar": { CompanyAvatar: "CompanyAvatar" },
+    "@/components/jobs/eligibility-badge": { EligibilityBadge: "EligibilityBadge" }, "@/components/ui/badge": badge,
+    "@/components/ui/drawer": { Drawer: "Drawer" }, "@/components/ui/button": { Button: "Button" },
+    "@/components/ui/icon": { Icon: "Icon" }, "@/lib/opportunities": await load("../src/lib/opportunities.ts"),
+    "@/components/jobs/tailoring-entry-point": { TailoringEntryPoint: "Entry" },
+    "@/components/jobs/opportunity-details": detailUi,
+  });
+  const description = "Original description\nhttps://example.com/unrelated";
+  for (const url of ["https://example.com/apply", "http://example.com/apply", "javascript:alert(1)", "https://user:pass@example.com/apply"]) {
+    const job = { id: "job", title: "Role", opportunity_type: "internship", organization: "Stripe", url, description,
+      location: "City", skills: [{ id: "skill", name: "Python" }], degree_level: "master", study_year: [1],
+      posted_at: "2026-10-08T00:00:00Z", deadline: "2026-11-02", is_active: false };
+    const tree = RecommendedJobs({ items: [{ opportunity: job, match: { score: 72, eligibility: "eligible", reasons: ["Reason"] } }] });
+    const briefs = nodes(tree).filter((node) => typeof node.type === "function" && node.type.name === "Brief");
+    assert.equal(briefs.length, 2);
+    for (const brief of briefs) {
+      const content = nodes(brief.type(brief.props));
+      const source = content.find((node) => node.type === "a");
+      assert.equal(Boolean(source), /^https?:\/\/example/.test(url));
+      if (source) {
+        assert.equal(source.props.rel, "noopener noreferrer");
+        assert.equal(source.props.target, "_blank");
+        assert.match(text(source), /View official listing/);
+        assert.ok(nodes(source).some((node) => node.props.name === "external-link"));
+      }
+      assert.equal(content.find((node) => node.type === "Link").props.href, "/opportunities/job");
+      assert.equal(content.find((node) => node.type === "CompanyAvatar").props.initials, "S");
+      assert.equal(content.find((node) => node.type === "MatchScore").props.score, 72);
+      assert.equal(content.find((node) => node.type === "EligibilityBadge").props.status, "eligible");
+      assert.deepEqual(content.filter((node) => node.type === "dt").map((node) => node.props.children),
+        ["Degree level", "Study year", "Application deadline", "Published"]);
+      assert.ok(content.some((node) => node.props.children === "Closed on InternCalling"));
+      const position = (value) => content.findIndex((node) => node.props.children === value);
+      assert.ok(position("At a glance") < position("Python"));
+      assert.ok(position("Python") < position("View full details"));
+      assert.ok(position("View full details") < position("About the opportunity"));
+      assert.ok(position(description) < position("Your match"));
+      assert.equal(content.at(-1).type, "Entry");
+    }
+  }
+  const tree = RecommendedJobs({ items: [{ opportunity: { id: "sparse", title: "Sparse", opportunity_type: "internship" }, match: null, status: "saved" }] });
+  const brief = nodes(tree).find((node) => typeof node.type === "function" && node.type.name === "Brief");
+  const content = nodes(brief.type(brief.props));
+  assert.equal(content.find((node) => node.type === "CompanyAvatar").props.initials, "–");
+  assert.ok(content.some((node) => node.props.children === "saved"));
+  assert.ok(!content.some((node) => node.props.children === "At a glance" || node.type === "a" || node.type === "Entry"));
+
+  const amazon = "https://www.amazon.jobs/en/jobs/12345/example";
+  const other = "https://www.amazon.jobs/en/jobs/67890/other";
+  const before = "Software Engineer Intern in Berlin.\r\n\r\nRead https://example.invalid/Berlin for context.";
+  const after = "Official source: " + other + "\r\nSource last checked: 2026-11-22.";
+  const fixtureDescription = before + "\r\nOfficial source: <" + amazon + ">\r\n" + after;
+  function listingBrief(description, url, title = "Software Engineer Intern", location = "Berlin") {
+    const opportunity = { id: "amazon", title, location, description, url, skills: [], opportunity_type: "internship" };
+    const tree = RecommendedJobs({ items: [{ opportunity, match: null }] });
+    const brief = nodes(tree).find((node) => typeof node.type === "function" && node.type.name === "Brief");
+    return nodes(brief.type(brief.props));
+  }
+  function prose(brief) {
+    return brief.find((node) => node.type === "p" && node.props.className.includes("whitespace-pre-wrap"));
+  }
+  function renderedText(value) {
+    if (typeof value === "string") return value;
+    if (Array.isArray(value)) return value.map(renderedText).join("");
+    return renderedText(value.props.children);
+  }
+  const amazonBrief = listingBrief(fixtureDescription, amazon);
+  const descriptionNode = prose(amazonBrief);
+  assert.equal(renderedText(descriptionNode), before + "\r\n" + after);
+  assert.deepEqual(nodes(descriptionNode).filter((node) => node.type === "strong").map((node) => node.props.children),
+    ["Software Engineer Intern", "Berlin"]);
+  assert.match(nodes(descriptionNode).find((node) => node.type === "span").props.className, /metadata-text/);
+  assert.deepEqual(amazonBrief.filter((node) => node.type === "a").map((node) => node.props.href), [amazon]);
+  assert.match(amazonBrief.find((node) => node.type === "a").props.className, /focus-visible:outline/);
+  const inline = "Read Official source: " + amazon + " before applying.";
+  assert.equal(renderedText(prose(listingBrief(inline, amazon))), inline);
+  assert.equal(renderedText(prose(listingBrief(fixtureDescription, "javascript:alert(0)"))), fixtureDescription);
+  const sparse = prose(listingBrief("Details will follow.", amazon));
+  assert.equal(sparse.props.children, "Details will follow.");
+  assert.equal(nodes(sparse).some((node) => node.type === "strong"), false);
+});
 test("development route returns notFound in production and never imports real persistence",async()=>{const {default:Page}=await load("../src/app/dev/resume-tailoring/page.tsx",{"next/navigation":{notFound(){throw new Error("404");}},"@/components/dev/resume-tailoring-preview":{ResumeTailoringPreview:"Preview"},"react/jsx-runtime":runtime});const old=process.env.NODE_ENV;try{for(const mode of ["production","test"]){process.env.NODE_ENV=mode;assert.throws(()=>Page(),/404/);}process.env.NODE_ENV="development";assert.equal(Page().type,"Preview");}finally{if(old===undefined)delete process.env.NODE_ENV;else process.env.NODE_ENV=old;}for(const path of ["../src/lib/resume-tailoring-preview-service.ts","../src/components/dev/resume-tailoring-preview.tsx","../src/components/profile/resume-tailoring-flow.tsx"]){const code=await readFile(new URL(path,import.meta.url),"utf8");assert.doesNotMatch(code,/fetch\(|localStorage|IndexedDB|api\/v1|profile\/actions|skills-actions/);}});

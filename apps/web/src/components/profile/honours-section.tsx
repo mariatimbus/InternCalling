@@ -60,8 +60,8 @@ export function HonoursSection({ service }: { service?: HonoursService }) {
   }
   const input = (key: "title" | "organization" | "receivedDate" | "referenceUrl", label: string) => <Input label={label} name={key} value={draft[key]} required={key === "title"} disabled={pending} maxLength={key === "receivedDate" ? 7 : key === "referenceUrl" ? 512 : 255} placeholder={key === "receivedDate" ? "YYYY or YYYY-MM" : undefined} error={errors[key]} onChange={event => change(key, event.target.value)} />;
   return <section className="mt-8 rounded-panel bg-card p-6 sm:p-9" aria-labelledby={id + "-title"} aria-busy={pending}>
-    <div className="flex flex-wrap items-center justify-between gap-3"><h2 ref={heading} tabIndex={-1} id={id + "-title"} className="text-lg outline-none">Honours &amp; Awards</h2>{!editing && <Button disabled={pending || !!deleting || !!service && state.kind !== "ready"} onClick={() => begin(null)}>{service ? "Add award" : "Draft award"}</Button>}</div>
-    <div className="mt-4"><CollectionView state={state} emptyMessage="No honours or awards yet." onRetry={() => { void reload(); }} renderEntry={row => <article className="space-y-3 break-words"><h3 className="font-medium">{row.title}</h3>
+    <div className="flex flex-wrap items-center justify-between gap-3"><h2 ref={heading} tabIndex={-1} id={id + "-title"} className="section-title">Honours &amp; Awards</h2>{!editing && <Button disabled={pending || !!deleting || !!service && state.kind !== "ready"} onClick={() => begin(null)}>{service ? "Add award" : "Draft award"}</Button>}</div>
+    <div className="mt-4"><CollectionView state={state} emptyMessage="No honours or awards yet." onRetry={() => { void reload(); }} renderEntry={row => <article className="space-y-3 break-words"><h3 className="card-title">{row.title}</h3>
       {row.organization && <p className="text-sm">{row.organization}</p>}
       {row.receivedDate && <p className="text-xs text-muted">Received: {row.receivedDate}</p>}
       {row.description && <p className="whitespace-pre-wrap text-sm leading-6">{row.description}</p>}
