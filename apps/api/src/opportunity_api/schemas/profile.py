@@ -1,11 +1,14 @@
 """Profile request/response schemas with Bachelor/Master field validation."""
 
 from datetime import datetime
+from typing import Annotated
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
 
-from opportunity_api.models.profile import DegreeLevel
+from opportunity_api.models.profile import DegreeLevel, StudyYear
+
+Preference = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
 
 GRADUATION_YEAR_MIN = 1900
 GRADUATION_YEAR_MAX = 2100
@@ -33,6 +36,12 @@ class ProfileResponse(BaseModel):
 
     id: UUID
     user_id: UUID
+    study_year: StudyYear | None = None
+    interests: list[Preference] | None = Field(default=None, max_length=50)
+    preferred_tech_domains: list[Preference] | None = Field(default=None, max_length=50)
+    preferred_locations: list[Preference] | None = Field(default=None, max_length=50)
+    remote_preferred: bool | None = None
+
     headline: str | None
     bio: str | None
     location: str | None
@@ -47,6 +56,12 @@ class ProfileResponse(BaseModel):
 
 class ProfileUpsert(BaseModel):
     """Full replacement payload for PUT /profile. Omitted fields are cleared."""
+
+    study_year: StudyYear | None = None
+    interests: list[Preference] | None = Field(default=None, max_length=50)
+    preferred_tech_domains: list[Preference] | None = Field(default=None, max_length=50)
+    preferred_locations: list[Preference] | None = Field(default=None, max_length=50)
+    remote_preferred: bool | None = None
 
     headline: str | None = Field(default=None, max_length=255)
     bio: str | None = None
@@ -63,6 +78,12 @@ class ProfileUpsert(BaseModel):
 
 class ProfilePatch(BaseModel):
     """Partial update payload for PATCH /profile. Only sent fields change."""
+
+    study_year: StudyYear | None = None
+    interests: list[Preference] | None = Field(default=None, max_length=50)
+    preferred_tech_domains: list[Preference] | None = Field(default=None, max_length=50)
+    preferred_locations: list[Preference] | None = Field(default=None, max_length=50)
+    remote_preferred: bool | None = None
 
     headline: str | None = Field(default=None, max_length=255)
     bio: str | None = None
