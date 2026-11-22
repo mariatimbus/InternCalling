@@ -1,0 +1,178 @@
+@import "tailwindcss";
+
+/* Brand primitives: keep these values aligned with AGENTS.md. */
+@theme {
+  --color-pale-blue: #c0c9e5;
+  --color-lavender-blue: #b2bcdc;
+  --color-electric-blue: #2862cf;
+  --color-cobalt-blue: #2e46aa;
+  --color-royal-blue: #1f3ca3;
+  --color-indigo: #142a7b;
+  --color-violet: #4a3f74;
+  --color-navy: #29263b;
+  --color-warm-white: #fffbf0;
+
+  --font-sans: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --radius-card: 1.5rem;
+  --radius-control: 1.5rem;
+  --radius-panel: 2rem;
+}
+
+/* Semantic roles: use these tokens for application UI. */
+@theme inline {
+  --color-background: var(--color-navy);
+  --color-surface: color-mix(in srgb, var(--color-navy) 96%, var(--color-warm-white));
+  --color-elevated: color-mix(in srgb, var(--color-navy) 92%, var(--color-warm-white));
+  --color-card: color-mix(in srgb, var(--color-surface) 88%, var(--color-electric-blue));
+  --color-nav-track: color-mix(in srgb, var(--color-navy) 92%, var(--color-indigo));
+  --color-line: color-mix(in srgb, var(--color-lavender-blue) 18%, transparent);
+  --color-foreground: var(--color-warm-white);
+  --color-body-copy: color-mix(in srgb, var(--color-warm-white) 88%, var(--color-lavender-blue));
+  --color-muted: var(--color-lavender-blue);
+  --color-primary: color-mix(in srgb, var(--color-electric-blue) 75%, var(--color-cobalt-blue));
+  --color-primary-hover: var(--color-cobalt-blue);
+  --color-on-primary: var(--color-warm-white);
+  --color-border: color-mix(in srgb, var(--color-lavender-blue) 56%, transparent);
+  --color-focus: color-mix(in srgb, var(--color-pale-blue) 85%, var(--color-electric-blue));
+  --color-accent: var(--color-pale-blue);
+  --color-accent-hover: var(--color-warm-white);
+  --color-danger-surface: #450a0a;
+  --color-danger-border: #f87171;
+  --color-danger-foreground: #fff1f2;
+}
+
+@layer base {
+  body {
+    @apply relative isolate bg-background font-sans text-body-copy antialiased;
+    color-scheme: dark;
+    font-feature-settings: "cv11", "ss01";
+  }
+
+  html {
+    background: var(--color-background);
+    color-scheme: dark;
+  }
+
+  button:not(:disabled), select:not(:disabled) {
+    cursor: pointer;
+  }
+
+  progress {
+    appearance: none;
+    border: 0;
+    background: var(--color-elevated);
+  }
+
+  progress::-webkit-progress-bar {
+    background: var(--color-elevated);
+    border-radius: 999px;
+  }
+
+  progress::-webkit-progress-value {
+    background: var(--color-primary);
+    border-radius: 999px;
+  }
+
+  progress::-moz-progress-bar {
+    background: var(--color-primary);
+    border-radius: 999px;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 4px;
+  }
+
+  ::selection {
+    background: var(--color-pale-blue);
+    color: var(--color-indigo);
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border) transparent;
+  }
+}
+
+@utility page-title {
+  @apply font-sans font-bold text-foreground;
+  font-size: clamp(1.875rem, 1.52rem + 1.5vw, 2.875rem);
+  line-height: 1.13;
+  letter-spacing: -0.04em;
+  overflow-wrap: anywhere;
+}
+
+@utility display-title {
+  @apply font-sans font-bold text-foreground;
+  font-size: clamp(2.125rem, 1.43rem + 3.05vw, 4rem);
+  line-height: 1.06;
+  letter-spacing: -0.05em;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+
+@utility display-accent {
+  color: var(--color-focus);
+}
+
+@utility section-title {
+  @apply text-xl font-bold text-foreground sm:text-2xl;
+  line-height: 1.24;
+  letter-spacing: -0.026em;
+  overflow-wrap: anywhere;
+}
+
+@utility card-title {
+  @apply text-[1.0625rem] font-semibold text-foreground sm:text-lg;
+  line-height: 1.3;
+  letter-spacing: -0.016em;
+  overflow-wrap: anywhere;
+}
+
+@utility reading-text {
+  @apply text-[0.9375rem] leading-[1.65] text-body-copy;
+}
+
+@utility metadata-text {
+  @apply text-[0.8125rem] leading-[1.45] text-muted;
+}
+
+@utility segmented-track {
+  @apply grid w-full min-w-0 grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)_minmax(0,1fr)] gap-0.5 rounded-full border border-line bg-nav-track p-1.5 sm:w-fit sm:min-w-96 sm:grid-cols-3;
+}
+
+@utility segmented-link {
+  @apply inline-flex min-h-11 min-w-0 items-center justify-center rounded-full px-1 text-center text-xs font-medium whitespace-nowrap text-muted motion-safe:transition-colors motion-safe:duration-150 sm:px-4 sm:text-sm;
+  &:hover { @apply bg-elevated text-foreground; }
+  &:focus-visible { outline-offset: 1px; }
+  &[aria-current="page"] { @apply bg-primary font-semibold text-on-primary; }
+  &[aria-current="page"]:hover { @apply bg-primary-hover; }
+}
+
+/* The palette stays fixed; only the blue/violet background blend changes with scroll. */
+.scroll-backdrop {
+  --scroll-progress: 0;
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 85% 0%, color-mix(in srgb, var(--color-indigo) 22%, transparent), transparent 60%),
+    linear-gradient(155deg, var(--color-navy) 30%, color-mix(in srgb, var(--color-navy) 94%, var(--color-indigo)) 100%);
+}
+
+.scroll-backdrop-shift {
+  position: absolute;
+  inset: 0;
+  opacity: calc(0.08 + var(--scroll-progress) * 0.34);
+  background:
+    radial-gradient(ellipse at 90% 85%, color-mix(in srgb, var(--color-violet) 85%, transparent), transparent 70%),
+    linear-gradient(145deg, transparent 20%, color-mix(in srgb, var(--color-indigo) 80%, transparent));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scroll-backdrop-shift {
+    opacity: 0.08;
+  }
+}

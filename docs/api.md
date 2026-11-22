@@ -43,6 +43,9 @@ Every non-2xx response (including framework validation failures):
 | 403 | `account_disabled` | deactivated user |
 | 404 | `not_found` | unknown route |
 | 404 | `skill_not_found` | skill not attached to profile |
+| 404 | `opportunity_not_found` | unknown opportunity id on application create |
+| 404 | `application_not_found` | unknown id, or owned by another user (indistinguishable) |
+| 409 | `application_exists` | opportunity already tracked by this user |
 | 429 | `rate_limited` | per-IP rate limit exceeded (see `APP_RATE_LIMIT_PER_MINUTE`) |
 | 422 | `validation_error` | schema validation (details = pydantic errors) |
 
@@ -141,12 +144,38 @@ and deduplicated; unknown names create new skill rows (get-or-create).
 
 ### GET /api/v1/skills — catalog of all skills (for pickers)
 
-## Frozen upcoming contracts
+## Opportunities
 
-Implemented in a later phase; the shapes below are frozen so B and C can build
-against them now. They mirror the SQLAlchemy models in `apps/api/src/opportunity_api/models/`.
+Implemented in A7 (read-only catalog). Ordered by `posted_at` descending,
+unposted opportunities last.
 
-### GET /api/v1/opportunities · GET /api/v1/opportunities/{id}
+### GET /api/v1/opportunities
+
+Query params (all optional, combined with AND):
+
+| Param | Type | Rule |
+| --- | --- | --- |
+| `page` | int | default `1`, ≥ 1 |
+| `page_size` | int | default `20`, 1–100 |
+| `opportunity_type` | enum | one of the 11 vocabulary values |
+| `degree_level` | enum | `bachelor`/`master` match themselves **and** `both`; `null` (unknown) never matches |
+| `study_year` | int (1–6) | containment: opportunity's `study_year` must include it; `null` (unknown) never matches |
+| `location` | string | case-insensitive substring |
+| `is_active` | bool | exact match |
+| `deadline_after` / `deadline_before` | datetime ISO 8601 | inclusive bounds on `deadline` |
+| `search` | string | case-insensitive substring of `title`, `organization`, or `description` |
+
+```json
+// 200
+{
+  "items": [{"id": "1d9a…", "title": "Backend Intern", "…": "…"}],
+  "page": 1,
+  "page_size": 20,
+  "total": 50
+}
+```
+
+Item shape (same as the detail endpoint):
 
 ```json
 {
@@ -172,7 +201,106 @@ against them now. They mirror the SQLAlchemy models in `apps/api/src/opportunity
 
 `degree_level` ∈ `bachelor | master | both`, nullable — eligibility, not the caller's own degree; `null` means not established (never "everyone"). `study_year` is a nullable array of eligible study years (e.g. `[2, 3]`); `null` means not established.
 
-### GET /api/v1/applications · POST /api/v1/applications · PATCH /api/v1/applications/{id}
+### GET /api/v1/opportunities/{id}
+
+`200` with the item shape above; `404 not_found` for a valid but unknown id;
+`422 validation_error` for a malformed UUID.
+
+### GET /api/v1/opportunities/{id}/eligibility 🔒
+
+A9 eligibility assessment of the opportunity against the caller's profile
+(full rule set: degree level, study year, graduation year, location — every
+rule reports `eligible | possibly_eligible | not_eligible | unknown` with a
+human-readable reason; facts the source never stated stay `unknown`).
+
+```json
+// 200
+{
+  "status": "possibly_eligible",
+  "reasons": [
+    { "rule": "degree_level", "status": "eligible", "reason": "Bachelor students are accepted" },
+    { "rule": "study_year", "status": "unknown", "reason": "Student study year is not known" },
+    { "rule": "graduation_year", "status": "unknown", "reason": "No structured graduation restriction available" },
+    { "rule": "location", "status": "eligible", "reason": "Remote opportunity; no location barrier" }
+  ]
+}
+```
+
+The profile currently carries `degree_level`, `graduation_year` and
+`location`; `study_year` has no profile field yet, so that rule is always
+`unknown` until the schema grows.
+
+### GET /api/v1/opportunities/{id}/match 🔒
+
+A10 explainable match score, gated by A9 eligibility (degree level, study
+year, location rules only — graduation cannot gate matching without a
+structured source). `not_eligible` always scores `0`;
+`possibly_eligible`/`unknown` caps the score at `49`; `eligible` is
+uncapped (max 100). The optional `ai` component (A11/A12, Ollama
+embeddings) is `0` when Ollama is not configured — the deterministic core
+is the product, AI is a bonus.
+
+```json
+// 200
+{
+  "score": 54,
+  "eligibility": "eligible",
+  "components": { "skills": 12, "field_fit": 25, "interests": 10, "location": 7, "ai": 0 },
+  "reasons": ["Skill overlap: Python, SQL", "Field of study matches: computer science", "Remote-friendly location"]
+}
+```
+
+Both endpoints: `401 unauthorized` without a bearer token; `404 not_found`
+for a valid but unknown id.
+
+## Applications 🔒
+
+Implemented in A8 (saved opportunities + application tracking). All endpoints
+require a bearer token and are scoped to the current user — an application
+owned by another user is indistinguishable from a missing one (`404`, never
+`403`), mirroring the Supabase RLS policy (defense in depth). `user_id` is
+never exposed in responses.
+
+### GET /api/v1/applications
+
+List of the caller's applications, newest first. Optional query param
+`status` (`saved|applied|interview|offer|rejected`) filters by status.
+
+```json
+// 200
+{
+  "items": [{ "…": "application shape below" }],
+  "total": 2
+}
+```
+
+### POST /api/v1/applications
+
+Saves an opportunity (default status `saved`).
+
+```json
+// request
+{"opportunity_id": "1d9a…"}
+```
+
+`201` with the application shape; `404 opportunity_not_found` if the
+opportunity does not exist; `409 application_exists` if it is already tracked
+(one application per (user, opportunity)). An explicit `status`, `notes`, or
+`applied_at` may be sent on create.
+
+### PATCH /api/v1/applications/{id}
+
+Updates `status`, `notes`, and/or `applied_at` (only sent fields change).
+When the status becomes `applied` and no `applied_at` was provided, the server
+stamps the current time. `404 application_not_found` for an unknown id or one
+owned by another user.
+
+### DELETE /api/v1/applications/{id}
+
+Removes the application from the tracker. `204` on success; `404` for an
+unknown id or one owned by another user.
+
+Application shape (all endpoints):
 
 ```json
 {
@@ -182,12 +310,26 @@ against them now. They mirror the SQLAlchemy models in `apps/api/src/opportunity
   "notes": "via referral",
   "applied_at": "2026-10-05T14:00:00Z",
   "created_at": "2026-10-05T14:00:00Z",
-  "updated_at": "2026-10-05T14:00:00Z"
+  "updated_at": "2026-10-05T14:00:00Z",
+  "opportunity": {
+    "id": "1d9a…",
+    "title": "Backend Intern",
+    "organization": "Example Corp",
+    "opportunity_type": "internship",
+    "deadline": "2026-11-30T23:59:59Z"
+  }
 }
 ```
 
-`status` ∈ `saved | applied | interview | offer | rejected`. One application per
-(user, opportunity) — duplicates → 409.
+`status` ∈ `saved | applied | interview | offer | rejected`. `opportunity` is
+an embedded summary so the tracker UI renders without extra lookups.
+
+## Frozen upcoming contracts
+
+Implemented in a later phase; the shapes below are frozen so B and C can build
+against them now. They mirror the SQLAlchemy models in `apps/api/src/opportunity_api/models/`.
+
+(none — applications moved out on 2026-10-15)
 
 ## Changelog
 
@@ -204,3 +346,93 @@ against them now. They mirror the SQLAlchemy models in `apps/api/src/opportunity
 - 2026-10-14 — opportunities gain nullable `degree_level`
   (`bachelor|master|both`) and `study_year` (array of ints) eligibility
   fields, backing the seed dataset. Additive; pending B/C sign-off.
+- 2026-10-15 — A7: `GET /api/v1/opportunities` (pagination + filters) and
+  `GET /api/v1/opportunities/{id}` implemented per the frozen shape; moved out
+  of „Frozen upcoming contracts". Query params documented above; pending B/C
+  sign-off.
+- 2026-10-15 — A8: applications endpoints implemented
+  (`GET/POST /api/v1/applications`, `PATCH/DELETE /api/v1/applications/{id}`);
+  moved out of „Frozen upcoming contracts". Responses embed an `opportunity`
+  summary; `applied_at` is auto-stamped on the transition to `applied`;
+  pending B/C sign-off.
+- 2026-10-22 — A9/A10/A11: `GET /api/v1/opportunities/{id}/eligibility` (A9
+  rule-by-rule eligibility with reasons) and `GET /api/v1/opportunities/{id}/match`
+  (explainable score gated by eligibility; optional Ollama `ai` component via
+  `APP_OLLAMA_URL`, deterministic-only when unset). Profile-driven:
+  `study_year` and `interests` are not profile fields yet, so the study-year
+  rule stays `unknown` and the interests component is always 0 until the
+  profile schema grows; pending B/C sign-off.
+
+
+### Profile v2
+
+GET/PUT/PATCH `/api/v1/profile` additionally accept/return nullable `study_year`
+(`first`, `second`, `third`, `fourth`, `fifth`, `sixth`), `interests`,
+`preferred_tech_domains`, `preferred_locations` (up to 50 nonempty strings, each
+up to 100 characters), and `remote_preferred` (boolean). PATCH changes only sent
+fields; PUT clears omitted fields. NULL study year remains unknown. Preferences
+influence relevance, never hard eligibility. Remote false is a soft preference,
+not a prohibition. Tech domains use descriptive text (e.g. `backend`, `data science`).
+
+Apply `20261117120000_profile_v2.sql` before deploying this API. The migration is
+additive, backfills no facts, and retains existing owner-only RLS policies/grants.
+Run `npm run db:test:fresh` for disposable PostgreSQL migration and two-user RLS
+checks; hosted verification still requires an approved development environment.
+
+### Global recommendations
+
+Authenticated `GET /api/v1/opportunities/recommended` filters the entire active,
+unexpired catalog before scoring and pagination. Default type: `internship`.
+Parameters: `page`, `page_size` (1–100), `opportunity_type`, `degree_level`,
+`study_year` (1–6), `location`, `search` (up to 200 characters), `deadline_after`,
+`deadline_before`. Filters use catalog semantics; explicit year filters require
+known matching years. Missing deadlines are retained unless a deadline filter is set.
+
+Response: `{items: [{opportunity, match, eligibility}], page, page_size, total}`.
+`match` includes score, components and reasons; `eligibility` includes every rule's
+status/evidence (including unknown requirements). Confirmed mismatches are excluded;
+unknown/possible eligibility remains visible. Confirmed matches sort first, then
+score descending, then UUID ascending. Pagination is stable for unchanged data;
+new data or profile edits can change placement. Matching is deterministic with no
+per-candidate Ollama calls. Relevance is not acceptance probability.
+
+The `/jobs` workspace consumes this order directly and displays component scores
+and full eligibility evidence rather than sorting one catalog page in the browser.
+The current implementation scores candidates in memory, suitable for beta volumes;
+measure latency before introducing indexed candidate retrieval or cached scores.
+
+### Application tracker integration
+
+`/jobs` details expose Save and Mark Applied. `/applications` reloads owner-scoped
+records from A8 and supports Saved/Applied views, status edits, notes, and removal.
+Server actions recheck authentication and resolve the current user's canonical
+record before POST/PATCH/DELETE. Successful writes revalidate both views; failures
+show an error without optimistic success. Concurrent saves reread the existing
+record and show a conflict. Saving an already tracked role keeps its progress.
+Explicit `status: null` on PATCH is rejected with 422; omit status to keep it.
+“Mark Applied” records the student's action; it does not submit to an employer.
+
+### Private CVs (A11)
+
+All `/api/v1/cv` routes require a verified Supabase bearer token. Storage calls
+retain that identity and use only a publishable/anon project key. The private
+bucket and metadata migration must be applied before enabling uploads.
+
+| Method | Path | Result |
+| --- | --- | --- |
+| POST | `/cv?filename=resume.pdf` or `resume.docx` | Raw matching PDF/DOCX bytes, maximum 5 MiB; 201 metadata |
+| GET | `/cv` | Current user's documents/drafts |
+| GET | `/cv/service-health` | Optional model configured/available flags |
+| GET | `/cv/{id}` | Owner metadata, extraction draft and accepted provenance |
+| GET | `/cv/{id}/file` | Private attachment with `Cache-Control: no-store` |
+| POST | `/cv/{id}/extract` | Validated draft; never changes the profile |
+| POST | `/cv/{id}/review` | Accept selected `fields`; rejects profile conflicts |
+| DELETE | `/cv/{id}` | Remove private object then metadata; 204 |
+
+Reviewable fields: headline, location, degree_level, field_of_study, university,
+graduation_year, skills, interests. Missing facts cannot be accepted. Accepting a
+field replaces its current value; clients must show values/evidence before asking
+the student to accept. Foreign document IDs return 404. Other errors: 409 stale
+profile/file or missing extraction, 413 too large, 415 wrong media type, 422 unreadable
+document or invalid/ungrounded AI output, 503 unconfigured/unavailable model/Storage.
+See `services/ai/README.md` for parser limits, setup, retention and hosted test gates.

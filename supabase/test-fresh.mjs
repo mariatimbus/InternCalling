@@ -18,11 +18,13 @@ try {
     GRANT USAGE ON SCHEMA auth TO anon, authenticated, service_role;
     GRANT EXECUTE ON FUNCTION auth.uid() TO anon, authenticated, service_role;
   `);
+  await db.exec(await readFile(new URL('./tests/storage-interface.sql', import.meta.url), 'utf8'));
   for (const file of (await readdir(new URL('./migrations/', import.meta.url))).filter(f => f.endsWith('.sql')).sort()) {
     await db.exec(await readFile(new URL(`./migrations/${file}`, import.meta.url), 'utf8'));
     console.log(`Applied ${file}`);
   }
   await db.exec(await readFile(new URL('./tests/rls.sql', import.meta.url), 'utf8'));
+  await db.exec(await readFile(new URL('./tests/cv-rls.sql', import.meta.url), 'utf8'));
   console.log('PASS: fresh PostgreSQL migration replay and RLS/Auth behavior');
 } finally {
   await db.close();

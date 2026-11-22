@@ -1,0 +1,987 @@
+{
+  "schema_version": 1,
+  "status": "proposal-only",
+  "prepared_on": "2026-11-17",
+  "purpose": "Review-only additive skills catalog; not an importer input or frontend fallback.",
+  "normalization": "Canonical database names use lowercase ASCII, trimmed text; aliases are review metadata only.",
+  "categories": [
+    {
+      "id": "programming-and-cs",
+      "count": 16
+    },
+    {
+      "id": "frontend-and-accessibility",
+      "count": 14
+    },
+    {
+      "id": "backend-and-apis",
+      "count": 15
+    },
+    {
+      "id": "databases-and-data-engineering",
+      "count": 15
+    },
+    {
+      "id": "data-science-ml-ai",
+      "count": 16
+    },
+    {
+      "id": "cloud-devops-infrastructure",
+      "count": 16
+    },
+    {
+      "id": "cybersecurity-and-networking",
+      "count": 14
+    },
+    {
+      "id": "embedded-electronics-hardware",
+      "count": 14
+    },
+    {
+      "id": "mobile-graphics-games-robotics-distributed",
+      "count": 20
+    }
+  ],
+  "legacy_records_to_preserve": [
+    {
+      "name": "c/c++",
+      "disposition": "Preserve ID and links; combined legacy entry is not an alias for either distinct language c or c++."
+    },
+    {
+      "name": "data structures and algorithm",
+      "disposition": "Preserve ID and links; combined legacy entry is not automatically replaced by the distinct data structures and algorithms skills."
+    }
+  ],
+  "skills": [
+    {
+      "name": "c",
+      "category": "programming-and-cs",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "c++",
+      "category": "programming-and-cs",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "c#",
+      "category": "programming-and-cs",
+      "aliases": [
+        "csharp",
+        "c sharp"
+      ],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "java",
+      "category": "programming-and-cs",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "python",
+      "category": "programming-and-cs",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "javascript",
+      "category": "programming-and-cs",
+      "aliases": [
+        "js"
+      ],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "typescript",
+      "category": "programming-and-cs",
+      "aliases": [
+        "ts"
+      ],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "go",
+      "category": "programming-and-cs",
+      "aliases": [
+        "golang"
+      ],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "rust",
+      "category": "programming-and-cs",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "kotlin",
+      "category": "programming-and-cs",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "swift",
+      "category": "programming-and-cs",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "bash",
+      "category": "programming-and-cs",
+      "aliases": [
+        "gnu bash"
+      ],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "data structures",
+      "category": "programming-and-cs",
+      "aliases": [],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "algorithms",
+      "category": "programming-and-cs",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "object-oriented programming",
+      "category": "programming-and-cs",
+      "aliases": [
+        "oop"
+      ],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "concurrency",
+      "category": "programming-and-cs",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "html",
+      "category": "frontend-and-accessibility",
+      "aliases": [
+        "html5"
+      ],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "css",
+      "category": "frontend-and-accessibility",
+      "aliases": [
+        "css3"
+      ],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "react",
+      "category": "frontend-and-accessibility",
+      "aliases": [
+        "react.js",
+        "reactjs"
+      ],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "vue.js",
+      "category": "frontend-and-accessibility",
+      "aliases": [
+        "vue",
+        "vuejs"
+      ],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "angular",
+      "category": "frontend-and-accessibility",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "next.js",
+      "category": "frontend-and-accessibility",
+      "aliases": [
+        "nextjs"
+      ],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "svelte",
+      "category": "frontend-and-accessibility",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "web accessibility",
+      "category": "frontend-and-accessibility",
+      "aliases": [
+        "a11y"
+      ],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "wai-aria",
+      "category": "frontend-and-accessibility",
+      "aliases": [
+        "aria"
+      ],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "responsive web design",
+      "category": "frontend-and-accessibility",
+      "aliases": [],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "web performance optimization",
+      "category": "frontend-and-accessibility",
+      "aliases": [],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "jest",
+      "category": "frontend-and-accessibility",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "playwright",
+      "category": "frontend-and-accessibility",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "web components",
+      "category": "frontend-and-accessibility",
+      "aliases": [],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "node.js",
+      "category": "backend-and-apis",
+      "aliases": [
+        "nodejs"
+      ],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "express.js",
+      "category": "backend-and-apis",
+      "aliases": [
+        "expressjs"
+      ],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "fastapi",
+      "category": "backend-and-apis",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "django",
+      "category": "backend-and-apis",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "flask",
+      "category": "backend-and-apis",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "spring boot",
+      "category": "backend-and-apis",
+      "aliases": [],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "asp.net core",
+      "category": "backend-and-apis",
+      "aliases": [
+        "aspnet core"
+      ],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "rest api design",
+      "category": "backend-and-apis",
+      "aliases": [
+        "restful api design"
+      ],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "graphql",
+      "category": "backend-and-apis",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "grpc",
+      "category": "backend-and-apis",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "oauth 2.0",
+      "category": "backend-and-apis",
+      "aliases": [
+        "oauth2"
+      ],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "openid connect",
+      "category": "backend-and-apis",
+      "aliases": [
+        "oidc"
+      ],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "api testing",
+      "category": "backend-and-apis",
+      "aliases": [],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "unit testing",
+      "category": "backend-and-apis",
+      "aliases": [],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "integration testing",
+      "category": "backend-and-apis",
+      "aliases": [],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "sql",
+      "category": "databases-and-data-engineering",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "postgresql",
+      "category": "databases-and-data-engineering",
+      "aliases": [
+        "postgres"
+      ],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "mysql",
+      "category": "databases-and-data-engineering",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "sqlite",
+      "category": "databases-and-data-engineering",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "mongodb",
+      "category": "databases-and-data-engineering",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "redis",
+      "category": "databases-and-data-engineering",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "database indexing",
+      "category": "databases-and-data-engineering",
+      "aliases": [],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "database transactions",
+      "category": "databases-and-data-engineering",
+      "aliases": [],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "data modeling",
+      "category": "databases-and-data-engineering",
+      "aliases": [],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "etl pipelines",
+      "category": "databases-and-data-engineering",
+      "aliases": [],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "apache spark",
+      "category": "databases-and-data-engineering",
+      "aliases": [
+        "spark"
+      ],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "apache kafka",
+      "category": "databases-and-data-engineering",
+      "aliases": [
+        "kafka"
+      ],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "apache airflow",
+      "category": "databases-and-data-engineering",
+      "aliases": [
+        "airflow"
+      ],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "dbt",
+      "category": "databases-and-data-engineering",
+      "aliases": [
+        "data build tool"
+      ],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "data warehousing",
+      "category": "databases-and-data-engineering",
+      "aliases": [],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "r",
+      "category": "data-science-ml-ai",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "julia",
+      "category": "data-science-ml-ai",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "numpy",
+      "category": "data-science-ml-ai",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "pandas",
+      "category": "data-science-ml-ai",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "scikit-learn",
+      "category": "data-science-ml-ai",
+      "aliases": [
+        "sklearn"
+      ],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "pytorch",
+      "category": "data-science-ml-ai",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "tensorflow",
+      "category": "data-science-ml-ai",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "statistics",
+      "category": "data-science-ml-ai",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "linear algebra",
+      "category": "data-science-ml-ai",
+      "aliases": [],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "data visualization",
+      "category": "data-science-ml-ai",
+      "aliases": [],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "machine learning",
+      "category": "data-science-ml-ai",
+      "aliases": [],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "deep learning",
+      "category": "data-science-ml-ai",
+      "aliases": [],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "natural language processing",
+      "category": "data-science-ml-ai",
+      "aliases": [
+        "nlp"
+      ],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "computer vision",
+      "category": "data-science-ml-ai",
+      "aliases": [],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "model evaluation",
+      "category": "data-science-ml-ai",
+      "aliases": [],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "retrieval-augmented generation",
+      "category": "data-science-ml-ai",
+      "aliases": [
+        "rag"
+      ],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "git",
+      "category": "cloud-devops-infrastructure",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "linux",
+      "category": "cloud-devops-infrastructure",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "docker",
+      "category": "cloud-devops-infrastructure",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "kubernetes",
+      "category": "cloud-devops-infrastructure",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "terraform",
+      "category": "cloud-devops-infrastructure",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "ansible",
+      "category": "cloud-devops-infrastructure",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "aws",
+      "category": "cloud-devops-infrastructure",
+      "aliases": [
+        "amazon web services"
+      ],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "azure",
+      "category": "cloud-devops-infrastructure",
+      "aliases": [
+        "microsoft azure"
+      ],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "google cloud",
+      "category": "cloud-devops-infrastructure",
+      "aliases": [
+        "gcp",
+        "google cloud platform"
+      ],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "ci/cd",
+      "category": "cloud-devops-infrastructure",
+      "aliases": [
+        "continuous integration and continuous delivery"
+      ],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "github actions",
+      "category": "cloud-devops-infrastructure",
+      "aliases": [],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "prometheus",
+      "category": "cloud-devops-infrastructure",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "grafana",
+      "category": "cloud-devops-infrastructure",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "opentelemetry",
+      "category": "cloud-devops-infrastructure",
+      "aliases": [
+        "otel"
+      ],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "nginx",
+      "category": "cloud-devops-infrastructure",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "container security",
+      "category": "cloud-devops-infrastructure",
+      "aliases": [],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "tcp/ip",
+      "category": "cybersecurity-and-networking",
+      "aliases": [
+        "tcp ip"
+      ],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "dns",
+      "category": "cybersecurity-and-networking",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "http",
+      "category": "cybersecurity-and-networking",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "tls",
+      "category": "cybersecurity-and-networking",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "network routing",
+      "category": "cybersecurity-and-networking",
+      "aliases": [],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "network troubleshooting",
+      "category": "cybersecurity-and-networking",
+      "aliases": [],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "wireshark",
+      "category": "cybersecurity-and-networking",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "penetration testing",
+      "category": "cybersecurity-and-networking",
+      "aliases": [],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "threat modeling",
+      "category": "cybersecurity-and-networking",
+      "aliases": [],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "secure coding",
+      "category": "cybersecurity-and-networking",
+      "aliases": [],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "cryptography",
+      "category": "cybersecurity-and-networking",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "identity and access management",
+      "category": "cybersecurity-and-networking",
+      "aliases": [
+        "iam"
+      ],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "web application security",
+      "category": "cybersecurity-and-networking",
+      "aliases": [],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "incident response",
+      "category": "cybersecurity-and-networking",
+      "aliases": [],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "embedded c",
+      "category": "embedded-electronics-hardware",
+      "aliases": [],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "embedded linux",
+      "category": "embedded-electronics-hardware",
+      "aliases": [],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "freertos",
+      "category": "embedded-electronics-hardware",
+      "aliases": [
+        "free rtos"
+      ],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "zephyr",
+      "category": "embedded-electronics-hardware",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "microcontrollers",
+      "category": "embedded-electronics-hardware",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "arm assembly",
+      "category": "embedded-electronics-hardware",
+      "aliases": [],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "verilog",
+      "category": "embedded-electronics-hardware",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "vhdl",
+      "category": "embedded-electronics-hardware",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "fpga design",
+      "category": "embedded-electronics-hardware",
+      "aliases": [
+        "field-programmable gate array design"
+      ],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "pcb design",
+      "category": "embedded-electronics-hardware",
+      "aliases": [
+        "printed circuit board design"
+      ],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "digital logic design",
+      "category": "embedded-electronics-hardware",
+      "aliases": [],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "circuit analysis",
+      "category": "embedded-electronics-hardware",
+      "aliases": [],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "i2c",
+      "category": "embedded-electronics-hardware",
+      "aliases": [
+        "i?c"
+      ],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "spi",
+      "category": "embedded-electronics-hardware",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "android development",
+      "category": "mobile-graphics-games-robotics-distributed",
+      "aliases": [
+        "android app development"
+      ],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "ios development",
+      "category": "mobile-graphics-games-robotics-distributed",
+      "aliases": [
+        "ios app development"
+      ],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "flutter",
+      "category": "mobile-graphics-games-robotics-distributed",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "react native",
+      "category": "mobile-graphics-games-robotics-distributed",
+      "aliases": [],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "unity",
+      "category": "mobile-graphics-games-robotics-distributed",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "unreal engine",
+      "category": "mobile-graphics-games-robotics-distributed",
+      "aliases": [
+        "unreal"
+      ],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "godot",
+      "category": "mobile-graphics-games-robotics-distributed",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "opengl",
+      "category": "mobile-graphics-games-robotics-distributed",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "vulkan",
+      "category": "mobile-graphics-games-robotics-distributed",
+      "aliases": [],
+      "current_matcher_single_token": true
+    },
+    {
+      "name": "computer graphics",
+      "category": "mobile-graphics-games-robotics-distributed",
+      "aliases": [],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "ros 2",
+      "category": "mobile-graphics-games-robotics-distributed",
+      "aliases": [
+        "ros2"
+      ],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "robot kinematics",
+      "category": "mobile-graphics-games-robotics-distributed",
+      "aliases": [],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "robot motion planning",
+      "category": "mobile-graphics-games-robotics-distributed",
+      "aliases": [],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "sensor fusion",
+      "category": "mobile-graphics-games-robotics-distributed",
+      "aliases": [],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "control systems",
+      "category": "mobile-graphics-games-robotics-distributed",
+      "aliases": [],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "distributed systems",
+      "category": "mobile-graphics-games-robotics-distributed",
+      "aliases": [],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "consensus algorithms",
+      "category": "mobile-graphics-games-robotics-distributed",
+      "aliases": [],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "distributed tracing",
+      "category": "mobile-graphics-games-robotics-distributed",
+      "aliases": [],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "message queues",
+      "category": "mobile-graphics-games-robotics-distributed",
+      "aliases": [],
+      "current_matcher_single_token": false
+    },
+    {
+      "name": "websockets",
+      "category": "mobile-graphics-games-robotics-distributed",
+      "aliases": [
+        "websocket"
+      ],
+      "current_matcher_single_token": true
+    }
+  ]
+}
