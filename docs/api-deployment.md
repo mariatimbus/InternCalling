@@ -34,8 +34,10 @@ as required reviewer.
 `https://interncalling-api.vercel.app`, plus `NEXT_PUBLIC_SUPABASE_URL`,
 `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `AUTH_APP_ORIGIN`.
 
-**GitHub → Environments → `production`:** secrets `SUPABASE_ACCESS_TOKEN`,
-`SUPABASE_DB_PASSWORD`; variables `SUPABASE_PROJECT_REF`, optional `API_PUBLIC_URL`.
+**GitHub → Environments → `production`:** secret `SUPABASE_DB_PASSWORD`; variables
+`SUPABASE_PROJECT_REF`, `SUPABASE_POOLER_HOST` (default `aws-1-eu-central-1.pooler.supabase.com`)
+and optional `API_PUBLIC_URL`. `migrate` builds a session-pooler URL (port 5432) from
+these, so no Supabase personal access token is needed.
 
 ## Serverless notes
 
