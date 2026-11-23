@@ -429,6 +429,13 @@ bucket and metadata migration must be applied before enabling uploads.
 | POST | `/cv/{id}/review` | Accept selected `fields`; rejects profile conflicts |
 | DELETE | `/cv/{id}` | Remove private object then metadata; 204 |
 
+Extraction does not require AI. When `APP_OLLAMA_URL` is unset, or the model is offline
+or returns an unverifiable draft, deterministic keyword rules (`ai/rules.py`, extractor
+`rules-v1`) propose degree level, university, field of study, graduation year, header
+city and catalog skills, each quoted from the CV. Workspace `capabilities.parsing` is
+therefore always `true`. Students still confirm every value; nothing is written
+automatically. 422 `invalid_extraction` means that neither path found an explicit fact.
+
 Reviewable fields: headline, location, degree_level, field_of_study, university,
 graduation_year, skills, interests. Missing facts cannot be accepted. Accepting a
 field replaces its current value; clients must show values/evidence before asking

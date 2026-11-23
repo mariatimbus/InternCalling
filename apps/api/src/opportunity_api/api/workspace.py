@@ -7,7 +7,6 @@ from uuid import UUID
 from fastapi import APIRouter, Header, Query, Response
 from pydantic import ConfigDict, Field, ValidationError
 
-from ..ai.client import AIInvalidOutput, AIUnavailable, OllamaClient
 from ..core.config import get_settings
 from ..core.errors import APIError
 from ..core.storage import PrivateCVStorage
@@ -41,15 +40,10 @@ def capabilities(user: CurrentUser):
         upload = True
     except APIError:
         upload = False
-    try:
-        parsing = bool(settings.ollama_url) and bool(
-            OllamaClient(settings.ollama_url, timeout=2).model_digest(settings.ollama_extract_model)
-        )
-    except (AIUnavailable, AIInvalidOutput):
-        parsing = False
+    # Deterministic rules can always parse; a configured model only improves the draft.
     return {
         "upload": upload,
-        "parsing": parsing,
+        "parsing": True,
         "confirmation": True,
         "collections": True,
         "tailoring": True,

@@ -11,8 +11,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
-from ..ai.client import AIInvalidOutput, AIUnavailable, OllamaClient
+from ..ai.client import AIUnavailable, OllamaClient
 from ..ai.documents import DOCX, MAX_FILE_BYTES, PDF, InvalidDocument, extract_text
+from ..ai.extract import extract_cv_facts
 from ..ai.schemas import CVExtraction
 from ..core.config import get_settings
 from ..core.database import get_db
@@ -38,18 +39,19 @@ def get_storage(creds: Annotated[HTTPAuthorizationCredentials | None, Depends(be
     )
 
 
-def get_model():
+def get_model() -> OllamaClient | None:
+    """The optional extraction model; None means deterministic rules are used."""
     settings = get_settings()
+    if not settings.ollama_url:
+        return None
     try:
         return OllamaClient(settings.ollama_url, timeout=settings.ollama_timeout)
-    except AIUnavailable as exc:
-        raise APIError(
-            "CV extraction is unavailable", status_code=503, code="ai_unavailable"
-        ) from exc
+    except AIUnavailable:
+        return None
 
 
 Storage = Annotated[PrivateCVStorage, Depends(get_storage)]
-Model = Annotated[OllamaClient, Depends(get_model)]
+Model = Annotated[OllamaClient | None, Depends(get_model)]
 
 
 def owned(db: Session, user: User, document_id: UUID, *, lock=False) -> CVDocument:
@@ -183,22 +185,15 @@ def extract_cv(document_id: UUID, db: Db, user: CurrentUser, storage: Storage, m
         raise APIError("CV content changed; upload it again", status_code=409, code="cv_changed")
     text = read_document(content, document.media_type)
     try:
-        extraction = model.generate(get_settings().ollama_extract_model, text, CVExtraction)
-        extraction.verify_evidence(text)
-    except AIUnavailable as exc:
+        extraction, extractor = extract_cv_facts(db, text, model)
+    except ValueError as exc:
         raise APIError(
-            "CV extraction is unavailable; your file is still saved",
-            status_code=503,
-            code="ai_unavailable",
-        ) from exc
-    except (AIInvalidOutput, ValueError) as exc:
-        raise APIError(
-            "Extraction could not be validated; edit your profile manually or try again",
+            "No explicit profile facts were found; edit your profile manually",
             status_code=422,
             code="invalid_extraction",
         ) from exc
     document.extraction = extraction.model_dump(mode="json")
-    document.extraction_model = get_settings().ollama_extract_model
+    document.extraction_model = extractor
     document.profile_snapshot = profile_values(user)
     document.status = "extracted"
     db.commit()
