@@ -1,0 +1,29 @@
+# Render Blueprint for the FastAPI backend. Secrets are entered in the Render
+# dashboard (sync: false) and never committed. Deploys are triggered by
+# .github/workflows/api-deploy.yml after CI and migrations succeed on main.
+services:
+  - type: web
+    name: opportunity-api
+    runtime: docker
+    plan: starter
+    region: frankfurt
+    branch: main
+    autoDeploy: false
+    dockerContext: ./apps/api
+    dockerfilePath: ./apps/api/Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: APP_SUPABASE_URL
+        sync: false
+      - key: APP_SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: APP_SUPABASE_JWT_SECRET
+        sync: false
+      - key: CORS_ORIGINS
+        value: https://interncalling.vercel.app
+      - key: APP_DEBUG
+        value: "false"
+      - key: APP_OLLAMA_URL
+        sync: false
