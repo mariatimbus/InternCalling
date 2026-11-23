@@ -161,7 +161,7 @@ Query params (all optional, combined with AND):
 | `degree_level` | enum | `bachelor`/`master` match themselves **and** `both`; `null` (unknown) never matches |
 | `study_year` | int (1–6) | containment: opportunity's `study_year` must include it; `null` (unknown) never matches |
 | `location` | string | case-insensitive substring |
-| `is_active` | bool | exact match |
+| `is_active` | `true` only | default `true`; hidden postings (inactive or under review) are never listed, and `false` is rejected with 422. A saved posting stays readable by id. |
 | `deadline_after` / `deadline_before` | datetime ISO 8601 | inclusive bounds on `deadline` |
 | `search` | string | case-insensitive substring of `title`, `organization`, or `description` |
 
