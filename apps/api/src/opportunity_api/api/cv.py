@@ -20,6 +20,7 @@ from ..core.errors import APIError
 from ..core.storage import PrivateCVStorage
 from ..models import CVDocument, Profile, User
 from ..schemas.cv import CVResponse, CVReview
+from ..workspace.common import lock_user
 from .deps import bearer_scheme, get_current_user
 from .profile import _get_or_create_skill
 
@@ -97,14 +98,9 @@ def list_cvs(db: Db, user: CurrentUser):
     )
 
 
-@router.post("", response_model=CVResponse, status_code=201)
-async def upload_cv(
-    request: Request,
-    db: Db,
-    user: CurrentUser,
-    storage: Storage,
-    filename: Annotated[str, Query(pattern=r"^[A-Za-z0-9][A-Za-z0-9 ._-]{0,180}\.(pdf|docx)$")],
-):
+async def stage_cv(request, db, user, storage, filename):
+    # Fail before writing an object if the metadata migration is missing.
+    db.scalar(select(CVDocument.id).where(CVDocument.user_id == user.id).limit(1))
     media_type = request.headers.get("content-type", "").split(";")[0].strip()
     expected = PDF if filename.endswith(".pdf") else DOCX
     if media_type != expected:
@@ -132,6 +128,19 @@ async def upload_cv(
         sha256=hashlib.sha256(content).hexdigest(),
     )
     db.add(document)
+    return document
+
+
+@router.post("", response_model=CVResponse, status_code=201)
+async def upload_cv(
+    request: Request,
+    db: Db,
+    user: CurrentUser,
+    storage: Storage,
+    filename: Annotated[str, Query(pattern=r"^[A-Za-z0-9][A-Za-z0-9 ._-]{0,180}\.(pdf|docx)$")],
+):
+    document = await stage_cv(request, db, user, storage, filename)
+    path = document.storage_path
     try:
         db.commit()
     except Exception as exc:
@@ -167,6 +176,7 @@ def download_cv(document_id: UUID, db: Db, user: CurrentUser, storage: Storage):
 
 @router.post("/{document_id}/extract", response_model=CVResponse)
 def extract_cv(document_id: UUID, db: Db, user: CurrentUser, storage: Storage, model: Model):
+    lock_user(db, user)
     document = owned(db, user, document_id, lock=True)
     content = storage.download(document.storage_path)
     if hashlib.sha256(content).hexdigest() != document.sha256:
@@ -197,6 +207,7 @@ def extract_cv(document_id: UUID, db: Db, user: CurrentUser, storage: Storage, m
 
 @router.post("/{document_id}/review", response_model=CVResponse)
 def review_cv(document_id: UUID, payload: CVReview, db: Db, user: CurrentUser):
+    lock_user(db, user)
     document = owned(db, user, document_id, lock=True)
     if document.status != "extracted" or not document.extraction:
         raise APIError("Extract this CV before reviewing it", status_code=409, code="cv_not_ready")
@@ -240,6 +251,7 @@ def review_cv(document_id: UUID, payload: CVReview, db: Db, user: CurrentUser):
 
 @router.delete("/{document_id}", status_code=204)
 def delete_cv(document_id: UUID, db: Db, user: CurrentUser, storage: Storage):
+    lock_user(db, user)
     document = owned(db, user, document_id, lock=True)
     storage.delete(document.storage_path)
     db.delete(document)

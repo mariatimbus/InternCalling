@@ -1,4 +1,4 @@
-/** PROVISIONAL frontend contract. No backend schema or endpoints are agreed. */
+/** Live editor contract; persisted through /api/backend/workspace/collections. */
 import type { CollectionService } from "./experience";
 import { partialDate } from "./experience";
 import { validateResumeUrl } from "./resume-link";

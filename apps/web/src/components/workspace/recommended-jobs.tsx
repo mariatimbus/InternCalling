@@ -169,7 +169,7 @@ function Brief({ item, detailContext, application }: { item: RankedOpportunity; 
     </section>}
     {match && <section><h3 className="card-title">Score breakdown</h3><p className="metadata-text mt-2">Profile relevance, not an acceptance probability.</p><dl className="mt-3 grid grid-cols-2 gap-3 text-sm">{Object.entries(match.components).map(([name, points]) => <div key={name}><dt className="text-muted">{name.replaceAll("_", " ")}</dt><dd>{points} points</dd></div>)}</dl></section>}
     {item.eligibility && <section><h3 className="card-title">Eligibility requirements</h3><p className="metadata-text mt-2">Unknown requirements need confirmation from the official source.</p><ul className="mt-3 space-y-3 text-sm text-muted">{item.eligibility.reasons.map((rule) => <li key={rule.rule}><EligibilityBadge status={rule.status} /><p className="mt-1">{rule.reason}</p></li>)}</ul></section>}
-    {listing && <TailoringEntryPoint title={job.title} organization={job.organization ?? ""} />}
+    {listing && <TailoringEntryPoint jobId={job.id} title={job.title} organization={job.organization ?? ""} />}
   </article>;
 }
 
