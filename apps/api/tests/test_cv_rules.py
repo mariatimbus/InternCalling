@@ -66,7 +66,8 @@ def test_romanian_cv_prefers_master_and_explicit_graduation():
     result = rules.extract(ROMANIAN, CATALOG)
     assert result.degree_level.value == "master"
     assert result.university.value == "Universitatea Babeș-Bolyai"
-    assert result.field_of_study.value == "Informatică"
+    # All facts describe the same (master's) programme, not the earlier licence.
+    assert result.field_of_study.value == "Inteligență Artificială"
     assert result.graduation_year.value == 2026  # "absolvire estimată 2026" wins over 2024
     assert result.location.value == "Cluj-Napoca"
     assert result.values_for("skills") == ["go", "java", "sql"]
@@ -127,3 +128,74 @@ def test_degree_line_field_beats_faculty_name():
     assert result.field_of_study.value == "Computer Engineering"
     assert result.university.value == "Universitatea Politehnica Timisoara"
     assert result.graduation_year.value == 2026
+
+
+# Mirrors a real CV whose PDF text puts work experience (mentioning a university)
+# before the Education section, uses dotted degree abbreviations and lists two degrees.
+TWO_DEGREES = "\n".join(
+    [
+        "Jane Student",
+        "Bucharest, Romania | jane@example.invalid",
+        "Research Assistant | Faculty of Physics, University of Bucharest / Institute of Space"
+        " Science Sep 2023 – Oct 2025",
+        "Skills",
+        "Python, C++, SQL",
+        "University of Bucharest – Faculty of Mathematics and Computer Science"
+        " Oct 2025 – Jun 2029 (Expected)",
+        "B.E., Computer Engineering",
+        "Relevant Coursework: Numerical Methods, Statistics, Linear Algebra",
+        "Bucharest University of Economic Studies (ASE) – B.S., Management"
+        " Oct 2025 – Jun 2028 (Expected)",
+    ]
+)
+
+
+def test_degree_entry_beats_university_mentioned_in_experience():
+    result = rules.extract(TWO_DEGREES, CATALOG)
+    assert result.degree_level.value == "bachelor"  # "B.E." is a bachelor's degree
+    assert result.university.value == "University of Bucharest"
+    assert result.field_of_study.value == "Computer Engineering"
+    assert result.graduation_year.value == 2029
+    assert result.location.value == "Bucharest"
+    quoted_in(result, TWO_DEGREES)
+
+
+def test_two_degrees_are_never_mixed():
+    text = (
+        "Bucharest University of Economic Studies (ASE) Oct 2025 – Jun 2028 (expected)\n"
+        "B.S. in Management\n"
+        "Relevant Coursework: Statistics, Macroeconomics\n"
+        "University of Bucharest – Faculty of Mathematics and Computer Science 2025 – 2029\n"
+        "B.E. in Computer Engineering\n"
+    )
+    result = rules.extract(text, [])
+    assert (
+        result.university.value,
+        result.field_of_study.value,
+        result.graduation_year.value,
+    ) == ("Bucharest University of Economic Studies (ASE)", "Management", 2028)
+
+
+def test_master_degree_is_the_anchor_when_present():
+    text = (
+        "Politehnica University of Bucharest, 2019 - 2023\nB.Sc. in Computer Science\n"
+        "University of Amsterdam, 2024 - 2026 (expected)\nM.Sc. in Artificial Intelligence\n"
+    )
+    result = rules.extract(text, [])
+    assert result.degree_level.value == "master"
+    assert result.university.value == "University of Amsterdam"
+    assert result.field_of_study.value == "Artificial Intelligence"
+    assert result.graduation_year.value == 2026
+
+
+@pytest.mark.parametrize(
+    "line",
+    ["B.E., Computer Engineering", "B.S. in Management", "B.A. History", "B.Tech in Robotics"],
+)
+def test_dotted_bachelor_abbreviations(line):
+    assert rules.extract(f"Fixture University\n{line}", []).degree_level.value == "bachelor"
+
+
+def test_coursework_is_not_a_field_of_study():
+    text = "Fixture University\nBachelor student\nRelevant Coursework: Statistics, Physics"
+    assert rules.extract(text, []).field_of_study is None
