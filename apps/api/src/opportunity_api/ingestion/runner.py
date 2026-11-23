@@ -68,7 +68,6 @@ class IngestionRunner:
     ) -> None:
         name = adapter.source_name
         source = report.source(name)
-        self.store.reset_index()
         pending: list[tuple[NormalizedOpportunity, str]] = []
         created_before, updated_before = source.created, source.updated
 
