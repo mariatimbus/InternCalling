@@ -10,6 +10,7 @@ this import path. New postings are inactive pending publication review, unless t
 store runs with ``publish=True``: then in-scope postings that need no review go live.
 """
 
+from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -19,7 +20,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, load_only
+from sqlalchemy.orm import Session
 
 from opportunity_api.models import Opportunity, OpportunityDegreeLevel, OpportunityType
 
@@ -28,6 +29,12 @@ from .normalize import canonical_url, clean_text
 from .report import IngestionError, Notice
 
 UpsertResult = Literal["created", "updated", "duplicate"]
+
+
+def _same(previous, value) -> bool:
+    if isinstance(previous, datetime) and isinstance(value, datetime):
+        return utc(previous) == utc(value)
+    return previous == value
 
 
 class NormalizedOpportunity(BaseModel):
@@ -165,37 +172,33 @@ class OpportunityStore:
     def __init__(self, session: Session, *, publish: bool = False) -> None:
         self.session = session
         self.publish = publish
-        self._live: dict[str, set[str]] = {}
         self._index: Deduplicator | None = None
+        self._by_source: dict[str, dict[str, Opportunity]] = defaultdict(dict)
         self._preview: _PreviewState | None = None
 
     def reset_index(self) -> None:
         self._index = None
 
     def _identity_rows(self) -> Iterable[Opportunity]:
-        query = select(Opportunity).options(
-            load_only(
-                Opportunity.id,
-                Opportunity.source,
-                Opportunity.source_id,
-                Opportunity.url,
-                Opportunity.title,
-                Opportunity.organization,
-                Opportunity.location,
-                Opportunity.deadline,
-                Opportunity.opportunity_type,
-            )
-        )
+        # Full rows: comparing an update needs every field, and lazy-loading the rest
+        # cost one round trip per column per record on a distant database.
         with self.session.no_autoflush:
-            yield from self.session.scalars(query)
+            yield from self.session.scalars(select(Opportunity))
 
     def _identities(self) -> Deduplicator:
         if self._index is None:
             self._index = Deduplicator()
-            # One metadata-only snapshot per source, not a full scan per incoming row.
+            self._by_source = defaultdict(dict)
+            # One snapshot per run (rebuilt only after a rollback), not one per source.
             for row in self._identity_rows():
-                self._index.remember(row)
+                self._remember(row)
         return self._index
+
+    def _remember(self, row: Opportunity) -> None:
+        assert self._index is not None
+        self._index.remember(row)
+        if row.source_id:
+            self._by_source[row.source][row.source_id] = row
 
     def begin_preview(self) -> None:
         """Fresh detached catalogue per run; keep it across source index resets."""
@@ -252,6 +255,14 @@ class OpportunityStore:
         """Create or update by identity; never insert a duplicate."""
         self._begin_write()
         try:
+            match = self._identities().find(record, allow_update=True)
+            if (
+                match is not None
+                and match.kind != "fingerprint"
+                and match.record.source == record.source
+                and self._unchanged(match.record, record)
+            ):
+                return "updated"  # nothing to write: skip the savepoint round trips
             with self.session.begin_nested():
                 match = self._identities().find(record, allow_update=True)
                 if match is not None:
@@ -275,7 +286,7 @@ class OpportunityStore:
                 )
                 self.session.add(row)
                 self.session.flush()
-                self._identities().remember(row)
+                self._remember(row)
                 return "created"
         except IntegrityError:
             # Only the failed record's savepoint rolls back; prior successful rows survive.
@@ -301,17 +312,21 @@ class OpportunityStore:
             self.reset_index()
             raise
 
+    def _unchanged(self, row: Opportunity, record: NormalizedOpportunity) -> bool:
+        """True when an upsert would write nothing (the common case on a rerun)."""
+        if any(not _same(getattr(row, k), v) for k, v in _row_values(record).items()):
+            return False
+        if (record._requires_review and row.is_active) or self._republishable(row, record):
+            return False
+        return bool(explicit_id(row)) or not record.source_id
+
     def _apply(self, row: Opportunity, record: NormalizedOpportunity) -> bool:
         """Copy mutable fields onto ``row``. Returns True when anything changed."""
         changed = False
         values = _row_values(record)
         for field_name, value in values.items():
             previous = getattr(row, field_name)
-            same = (
-                utc(previous) == utc(value)
-                if isinstance(previous, datetime) and isinstance(value, datetime)
-                else previous == value
-            )
+            same = _same(previous, value)
             if not same:
                 setattr(row, field_name, value)
                 changed = True
@@ -330,26 +345,15 @@ class OpportunityStore:
         """Hide a live posting that the current scope rules now reject (publish mode)."""
         if not self.publish or not source_id:
             return False
-        if source not in self._live:  # one query per source, not per rejected record
-            live = select(Opportunity.source_id).where(
-                Opportunity.source == source, Opportunity.is_active.is_(True)
-            )
-            self._live[source] = set(self.session.scalars(live))
-        if source_id not in self._live[source]:
+        self._identities()  # the run's snapshot answers this without another query
+        row = self._by_source[source].get(source_id)
+        if row is None or not row.is_active:
             return False
         self._begin_write()
         with self.session.begin_nested():
-            row = self.session.scalar(
-                select(Opportunity).where(
-                    Opportunity.source == source, Opportunity.source_id == source_id
-                )
-            )
-            if row is None or not row.is_active:
-                return False
             row.is_active = False
             row.updated_at = datetime.now(UTC)
             self.session.flush()
-        self._live[source].discard(source_id)
         return True
 
     def _republishable(self, row: Opportunity, record: NormalizedOpportunity) -> bool:
@@ -360,8 +364,8 @@ class OpportunityStore:
         return row.inactive_reason in (None, "source_missing") and not expired
 
     def commit(self) -> None:
+        # Rows stay valid after commit, so the run keeps one identity snapshot.
         self.session.commit()
-        self.reset_index()
 
     def rollback(self) -> None:
         self.session.rollback()
