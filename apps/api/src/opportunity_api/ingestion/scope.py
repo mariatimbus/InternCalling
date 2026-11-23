@@ -229,7 +229,8 @@ NON_STEM_TITLE = re.compile(
     r"payroll|legal|paralegal|accounting|accountant|consolidation|finance|financial|tax|"
     r"communications?|public\s+relations|brand|content|copywriting|influencer|affiliat\w*|"
     r"crm|account\s+management|merchant|customer\s+success|business\s+development|"
-    r"events?|graphic|creative|vertrieb|commercial|comptab\w*|juridique|"
+    r"events?|graphic|creative|vertrieb|commercial|comptab\w*|juridique|customer\s+service|"
+    r"kundenservice|office\s+management|"
     r"ressources\s+humaines)\b",
     re.IGNORECASE,
 )
@@ -263,8 +264,24 @@ def _is_europe(location: str) -> bool:
     return EUROPE_PATTERN.search(location) is not None
 
 
-def assess_scope(title: str, description: str | None, location: str | None) -> ScopeDecision:
-    """Decide whether a raw posting is inside the ingestion scope."""
+def _technical_title(title: str) -> bool:
+    """A STEM title, ignoring a bare "AI" that is often part of a company name."""
+    words = {m.group(0).lower() for m in STEM_PATTERN.finditer(title)}
+    return bool(words - {"ai"}) or IT_TITLE_PATTERN.search(title) is not None
+
+
+def assess_scope(
+    title: str,
+    description: str | None,
+    location: str | None,
+    *,
+    european_source: bool = False,
+) -> ScopeDecision:
+    """Decide whether a raw posting is inside the ingestion scope.
+
+    ``european_source`` marks boards that only list jobs in Europe, so a town without a
+    country name ("Greven") still counts as European.
+    """
     reviews = []
     if not _is_student_role(title):
         if re.search(r"\b(?:student|trainee)\b", title, re.I):
@@ -273,15 +290,15 @@ def assess_scope(title: str, description: str | None, location: str | None) -> S
             return ScopeDecision(
                 False, "not an internship-level student role", code="not_student_role"
             )
-    if NON_STEM_TITLE.search(title) and not _is_stem(title, ""):
+    if NON_STEM_TITLE.search(title) and not _technical_title(title):
         return ScopeDecision(False, "not tech/STEM", code="not_stem")
     if not _is_stem(title, description or ""):
         if NON_STEM.search(f"{title}\n{description or ''}"):
             return ScopeDecision(False, "not tech/STEM", code="not_stem")
         reviews.append("tech/STEM domain is not established")
     place = location or ""
-    european = _is_europe(place)
     outside = OUTSIDE_PATTERN.search(place) is not None or US_STATE.search(place) is not None
+    european = _is_europe(place) or (european_source and not outside)
     if EU_EXCLUDED.search(place) or (outside and not european):
         return ScopeDecision(False, "outside Europe", code="outside_europe")
     if outside and european:
