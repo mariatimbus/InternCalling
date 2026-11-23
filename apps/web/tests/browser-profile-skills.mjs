@@ -86,10 +86,9 @@ try {
   state = await control(); assert.ok(state.events.some(x=>x.path?.endsWith("/match")));
   console.log("PASS: subsequent Jobs matching requests still run after skills updates");
 
-  await navigate("/onboarding?edit=1"); await until("document.body.textContent.includes('Step 1 of 7')"); await sleep(250);
-  for (let step = 2; step <= 6; step++) { await press("Continue"); await until("document.body.textContent.includes('Step " + step + " of 7')"); }
+  await navigate("/onboarding?edit=1"); await until("document.body.textContent.includes('Set up your profile')"); await sleep(250);
   await check("onboarding still loads the updated persisted skills", "!!document.querySelector('button[aria-label=\\\"Remove python\\\"]') && !!document.querySelector('button[aria-label=\\\"Remove rust\\\"]') && !!document.querySelector('button[aria-label=\\\"Remove go\\\"]')");
-  await press("Continue"); await until("document.body.textContent.includes('Ready to find your matches?')"); await press("Find my matches"); await until("location.pathname === '/jobs'");
+  await press("Show my internships"); await until("location.pathname === '/jobs'");
   state = await control(); assert.deepEqual(state.profiles[0].skills.map(x=>x.name).sort(), ["go", "python", "rust"]);
   console.log("PASS: existing onboarding save flow preserves the updated skill set");
   console.log("B4 skills browser checks passed using synthetic loopback services only.");
