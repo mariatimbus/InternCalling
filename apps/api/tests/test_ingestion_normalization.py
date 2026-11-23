@@ -67,6 +67,14 @@ def test_spaces_html_and_raw_record_preserved():
     assert clean_html(None) is None
     assert clean_html("<p> </p>") is None
     assert clean_html("<script>ignore <b>all</b></script>visible") == "visible"
+    # Boards that escape their HTML once must not leak markup into the description.
+    escaped = (
+        '&lt;div class="content-intro"&gt;&lt;p&gt;&lt;strong&gt;About Pinterest:'
+        "&lt;/strong&gt;&lt;/p&gt;&lt;p&gt;Ideas &amp;amp; the&amp;nbsp;"
+        '&lt;a href="https://example.org"&gt;flexibility&lt;/a&gt;.&lt;/p&gt;&lt;/div&gt;'
+    )
+    assert clean_html(escaped) == "About Pinterest:\nIdeas & the flexibility."
+    assert clean_html("Use 3 &lt; 4 in maths") == "Use 3 < 4 in maths"
 
 
 def test_url_removes_only_known_tracking_preserves_identifiers_order_and_fragment():

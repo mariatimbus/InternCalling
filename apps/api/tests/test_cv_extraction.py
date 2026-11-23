@@ -88,8 +88,7 @@ def upload(client, headers):
     return response.json()
 
 
-def test_text_parsers_and_schema_grounding():
-    assert "Fixture University" in extract_text(docx(), DOCX)
+def _pdf(content: bytes) -> bytes:
     writer = PdfWriter()
     page = writer.add_blank_page(width=200, height=200)
     font = DictionaryObject(
@@ -103,11 +102,23 @@ def test_text_parsers_and_schema_grounding():
         {NameObject("/Font"): DictionaryObject({NameObject("/F1"): writer._add_object(font)})}
     )
     stream = DecodedStreamObject()
-    stream.set_data(b"BT /F1 12 Tf 10 100 Td (Synthetic Python CV) Tj ET")
+    stream.set_data(b"BT /F1 12 Tf 10 100 Td (" + content + b") Tj ET")
     page[NameObject("/Contents")] = writer._add_object(stream)
     file = BytesIO()
     writer.write(file)
-    assert "Synthetic Python CV" in extract_text(file.getvalue(), PDF)
+    return file.getvalue()
+
+
+def test_unmapped_glyphs_do_not_reject_the_cv():
+    from opportunity_api.ai.documents import _parse_text
+
+    text = _parse_text(_pdf(b"Universitatea Babe\x00-Bolyai"), PDF)
+    assert "\x00" not in text and "Babe-Bolyai" in text
+
+
+def test_text_parsers_and_schema_grounding():
+    assert "Fixture University" in extract_text(docx(), DOCX)
+    assert "Synthetic Python CV" in extract_text(_pdf(b"Synthetic Python CV"), PDF)
     CVExtraction.model_validate(output()).verify_evidence(TEXT)
     invalid = output()
     invalid["university"]["value"] = "Invented University"
