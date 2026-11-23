@@ -7,7 +7,13 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
 from ..registry import AdapterRegistry
-from .ats import GreenhouseAdapter, LeverAdapter, SmartRecruitersAdapter
+from .ats import (
+    ArbeitnowAdapter,
+    AshbyAdapter,
+    GreenhouseAdapter,
+    LeverAdapter,
+    SmartRecruitersAdapter,
+)
 from .http import PublicJSONClient
 
 REGISTRY = Path(__file__).with_name("employers.json")
@@ -17,7 +23,7 @@ class Employer(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     name: str = Field(min_length=1, max_length=255)
-    provider: Literal["greenhouse", "lever", "smartrecruiters"]
+    provider: Literal["greenhouse", "lever", "smartrecruiters", "ashby", "arbeitnow"]
     identifier: str = Field(pattern=r"^[A-Za-z0-9_-]{1,40}$")
     careers_url: HttpUrl
     region: Literal["global", "eu"] = "global"
@@ -62,6 +68,8 @@ def employer_registry(
         "greenhouse": GreenhouseAdapter,
         "lever": LeverAdapter,
         "smartrecruiters": SmartRecruitersAdapter,
+        "ashby": AshbyAdapter,
+        "arbeitnow": ArbeitnowAdapter,
     }
     for employer in load_employers() if employers is None else employers:
         if employer.enabled:
