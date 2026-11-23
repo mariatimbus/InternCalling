@@ -257,7 +257,10 @@ class AshbyAdapter(ATSAdapter):
         places = [raw.get("location")]
         places += [row.get("location") for row in raw.get("secondaryLocations") or []]
         country = (raw.get("address") or {}).get("postalAddress", {}).get("addressCountry")
-        places.append(country)
+        if isinstance(country, str) and not any(
+            isinstance(p, str) and country.lower() in p.lower() for p in places
+        ):
+            places.append(country)  # "Paris, France" already names the country
         if raw.get("isRemote") or raw.get("workplaceType") == "Remote":
             places.append("Remote")
         place = ", ".join(dict.fromkeys(p for p in places if isinstance(p, str) and p.strip()))
@@ -279,6 +282,8 @@ class ArbeitnowAdapter(ATSAdapter):
 
     provider = "arbeitnow"
     endpoint = "https://www.arbeitnow.com/api/job-board-api"
+    # The board only lists jobs in Europe; small towns rarely carry a country name.
+    european_source = True
 
     def records(self):
         seen = set()
@@ -298,8 +303,6 @@ class ArbeitnowAdapter(ATSAdapter):
         place = raw.get("location") or ""
         if raw.get("remote"):
             place = ", ".join(filter(None, [place, "Remote"]))
-        # Arbeitnow only lists jobs in Europe; small towns rarely carry a country name.
-        place = ", ".join(filter(None, [place, "Europe"]))
         record = self.raw(
             dict(raw, id=raw["slug"]),
             title=raw["title"],
