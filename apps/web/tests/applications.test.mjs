@@ -60,3 +60,105 @@ test("concurrent save conflict rereads canonical data", async () => {
   const result = await changeTracking(api, form("save"));
   assert.ok(result.error); assert.equal(result.application.id, "canonical-id"); assert.equal(count, 2);
 });
+
+async function loadRoute(file, dependencies) {
+  const source = await readFile(new URL("../src/app/(workspace)/applications/" + file, import.meta.url), "utf8");
+  const { outputText } = ts.transpileModule(source, { compilerOptions: {
+    module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX,
+  } });
+  const exports = {};
+  new Function("require", "exports", outputText)((name) => {
+    assert.ok(name in dependencies, "Unexpected dependency " + name);
+    return dependencies[name];
+  }, exports);
+  return exports;
+}
+
+const jsx = (type, props) => ({ type, props });
+const nodes = (node) => node?.props ? [node, ...[node.props.children].flat(Infinity).flatMap(nodes)] : [];
+
+async function applicationsRoute(api) {
+  const invalidations = [];
+  const account = { requireCompletedAccount: async () => ({ api }) };
+  const { default: page } = await loadRoute("page.tsx", {
+    "react/jsx-runtime": { jsx, jsxs: jsx },
+    "next/link": { default: "Link" },
+    "@/lib/auth/account": account,
+    "@/components/ui/empty-state": { EmptyState: "EmptyState" },
+    "@/components/applications/application-controls": { ApplicationControls: "Controls" },
+  });
+  const { updateTracking } = await loadRoute("actions.ts", {
+    "next/cache": { revalidatePath: (path) => invalidations.push(path) },
+    "@/lib/auth/account": account,
+    "@/lib/applications": { changeTracking },
+  });
+  return { render: async (view) => nodes(await page({ searchParams: Promise.resolve({ view }) })),
+    updateTracking, invalidations };
+}
+
+function application(status, opportunityId = opportunity) {
+  return { id: "application-" + status, opportunity_id: opportunityId, status, notes: null,
+    opportunity: { title: status + " fixture", organization: "Fixture" } };
+}
+
+function trackerView(tree) {
+  const links = tree.filter(({ type, props }) => type === "Link" && props.href.startsWith("/applications?view="));
+  return {
+    active: links.find(({ props }) => props["aria-current"] === "page").props.href,
+    counts: links.map(({ props }) => [props.href.split("=")[1], [props.children].flat().filter(Boolean).join("")]),
+    rows: tree.filter(({ type }) => type === "Controls").map(({ props }) => props.application),
+    empty: tree.find(({ type }) => type === "EmptyState")?.props.title,
+  };
+}
+
+test("Applications counts the complete tracker and supports exact status and legacy Applied views", async () => {
+  const api = fixture();
+  const statuses = ["saved", "applied", "interview", "offer", "rejected"];
+  api.items.push(...statuses.map((status) => application(status)));
+  const { render } = await applicationsRoute(api);
+  for (const status of statuses) {
+    const view = status === "applied" ? "applied-only" : status;
+    const page = trackerView(await render(view));
+    assert.equal(page.active, "/applications?view=" + view);
+    assert.deepEqual(page.rows.map((row) => row.status), [status]);
+    assert.deepEqual(Object.fromEntries(page.counts), {
+      all: "All", saved: "Saved (1)", applied: "Applied and later", "applied-only": "Applied (1)",
+      interview: "Interview (1)", offer: "Offer (1)", rejected: "Rejected (1)",
+    });
+  }
+  assert.deepEqual(trackerView(await render("applied")).rows.map((row) => row.status), statuses.slice(1));
+  assert.equal(trackerView(await render(["saved", "offer"])).rows.length, 5);
+  assert.ok(api.calls.every(({ path, method }) => path === "/api/v1/applications" && !method));
+});
+
+test("Save progress updates confirmed counts on the current filter and notes persist on a fresh read", async () => {
+  const api = fixture();
+  const saved = application("saved");
+  api.items.push(saved);
+  const { render, updateTracking, invalidations } = await applicationsRoute(api);
+  const before = trackerView(await render("saved"));
+  assert.equal(Object.fromEntries(before.counts).saved, "Saved (1)");
+  const updated = await updateTracking({ application: saved }, form("update", { status: "applied", notes: "Follow up Friday" }));
+  assert.equal(updated.application.status, "applied");
+  assert.ok(invalidations.includes("/applications"));
+  const after = trackerView(await render("saved"));
+  assert.equal(after.active, before.active);
+  assert.equal(after.empty, "No saved internships yet");
+  assert.equal(Object.fromEntries(after.counts).saved, "Saved (0)");
+  assert.equal(Object.fromEntries(after.counts)["applied-only"], "Applied (1)");
+  const refreshed = trackerView(await render("applied-only"));
+  assert.deepEqual(refreshed.rows.map(({ status, notes }) => [status, notes]), [["applied", "Follow up Friday"]]);
+});
+
+test("a failed Save progress leaves the Application counts and confirmed notes unchanged", async () => {
+  const api = fixture();
+  const saved = { ...application("saved"), notes: "Original notes" };
+  api.items.push(saved);
+  const { render, updateTracking } = await applicationsRoute(api);
+  const before = trackerView(await render("saved"));
+  const request = api.request.bind(api);
+  api.request = (path, init) => init?.method === "PATCH" ? Promise.reject(new ApiError(503, "test")) : request(path, init);
+  const failed = await updateTracking({ application: saved }, form("update", { status: "applied", notes: "Unconfirmed" }));
+  assert.ok(failed.error);
+  assert.deepEqual(trackerView(await render("saved")), before);
+});
