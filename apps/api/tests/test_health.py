@@ -25,17 +25,15 @@ def test_unknown_route_returns_standard_error_model(client):
 
 
 def test_engine_options_are_pooler_and_serverless_safe():
-    from sqlalchemy.pool import NullPool
-
     from opportunity_api.core.database import engine_options
 
     hosted = engine_options(
         "postgresql+psycopg://u:p@pooler.example.invalid:6543/db", serverless=True
     )
     assert hosted["connect_args"] == {"prepare_threshold": None}
-    assert hosted["poolclass"] is NullPool
+    assert hosted["pool_size"] == 2 and hosted["pool_recycle"] < 300
     local = engine_options("sqlite://", serverless=False)
-    assert "connect_args" not in local and "poolclass" not in local
+    assert "connect_args" not in local and "pool_size" not in local
 
 
 def test_vercel_entrypoint_exposes_the_app():

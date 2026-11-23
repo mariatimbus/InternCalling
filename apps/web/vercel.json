@@ -3,5 +3,10 @@
   "framework": "nextjs",
   "installCommand": "npm ci",
   "buildCommand": "npm run build",
-  "git": { "deploymentEnabled": true }
+  "git": {
+    "deploymentEnabled": true
+  },
+  "regions": [
+    "fra1"
+  ]
 }
