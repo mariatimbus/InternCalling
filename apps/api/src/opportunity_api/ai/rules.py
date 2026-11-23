@@ -281,6 +281,8 @@ def _skill_pattern(name: str) -> re.Pattern:
 
 def _skills(lines: list[str], catalog: Iterable[str]) -> list[dict]:
     names = sorted({n.strip() for n in catalog if 1 < len(n.strip()) <= 40}, key=len, reverse=True)
+    # Courses taken ("Relevant Coursework: Statistics") are not skills the student claims.
+    lines = [line for line in lines if not _COURSEWORK.search(line)]
     found, seen = [], set()
     for name in names:
         if name.casefold() in seen:
