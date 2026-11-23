@@ -123,14 +123,16 @@ def test_scope_keeps_missing_location_for_review():
     assert decision.code == "scope_ambiguous"
 
 
-def test_scope_keeps_unrestricted_remote_for_review_without_assuming_europe():
-    decision = assess_scope(
+def test_scope_accepts_unrestricted_remote_but_reviews_unknown_regions():
+    remote = assess_scope(
         "Software Engineering Intern",
         "Python and cloud work for students.",
         "Remote",
     )
-    assert not decision.accepted
-    assert decision.requires_review
+    assert remote.accepted
+    worldwide = assess_scope("Software Engineering Intern", "Python", "Worldwide")
+    assert not worldwide.accepted
+    assert worldwide.requires_review
 
 
 def test_adapter_interface_is_abstract():

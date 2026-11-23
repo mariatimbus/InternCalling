@@ -106,6 +106,20 @@ def test_invalid_provider_configuration_never_opens_database(tmp_path, monkeypat
     assert "private-sentinel" not in capsys.readouterr().err
 
 
+def test_allow_partial_succeeds_unless_every_source_fails(tmp_path, monkeypatch, capsys):
+    engine, url = local_database(tmp_path)
+    monkeypatch.setenv("DATABASE_URL", url)
+    try:
+        offline_cli(monkeypatch, broken="lever")
+        assert cli.main(command_args(tmp_path, "--apply") + ["--allow-partial"]) == 0
+        assert json.loads(capsys.readouterr().out)["failed_sources"] == ["lever.fixture"]
+        only_lever = {"greenhouse": False, "lever": True, "smartrecruiters": False}
+        args = command_args(tmp_path, "--apply", switches=only_lever) + ["--allow-partial"]
+        assert cli.main(args) == 1
+    finally:
+        engine.dispose()
+
+
 def test_all_disabled_fails_before_database_access(tmp_path, monkeypatch):
     args = command_args(
         tmp_path,
