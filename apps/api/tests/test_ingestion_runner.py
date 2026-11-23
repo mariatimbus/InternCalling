@@ -261,3 +261,14 @@ def test_publish_mode_revives_returning_postings_but_not_expired_ones(session):
         "ashby-job-1": (True, None),
         "ashby-job-2": (False, "deadline_expired"),
     }
+
+
+def test_publish_mode_hides_live_postings_that_scope_now_rejects(session):
+    record = make_raw("ashby", 1, deadline_raw=None, title="Software Engineering Intern")
+    IngestionRunner(OpportunityStore(session, publish=True)).run([StaticAdapter("ashby", [record])])
+    assert _active(session) == {"ashby-job-1": (True, None)}
+    marketing = make_raw("ashby", 1, deadline_raw=None, title="Brand Marketing Intern")
+    IngestionRunner(OpportunityStore(session, publish=True)).run(
+        [StaticAdapter("ashby", [marketing])]
+    )
+    assert _active(session) == {"ashby-job-1": (False, None)}

@@ -425,6 +425,12 @@ This commit prepares existing ATS operation; it does not pretend C6/C7 are merge
 The scheduled job passes `--publish`: in-scope postings (student role, STEM, Europe or
 unrestricted remote) that need no review go live immediately; ambiguous postings stay
 inactive for review. Without `--publish` the CLI keeps the inactive review policy.
+Scope recognises European countries (also in local languages, e.g. Deutschland,
+Nederland) and major European cities; Arbeitnow postings are European by source.
+Obvious non-European places (US state codes, major US/Asian cities) are rejected
+rather than queued for review. Business-function titles (marketing, sales, legal,
+HR, finance, content...) are not STEM unless the title itself is technical. With
+`--publish`, a live posting that the current rules reject is hidden again.
 `--allow-partial` keeps a run green when individual boards fail, but fails when every
 source fails; failed sources are still listed in the report and summary.
 
