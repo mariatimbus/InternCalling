@@ -1,5 +1,6 @@
 """Deterministic, offline cleanup. Unknown source facts are never inferred."""
 
+import html
 import re
 from datetime import UTC, date, datetime
 from html.parser import HTMLParser
@@ -55,6 +56,12 @@ def clean_text(value: str | None) -> str | None:
     return " ".join(value.split()) or None if value is not None else None
 
 
+BLOCK_TAGS = frozenset({"p", "div", "li", "tr", "ul", "ol", "section", "h1", "h2", "h3", "h4"})
+# Greenhouse and Arbeitnow send HTML escaped once ("&lt;p&gt;"); parsing that as-is
+# would turn the markup into visible text instead of removing it.
+ESCAPED_TAG = re.compile(r"&lt;/?[a-zA-Z][a-zA-Z0-9]*(?:\s[^&]*)?&gt;")
+
+
 class _Text(HTMLParser):
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
@@ -64,14 +71,14 @@ class _Text(HTMLParser):
     def handle_starttag(self, tag, attrs):
         if tag in {"script", "style", "noscript", "template"}:
             self.hidden.append(tag)
-        if not self.hidden and tag in {"p", "div", "br", "li", "tr", "h1", "h2", "h3"}:
+        if not self.hidden and tag in BLOCK_TAGS | {"br"}:
             self.parts.append("\n")
 
     def handle_endtag(self, tag):
         if self.hidden:
             if tag == self.hidden[-1]:
                 self.hidden.pop()
-        elif tag in {"p", "div", "li", "tr", "h1", "h2", "h3"}:
+        elif tag in BLOCK_TAGS:
             self.parts.append("\n")
 
     def handle_data(self, data):
@@ -82,6 +89,8 @@ class _Text(HTMLParser):
 def clean_html(value: str | None) -> str | None:
     if value is None:
         return None
+    if ESCAPED_TAG.search(value):
+        value = html.unescape(value)
     parser = _Text()
     parser.feed(value)
     parser.close()
