@@ -32,8 +32,8 @@ export function QuickOnboarding({ initial, suggestions }: { initial: OnboardingD
     const signal = lifetime.current?.signal; if (!signal || reading) return;
     if (file) { const check = validateResumeSelection([file]); if (check.error) { setNote(check.error); return; } }
     setReading(true); setReusable(false); setNote("Reading your CV…");
+    let source = resume;
     try {
-      let source = resume;
       if (file) { source = await services.pdf.upload(file, { replace: resume && { id: resume.id, revision: resume.revision }, signal, onProgress: () => {} }); setResume(source); }
       if (!source) return;
       let job = await services.review.start({ id: source.id, revision: source.revision }, { signal });
@@ -43,7 +43,7 @@ export function QuickOnboarding({ initial, suggestions }: { initial: OnboardingD
       if (!isParsingResult(result)) throw new Error("invalid result");
       setDraft(current => prefillOnboarding(current, result.proposed));
       setNote("Filled in from your CV. Fix anything that looks wrong.");
-    } catch { if (!signal.aborted) setNote("We couldn't read this CV. Fill in the details below."); }
+    } catch { if (!signal.aborted) { setNote("We couldn't read this CV. Fill in the details below."); setReusable(!!source); } }
     finally { if (!signal.aborted) setReading(false); }
   }
   function addSkill() {
