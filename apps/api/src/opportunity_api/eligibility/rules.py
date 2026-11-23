@@ -17,9 +17,7 @@ from opportunity_api.schemas.eligibility import (
 )
 
 
-def check_degree_level(
-    student: StudentInput, opportunity: OpportunityInput
-) -> RuleResult:
+def check_degree_level(student: StudentInput, opportunity: OpportunityInput) -> RuleResult:
     required = opportunity.degree_level
     actual = student.degree_level
     if required is None:
@@ -47,9 +45,7 @@ def check_degree_level(
     )
 
 
-def check_study_year(
-    student: StudentInput, opportunity: OpportunityInput
-) -> RuleResult:
+def check_study_year(student: StudentInput, opportunity: OpportunityInput) -> RuleResult:
     accepted = opportunity.study_year
     actual = student.study_year
     if accepted is None:
@@ -78,9 +74,7 @@ def check_study_year(
     )
 
 
-def check_graduation_year(
-    student: StudentInput, opportunity: OpportunityInput
-) -> RuleResult:
+def check_graduation_year(student: StudentInput, opportunity: OpportunityInput) -> RuleResult:
     """Structured graduation constraints only; never inferred from description."""
     required = opportunity.graduation_years
     actual = student.graduation_year
@@ -110,9 +104,7 @@ def check_graduation_year(
     )
 
 
-def check_location(
-    student: StudentInput, opportunity: OpportunityInput
-) -> RuleResult:
+def check_location(student: StudentInput, opportunity: OpportunityInput) -> RuleResult:
     """Deterministic, conservative: free text can establish a match or
     remote-friendly status, but never a hard rejection."""
     location = opportunity.location

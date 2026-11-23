@@ -9,7 +9,6 @@ from collections.abc import Generator
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
-from sqlalchemy.pool import NullPool
 
 from .config import get_settings
 
@@ -34,7 +33,9 @@ def engine_options(url: str | None = None, *, serverless: bool | None = None) ->
     if url.startswith("postgresql+psycopg"):
         options["connect_args"] = {"prepare_threshold": None}
     if serverless:
-        options["poolclass"] = NullPool
+        # Fluid compute reuses instances across requests, so keep a small pool instead of
+        # reconnecting (TLS + pooler handshake) on every request; recycle before idle drops.
+        options.update(pool_size=2, max_overflow=3, pool_recycle=240, pool_timeout=10)
     return options
 
 

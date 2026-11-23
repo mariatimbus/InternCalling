@@ -298,3 +298,22 @@ def test_unconfigured_ai_and_storage_do_not_break_core_product(client):
         ).status_code
         == 503
     )
+
+
+def test_parser_process_settings_are_serverless_safe(monkeypatch):
+    import sys
+
+    from opportunity_api.ai import documents
+
+    monkeypatch.setattr(sys, "platform", "linux")
+    assert documents._start_method() == "fork"
+    monkeypatch.setattr(sys, "platform", "darwin")
+    assert documents._start_method() == "spawn"
+    assert documents._mapped_bytes() >= 0
+
+
+@pytest.mark.skipif(
+    not __import__("sys").platform.startswith("linux"), reason="fork path is Linux-only"
+)
+def test_forked_parser_reads_pdf_under_memory_cap():
+    assert "Fixture University" in extract_text(docx(), DOCX)
