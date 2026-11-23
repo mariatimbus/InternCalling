@@ -14,11 +14,14 @@ RULES_MODEL = "rules-v1"
 _MAX_EVIDENCE = 500
 
 _BACHELOR = re.compile(
-    r"\b(bachelor(?:'?s)?|b\.?\s?sc\b\.?|bsc\b|b\.?\s?eng\b\.?|licen[țţt][ăa]|licen[tț]iat)",
+    r"\b(bachelor(?:'?s)?|b\.?\s?sc\b\.?|bsc\b|b\.?\s?eng\b\.?|b\.?\s?tech\b\.?"
+    r"|b\.\s?[aes]\.(?!\w)|licen[țţt][ăa]|licen[tț]iat)",
     re.IGNORECASE,
 )
 _MASTER = re.compile(
-    r"\b(master(?:'?s)?|masterat|m\.?\s?sc\b\.?|msc\b|m\.?\s?eng\b\.?)", re.IGNORECASE
+    r"\b(master(?:'?s)?|masterat|m\.?\s?sc\b\.?|msc\b|m\.?\s?eng\b\.?|m\.?\s?tech\b\.?"
+    r"|m\.\s?[aes]\.(?!\w))",
+    re.IGNORECASE,
 )
 _INSTITUTION = re.compile(
     r"\b(universit(?:y|atea|ät|é|à|ad|eit)|polytechnic|politehnic[ăa]|institute of technology"
@@ -35,11 +38,15 @@ _DATE_ONLY = re.compile(
 )
 _EXPECTED = re.compile(r"(expected|graduat|absolv|anticipated|class of|promo[țt]ia)", re.IGNORECASE)
 _SEPARATORS = re.compile(r"\s*(?:\||•|·|–|—|\t|\s-\s|;)\s*|,\s+(?=\d)")
+_MONTH = r"(?:[A-Za-zăâîșț]{3,9}\.?\s+)?"
 _TRAILING_DATES = re.compile(
-    r"[\s,(]*(?:19|20)\d\d\s*(?:[-–—]\s*(?:(?:19|20)\d\d|present|prezent|now))?\)?$", re.IGNORECASE
+    rf"[\s,(]*{_MONTH}(?:19|20)\d\d\s*(?:[-–—]\s*(?:{_MONTH}(?:19|20)\d\d|present|prezent|now))?"
+    r"\s*(?:\(?expected\)?)?\)?$",
+    re.IGNORECASE,
 )
 _FIELD_AFTER_DEGREE = re.compile(
-    r"(?:bachelor(?:'?s)?|master(?:'?s)?|bsc|msc|b\.sc\.?|m\.sc\.?|licen[țţt][ăa]|masterat)"
+    r"(?:bachelor(?:'?s)?|master(?:'?s)?|bsc|msc|b\.sc\.?|m\.sc\.?|b\.\s?[aes]\.|m\.\s?[aes]\."
+    r"|licen[țţt][ăa]|masterat)"
     r"\s*(?:degree\s*)?(?:of science\s*|of arts\s*)?(?:in|of|în|de|la)\s+([^\d|•·–—;,(]{3,80})",
     re.IGNORECASE,
 )
@@ -117,77 +124,138 @@ def _is_education(line: str) -> bool:
     return bool(_INSTITUTION.search(line) or _BACHELOR.search(line) or _MASTER.search(line))
 
 
+_COURSEWORK = re.compile(r"^\s*(relevant\s+)?(coursework|courses|cursuri|discipline)\b", re.I)
+
+
+def _is_degree(line: str) -> bool:
+    return bool(_BACHELOR.search(line) or _MASTER.search(line))
+
+
+def _anchor(lines: list[str]) -> int | None:
+    """The one degree the draft describes: the first master's line, else the first bachelor's.
+
+    University, field and year are all taken around this line, so a CV listing two
+    programmes never mixes facts from both.
+    """
+    for pattern in (_MASTER, _BACHELOR):
+        for index, line in enumerate(lines):
+            if pattern.search(line) and not _COURSEWORK.search(line):
+                return index
+    return None
+
+
+def _around(lines: list[str], anchor: int, reach: int = 2) -> list[int]:
+    order = [anchor]
+    for step in range(1, reach + 1):
+        order += [anchor - step, anchor + step]
+    return [i for i in order if 0 <= i < len(lines) and not _COURSEWORK.search(lines[i])]
+
+
 def _degree(lines: list[str]):
-    found = {}
-    for line in lines:
-        for level, pattern in (("master", _MASTER), ("bachelor", _BACHELOR)):
-            match = pattern.search(line)
-            if match and level not in found:
-                found[level] = _fact(level, line, match.start(), match.end())
-    # A student listing both is usually in (or has finished) the master's programme.
-    return found.get("master") or found.get("bachelor")
+    anchor = _anchor(lines)
+    if anchor is None:
+        return None
+    line = lines[anchor]
+    match = _MASTER.search(line) or _BACHELOR.search(line)
+    level = "master" if _MASTER.search(line) else "bachelor"
+    return _fact(level, line, match.start(), match.end())
+
+
+def _clean_institution(segment: str) -> str:
+    value = _TRAILING_DATES.sub("", segment).strip(" ,.:")
+    if value.count("(") > value.count(")"):
+        value = value[: value.rfind("(")].strip(" ,.:")
+    return value
 
 
 def _university(lines: list[str]):
-    for line in lines:
-        match = _INSTITUTION.search(line)
-        if not match:
-            continue
-        segment, begin = _segment(line, match.start())
-        value = _TRAILING_DATES.sub("", segment).strip(" ,.:()")
+    """The institution next to the chosen degree; otherwise the best-ranked one.
+
+    Without a degree line, prefer institution lines with an expected/graduation date
+    over others, so an employer or lab in work experience is not picked first.
+    """
+    anchor = _anchor(lines)
+    candidates = (
+        [i for i in _around(lines, anchor) if _INSTITUTION.search(lines[i])]
+        if anchor is not None
+        else []
+    )
+    if not candidates:
+        ranked = [
+            (0 if _EXPECTED.search(line) else 1, index)
+            for index, line in enumerate(lines)
+            if _INSTITUTION.search(line)
+        ]
+        candidates = [index for _, index in sorted(ranked)]
+    for index in candidates:
+        line = lines[index]
+        segment, begin = _segment(line, _INSTITUTION.search(line).start())
+        value = _clean_institution(segment)
         if 3 <= len(value) <= 255:
             return _fact(value, line, begin, begin + len(segment))
     return None
 
 
-def _education_context(lines: list[str]) -> list[str]:
-    """Education lines plus their neighbours (CVs often put the field on its own line)."""
-    # Degree lines first ("BEng in Computer Engineering" beats a faculty name), then
-    # institution lines, then their neighbours.
-    degree, institution, nearby = [], [], []
-    for index, line in enumerate(lines):
-        if _BACHELOR.search(line) or _MASTER.search(line):
-            degree.append(index)
-        elif _INSTITUTION.search(line):
-            institution.append(index)
-        else:
-            continue
-        nearby += [i for i in (index - 1, index + 1) if 0 <= i < len(lines)]
-    return [lines[i] for i in dict.fromkeys(degree + institution + nearby)]
+def _known_field(line: str):
+    lowered = line.casefold()
+    for name in FIELDS:  # longest first, so "Applied Mathematics" beats "Mathematics"
+        index = lowered.find(name.casefold())
+        if index >= 0:
+            return _fact(line[index : index + len(name)], line, index, index + len(name))
+    return None
+
+
+def _field_after_degree(line: str):
+    match = _FIELD_AFTER_DEGREE.search(line)
+    if match:
+        value = re.split(r"\s+(?:at|la)\s+", match.group(1), maxsplit=1)[0].strip(" ,.")
+        if 3 <= len(value) <= 255 and not _INSTITUTION.search(value):
+            return _fact(value, line, match.start(1), match.start(1) + len(value))
+    return None
 
 
 def _field(lines: list[str]):
-    education = [line for line in lines if _is_education(line)]
-    for line in _education_context(lines):
-        lowered = line.casefold()
-        for name in FIELDS:  # longest first, so "Applied Mathematics" beats "Mathematics"
-            index = lowered.find(name.casefold())
-            if index >= 0:
-                return _fact(line[index : index + len(name)], line, index, index + len(name))
-    for line in education:
-        match = _FIELD_AFTER_DEGREE.search(line)
-        if match:
-            value = re.split(r"\s+(?:at|la)\s+", match.group(1), maxsplit=1)[0].strip(" ,.")
-            if 3 <= len(value) <= 255 and not _INSTITUTION.search(value):
-                return _fact(value, line, match.start(1), match.start(1) + len(value))
+    anchor = _anchor(lines)
+    if anchor is not None:
+        line = lines[anchor]
+        found = _known_field(line) or _field_after_degree(line)
+        if found:
+            return found
+        # The field may sit on the institution line or on its own line beside the degree.
+        for index in _around(lines, anchor, reach=1):
+            neighbour = lines[index]
+            if index != anchor and (_INSTITUTION.search(neighbour) or len(neighbour.split()) <= 6):
+                found = _known_field(neighbour)
+                if found:
+                    return found
+        return None
+    for index, line in enumerate(lines):
+        if _INSTITUTION.search(line):
+            for neighbour in (line, *(lines[index + 1 : index + 2])):
+                if not _COURSEWORK.search(neighbour) and (found := _known_field(neighbour)):
+                    return found
     return None
 
 
 def _graduation_year(lines: list[str]):
+    anchor = _anchor(lines)
+    if anchor is not None:
+        rows = _around(lines, anchor)
+    else:
+        rows = [i for i, line in enumerate(lines) if _INSTITUTION.search(line)]
+        rows = list(dict.fromkeys(j for i in rows for j in (i, i + 1, i + 2) if j < len(lines)))
     explicit = latest = None
-    for index, line in enumerate(lines):
-        if not _is_education(line):
+    for index in rows:
+        line = lines[index]
+        years = [(int(m.group(1)), m) for m in _YEAR.finditer(line)]
+        relevant = _is_education(line) or _EXPECTED.search(line) or _DATE_ONLY.match(line)
+        if not years or not relevant:
             continue
-        for nearby in lines[index : index + 3]:
-            years = [(int(m.group(1)), m) for m in _YEAR.finditer(nearby)]
-            relevant = _is_education(nearby) or _EXPECTED.search(nearby) or _DATE_ONLY.match(nearby)
-            if not years or not relevant:
-                continue
-            year, match = max(years, key=lambda item: item[0])
-            if explicit is None and _EXPECTED.search(nearby):
-                explicit = _fact(year, nearby, match.start(), match.end())
-            if latest is None or year > latest["value"]:
-                latest = _fact(year, nearby, match.start(), match.end())
+        year, match = max(years, key=lambda item: item[0])
+        if explicit is None and _EXPECTED.search(line):
+            explicit = _fact(year, line, match.start(), match.end())
+        if latest is None or year > latest["value"]:
+            latest = _fact(year, line, match.start(), match.end())
     return explicit or latest
 
 
