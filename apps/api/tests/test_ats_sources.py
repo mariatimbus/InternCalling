@@ -211,7 +211,7 @@ def test_c3_scope_and_rerun_identity(adapter_type, session):
 
 def test_registry_allowlist_and_shared_client():
     employers = load_employers()
-    assert 20 <= len(employers) <= 30
+    assert 150 <= len(employers) <= 400
     assert len({e.source_name for e in employers}) == len(employers)
     registry = employer_registry(employers)
     assert len(registry.names()) == sum(e.enabled for e in employers)
@@ -263,13 +263,29 @@ def test_http_robots_cache_and_rate_limit():
 
 
 @pytest.mark.parametrize(
-    "rules", [b"User-agent: *\nDisallow: /", HTTPError("https://example.org", 403, "", {}, None)]
+    "rules",
+    [
+        b"User-agent: *\nDisallow: /",
+        HTTPError("https://example.org", 429, "", {"Retry-After": "120"}, None),
+    ],
 )
 def test_robots_denial_and_failure_fail_closed(rules):
     opener = Opener(rules)
     with pytest.raises((ValueError, HTTPError)):
         PublicJSONClient(open_url=opener).get("https://example.org/jobs")
     assert len(opener.requests) == 1
+
+
+@pytest.mark.parametrize("code", [401, 403, 404, 410])
+def test_unavailable_robots_means_no_rules(code):
+    # RFC 9309: a 4xx robots.txt (except 429) is "unavailable", so nothing is disallowed.
+    opener = Opener(HTTPError("", code, "", {}, None), b"[]")
+    assert (
+        PublicJSONClient(open_url=opener, clock=lambda: 0, sleep=lambda _: None).get(
+            "https://example.org/jobs"
+        )
+        == []
+    )
 
 
 def test_robots_404_and_transient_retry():
