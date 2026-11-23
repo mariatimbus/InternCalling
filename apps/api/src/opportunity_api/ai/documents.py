@@ -51,6 +51,9 @@ def _parse_text(data: bytes, media_type: str) -> str:
         raise
     except Exception as exc:
         raise InvalidDocument("CV could not be read safely") from exc
+    # A font without a Unicode map turns letters such as "ș" into NUL, which Postgres
+    # cannot store; drop them instead of rejecting the whole CV.
+    text = text.replace("\x00", "")
     if not text.strip():
         raise InvalidDocument("No readable text found; upload a text-based PDF or DOCX")
     if len(text) > MAX_TEXT_CHARS:
