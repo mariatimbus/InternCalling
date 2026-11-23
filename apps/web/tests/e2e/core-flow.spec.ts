@@ -58,9 +58,25 @@ test("confirmed signup, profile, ranking, filters, save/apply/status/notes and r
   await expect(page).toHaveURL(/q=Python/);
   await expect(page.getByText("1 opportunity", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: /Python Engineering Intern.*View details/ }).click();
-  await expect(page.getByRole("heading", { name: "Score breakdown" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Eligibility requirements" })).toBeVisible();
-  await page.getByRole("button", { name: "Save opportunity", exact: true }).click();
+  const detail = page.getByRole("article").filter({
+    has: page.getByRole("region", { name: "Opportunity information", exact: true }),
+  });
+  await expect(detail.getByRole("heading", { name: "Match Score", exact: true })).toBeVisible();
+  await expect(detail.getByRole("heading", { name: "Eligibility", exact: true })).toBeVisible();
+  const scoreBreakdown = detail.locator("details").filter({
+    has: page.getByText("Score breakdown", { exact: true }),
+  });
+  await scoreBreakdown.locator("summary").click();
+  await expect(scoreBreakdown.getByText("5 points", { exact: true })).toBeVisible();
+  await expect(scoreBreakdown.getByText("10 points", { exact: true })).toBeVisible();
+  const eligibilityDetails = detail.locator("details").filter({
+    has: page.getByText("Eligibility details", { exact: true }),
+  });
+  await eligibilityDetails.locator("summary").click();
+  const criteria = eligibilityDetails.getByRole("list", { name: "Eligibility criteria" });
+  await expect(criteria.getByText("Opportunity does not specify a degree level", { exact: true })).toBeVisible();
+  await expect(criteria.getByText("Remote opportunity; no location barrier", { exact: true })).toBeVisible();
+  await detail.getByRole("button", { name: "Save Python Engineering Intern", exact: true }).click();
   await expect(page.getByRole("combobox", { name: "Application status", exact: true })).toHaveValue("saved");
   await page.goto("/applications?view=saved");
   await expect(page.getByRole("heading", { name: "Python Engineering Intern" })).toBeVisible();
