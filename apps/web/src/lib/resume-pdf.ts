@@ -3,7 +3,7 @@ export const MAX_RESUME_BYTES = 5 * 1024 * 1024;
 export type ResumeMetadata = { id: string; revision: number; fileName: string; sizeBytes: number; contentType: "application/pdf"; uploadedAt: string };
 export type ResumeIdentity = Pick<ResumeMetadata, "id" | "revision">;
 export type TransferProgress = { transferredBytes: number; totalBytes: number };
-export type ResumeAccess = { kind: "authorized"; url: string; expiresAt: string } | { kind: "local-preview"; url: string; release: () => void };
+export type ResumeAccess = { kind: "authenticated"; url: string; release: () => void } | { kind: "authorized"; url: string; expiresAt: string } | { kind: "local-preview"; url: string; release: () => void };
 export interface ResumePdfService {
   load(options: { signal: AbortSignal }): Promise<ResumeMetadata | null>;
   upload(file: File, options: { replace: ResumeIdentity | null; signal: AbortSignal; onProgress: (progress: TransferProgress) => void }): Promise<ResumeMetadata>;
@@ -30,6 +30,7 @@ export function safeResumeAccess(access: ResumeAccess, preview: boolean, now = D
   try {
     if (/[\u0000-\u0020\u007f\\]/.test(access.url)) return false;
     const url = new URL(access.url);
+    if (access.kind === "authenticated") return url.protocol === "blob:" && typeof access.release === "function";
     if (access.kind === "local-preview") return preview && url.protocol === "blob:" && typeof access.release === "function";
     return access.kind === "authorized" && /^https:\/\//i.test(access.url) && url.protocol === "https:" && !url.username && !url.password && !/^https:\/\/[^/?#]*@/i.test(access.url) && Number.isFinite(Date.parse(access.expiresAt)) && Date.parse(access.expiresAt) > now;
   } catch { return false; }

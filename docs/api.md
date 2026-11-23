@@ -436,3 +436,73 @@ the student to accept. Foreign document IDs return 404. Other errors: 409 stale
 profile/file or missing extraction, 413 too large, 415 wrong media type, 422 unreadable
 document or invalid/ungrounded AI output, 503 unconfigured/unavailable model/Storage.
 See `services/ai/README.md` for parser limits, setup, retention and hosted test gates.
+
+
+## Live profile workspace adapters
+
+Apply `20261122160000_profile_workspace.sql` after the existing migrations before
+serving these routes. All routes below require the signed-in owner's bearer
+session; owner IDs in request bodies are never trusted. Browser editors use the
+verified Next.js same-origin `/api/backend/workspace` proxy. Configure
+`API_BASE_URL` (server-only preferred, falling back to `NEXT_PUBLIC_API_BASE_URL`)
+and `AUTH_APP_ORIGIN` to the frontend origin. Cross-origin writes are rejected.
+
+- `GET /api/v1/workspace/capabilities`: independent availability of private
+  uploads, optional Ollama parsing, explicit confirmation, collections and
+  deterministic source-based tailoring. Missing extraction model disables
+  parsing without disabling manual profile editing or configured PDF storage.
+- `GET /api/v1/workspace/snapshot`: current core fields, skills and all six
+  collections with a content revision used by import/onboarding confirmation.
+- `GET|POST /api/v1/workspace/collections/{section}` and
+  `PATCH|DELETE /api/v1/workspace/collections/{section}/{id}`: experience,
+  projects, certificates, honours, languages and publications. Mutations require
+  a UUID `Idempotency-Key`. POST/PATCH bodies contain `values` matching the
+  typed editor draft; PATCH additionally requires the saved integer `revision`.
+  DELETE requires `?revision=N`. The response has flat fields plus `id`,
+  `revision`, and `position`. Multiline authors/achievements become arrays.
+- `POST /api/v1/workspace/manual-confirm`: `{requestId, profileRevision, draft}`
+  atomically saves the five required onboarding fields and explicit skill list.
+  Returns the complete confirmed snapshot. A changed baseline returns 409.
+- `GET|POST /api/v1/workspace/resume`: current private PDF metadata or null,
+  and raw `application/pdf` upload (5 MiB maximum). Replacement requires
+  `replace_id` and `replace_revision` query values. Uploads use an idempotency
+  header. Metadata uses the fixed safe filename `resume.pdf`.
+- `GET /api/v1/workspace/resume/{id}/file?revision=N`: private owner PDF bytes,
+  never a public storage URL. DELETE at `/resume/{id}?revision=N` requires
+  an idempotency header and removes the active PDF. Older uploads are private
+  archives and never automatically become active after removal.
+- `POST /api/v1/workspace/resume/review/start`: `{source:{id,revision}}`,
+  idempotency header. Persists a validated, source-grounded core profile/skills
+  proposal. `GET /resume/review/{jobId}` and `/result` retrieve its status and
+  draft. Other profile sections remain manually editable. Parsing alone never
+  writes extracted values to the profile.
+- `POST /api/v1/workspace/resume/review/confirm`: explicit selected profile,
+  skill additions and collection edits, with request/job/source and baseline
+  revision. All edits and the durable receipt commit atomically; stale profile,
+  PDF or collection versions reject with 409. Human corrections are labelled
+  user-provided; accepted unchanged extracted facts retain reviewed provenance.
+- `GET /api/v1/workspace/tailoring/context/{jobId}`: actual job requirements and
+  current saved source facts, with revision scope. POST `/tailoring/generate`
+  accepts `{requestId,scope}` and returns a ready, persisted draft of reordered
+  source facts. It does not invent qualifications or perform AI rewriting.
+  GET `/tailoring/generation/{id}` reloads its status.
+- POST `/tailoring/save` accepts `{requestId,draft:{id,revision},blocks}`;
+  `/approve` accepts `{requestId,draft}` after every block is accepted/excluded.
+  `/export` accepts `{requestId,approval}` and prepares the exact approved
+  wording. GET `/tailoring/export/{id}` and `/file` return status/private PDF.
+  Editing the draft or changing its job/profile/PDF source invalidates export
+  access. Export contains accepted blocks only, with supported Unicode glyphs;
+  oversized/unsupported text fails validation before readiness.
+
+Collection revisions are integers; tailoring refs use revision strings to match
+its existing client contract. Idempotency keys and body request IDs are UUIDs,
+scoped to the owner and exact operation/payload. Retrying a dropped response with
+its original identifier returns the saved receipt, without repeating writes.
+Reusing the identifier for different content returns 409. The private workflow
+records contain CV/profile text: access is owner-only SELECT via Supabase RLS,
+with browser writes denied. The API performs authenticated writes. Account
+removal cascades these records; no automatic receipt expiration is applied.
+
+Browser PDF access uses session-authenticated fetch and a short-lived in-memory
+blob URL, revoked on close/replacement. Neither this adapter nor PDF export sends
+applications to employers. The original `/api/v1/cv` endpoints remain available.
