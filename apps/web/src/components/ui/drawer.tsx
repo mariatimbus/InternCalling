@@ -57,7 +57,9 @@ export function Drawer({ id, open, onClose, title, description, children, closeA
           <div><h2 id={titleId} className="section-title">{title}</h2>{description && <p id={descriptionId} className="mt-1 text-sm text-muted">{description}</p>}</div>
           <Button data-drawer-close variant="secondary" onClick={onClose} aria-label={`Close ${title}`}>{size === "skills" ? "\u00d7" : "Close"}</Button>
         </div>
-        <div className={size === "skills" ? "flex min-h-0 flex-1 flex-col overflow-hidden [@media(max-height:400px)]:overflow-y-auto" : "min-h-0 flex-1 overflow-y-auto overscroll-contain p-4"}>{(open || keepMounted) && children}</div>
+        <div className={size === "skills" ? "flex min-h-0 flex-1 flex-col overflow-hidden [@media(max-height:400px)]:overflow-y-auto"
+          : size === "detail" ? "flex min-h-0 flex-1 flex-col"
+            : "min-h-0 flex-1 overflow-y-auto overscroll-contain p-4"}>{(open || keepMounted) && children}</div>
         {footer && <div className="shrink-0 border-t border-border p-3">{footer}</div>}
       </div>
     </dialog>
