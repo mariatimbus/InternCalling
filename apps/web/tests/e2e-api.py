@@ -12,6 +12,7 @@ os.environ["APP_SUPABASE_URL"] = "http://127.0.0.1:8300"
 os.environ["APP_SUPABASE_JWT_SECRET"] = "local-e2e-fixture-signing-key-only-0000"
 os.environ["APP_RATE_LIMIT_PER_MINUTE"] = "0"
 os.environ["APP_OLLAMA_URL"] = ""
+os.environ["APP_SUPABASE_PUBLISHABLE_KEY"] = "sb_publishable_local_e2e_fixture"
 
 import uvicorn
 from opportunity_api.core.database import Base, get_db
@@ -45,6 +46,31 @@ with Session() as db:
     db.commit()
 
 app = create_app()
+
+# Synthetic private Storage transport, injected only into this loopback fixture.
+from opportunity_api.api.cv import get_storage
+class FixtureStorage:
+    files = {}
+    def upload(self, path, data, media_type):
+        self.files[path] = data
+    def download(self, path):
+        return self.files[path]
+    def delete(self, path):
+        self.files.pop(path, None)
+app.dependency_overrides[get_storage] = FixtureStorage
+
+@app.get("/__test/resume.pdf")
+def fixture_pdf():
+    from io import BytesIO
+    from fastapi import Response
+    from reportlab.pdfgen.canvas import Canvas
+    buffer = BytesIO()
+    canvas = Canvas(buffer)
+    canvas.drawString(60, 760, "Synthetic fixture resume: Python research")
+    canvas.save()
+    return Response(buffer.getvalue(), media_type="application/pdf")
+
+
 
 
 def test_db():

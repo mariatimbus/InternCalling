@@ -31,13 +31,17 @@ Redeploy after changing variables, because public Next.js values are built into
 browser bundles.
 
 - `NEXT_PUBLIC_API_BASE_URL`: public HTTPS FastAPI origin, without `/api/v1`.
+  `API_BASE_URL` can override this for server-side calls; set both consistently.
 - `NEXT_PUBLIC_SUPABASE_URL`: intended hosted Supabase project URL.
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`: that project's browser publishable key.
 - `AUTH_APP_ORIGIN`: `https://interncalling.vercel.app` (or your approved custom
   domain). Add the corresponding Auth callback/recovery URLs in Supabase.
 
 Never put database passwords or elevated Supabase credentials in public values.
-The API must allow the frontend origin in credentialed CORS. FastAPI and its
+The API must allow the frontend origin in credentialed CORS. Apply `20261122160000_profile_workspace.sql` after the existing migrations
+before enabling the live profile/CV/tailoring services on the API. Optional local
+model extraction also needs the configured Ollama model; manual editing and
+source-based tailoring do not require it. FastAPI and its
 schema are deployed separately; Vercel frontend hosting does not start the API.
 No production API or Supabase settings were invented or copied from other apps.
 Without the production variables, the public frontend can deploy, but account
