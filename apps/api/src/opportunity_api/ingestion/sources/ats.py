@@ -298,6 +298,8 @@ class ArbeitnowAdapter(ATSAdapter):
         place = raw.get("location") or ""
         if raw.get("remote"):
             place = ", ".join(filter(None, [place, "Remote"]))
+        # Arbeitnow only lists jobs in Europe; small towns rarely carry a country name.
+        place = ", ".join(filter(None, [place, "Europe"]))
         record = self.raw(
             dict(raw, id=raw["slug"]),
             title=raw["title"],

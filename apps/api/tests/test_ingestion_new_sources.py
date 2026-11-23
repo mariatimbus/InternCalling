@@ -70,7 +70,7 @@ def test_arbeitnow_paginates_dedupes_and_keeps_the_real_company():
     records = list(adapter.fetch())
     assert [r.source_id for r in records] == ["intern-1", "intern-2"]
     assert records[0].organization == "Acme GmbH"
-    assert records[0].location == "Munich, Remote" and records[1].location is None
+    assert records[0].location == "Munich, Remote, Europe" and records[1].location == "Europe"
     assert client.urls[1].endswith("?page=2")
 
 
@@ -121,3 +121,33 @@ def test_overlong_location_lists_are_shortened_not_dropped():
     }
     [record] = list(AshbyAdapter(employer("ashby"), Client({"jobs": [job]})).fetch())
     assert len(record.location) <= 255 and record.location.endswith("...")
+
+
+@pytest.mark.parametrize(
+    ("title", "location", "code"),
+    [
+        ("Software Engineering Intern", "Berlin", "in_scope"),
+        ("Software Engineering Intern", "Amsterdam, Noord-Holland, Nederland", "in_scope"),
+        ("Software Engineering Intern", "Zurich, CH", "in_scope"),
+        ("Software Engineering Intern", "Foster City, CA", "outside_europe"),
+        ("Software Engineering Intern", "Hybrid - New York, NY", "outside_europe"),
+        ("Brand Marketing Intern, France", "Paris", "not_stem"),
+        ("Sales Engineering Intern", "London", "in_scope"),
+        ("Data & People Analytics Intern", "Paris", "in_scope"),
+    ],
+)
+def test_cities_and_title_based_stem_scope(title, location, code):
+    assert assess_scope(title, "Python data cloud", location).code == code
+
+
+def test_arbeitnow_locations_are_european():
+    row = {
+        "slug": "s",
+        "company_name": "Acme",
+        "title": "Backend Intern",
+        "url": "https://www.arbeitnow.com/jobs/s",
+        "location": "Greven",
+    }
+    client = Client({"data": [row], "links": {}})
+    [record] = list(ArbeitnowAdapter(employer("arbeitnow", "board"), client).fetch())
+    assert record.location == "Greven, Europe"
