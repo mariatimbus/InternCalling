@@ -9,7 +9,7 @@ export function getPublicAuthConfig() {
 
 export function getApiBaseUrl() {
   const environment = process.env;
-  const value = environment.NEXT_PUBLIC_API_BASE_URL?.trim();
+  const value = environment.API_BASE_URL?.trim() || environment.NEXT_PUBLIC_API_BASE_URL?.trim();
   if (!value) throw new Error("The application API is not configured.");
   return value;
 }

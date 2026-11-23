@@ -20,7 +20,7 @@ export class ResumePdfController {
   private releaseAccess() {
     if (this.expiry) clearTimeout(this.expiry); this.expiry = null;
     const access = this.state.access?.value;
-    if (access?.kind === "local-preview") access.release();
+    if (access && access.kind !== "authorized") access.release();
     this.update({ access: null });
   }
   async load() {
@@ -104,8 +104,8 @@ export class ResumePdfController {
     let value: ResumeAccess | undefined;
     try {
       value = await this.service.access({ id: confirmed.id, revision: confirmed.revision }, { intent, signal: operation.signal });
-      if (this.disposed || operation.signal.aborted) { if (value.kind === "local-preview") value.release(); return; }
-      if (!safeResumeAccess(value, this.preview)) { if (value.kind === "local-preview") value.release(); throw new Error("Unsafe access URL"); }
+      if (this.disposed || operation.signal.aborted) { if (value.kind !== "authorized") value.release(); return; }
+      if (!safeResumeAccess(value, this.preview)) { if (value.kind !== "authorized") value.release(); throw new Error("Unsafe access URL"); }
       this.update({ access: { value, intent } });
       if (value.kind === "authorized") this.expiry = setTimeout(() => { this.releaseAccess(); this.update({ notice: "The access link expired. Request a new link to open the PDF." }); }, Math.min(Date.parse(value.expiresAt) - Date.now(), 2147483647));
     } catch { if (!this.disposed) this.update({ error: "A safe access link could not be obtained. Retry View PDF or Download PDF." }); }

@@ -56,6 +56,8 @@ class PrivateCVStorage:
                 response = self.client.request(
                     method, self.base + suffix, headers=headers, **kwargs
                 )
+                if method == "DELETE" and response.status_code == 404:
+                    return b""
                 response.raise_for_status()
                 if len(response.content) > MAX_FILE_BYTES:
                     raise ValueError("Storage object is too large")
@@ -64,6 +66,8 @@ class PrivateCVStorage:
                 with client.stream(
                     method, self.base + suffix, headers=headers, **kwargs
                 ) as response:
+                    if method == "DELETE" and response.status_code == 404:
+                        return b""
                     response.raise_for_status()
                     data = bytearray()
                     for chunk in response.iter_bytes():

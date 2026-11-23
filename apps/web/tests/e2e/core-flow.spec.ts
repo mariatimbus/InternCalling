@@ -29,6 +29,7 @@ async function onboard(page: Page) {
   }
   await page.getByRole("button", { name: "Skip", exact: true }).click();
   await page.getByRole("button", { name: "Find my matches", exact: true }).click();
+  await page.getByRole("button", {name: "Continue to opportunities", exact: true}).click();
   await expect(page).toHaveURL(/\/jobs/);
 }
 
@@ -45,6 +46,23 @@ test("confirmed signup, profile, ranking, filters, save/apply/status/notes and r
   await page.goto(`/auth/callback?code=${encodeURIComponent(control.confirmationCode)}`);
   await onboard(page);
   await page.goto("/profile");
+  const fixturePdf = await request.get("http://127.0.0.1:8302/__test/resume.pdf");
+  await page.getByLabel("Select PDF", {exact:true}).setInputFiles({name:"fixture.pdf",mimeType:"application/pdf",buffer:await fixturePdf.body()});
+  await page.getByRole("button", {name:"Upload PDF",exact:true}).click();
+  await expect(page.getByRole("heading", {name:"Confirmed uploaded PDF",exact:true})).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("heading", {name:"Confirmed uploaded PDF",exact:true})).toBeVisible();
+  await page.getByRole("button", {name:"View PDF",exact:true}).click();
+  await expect(page.getByRole("link", {name:/Open ready PDF/})).toHaveAttribute("href", /^blob:/);
+  await page.getByRole("button", {name:"Remove PDF",exact:true}).click();
+  await page.getByRole("button", {name:"Confirm remove PDF",exact:true}).click();
+  await expect(page.getByText("No PDF uploaded", {exact:true})).toBeVisible();
+  await page.getByRole("button", { name: "Add project", exact: true }).click();
+  await page.getByLabel("Project name (required)", {exact: true}).fill("Persistent solver project");
+  await page.getByRole("button", {name: "Save", exact: true}).click();
+  await expect(page.getByRole("heading", {name:"Persistent solver project",exact:true})).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("heading", {name:"Persistent solver project",exact:true})).toBeVisible();
   await page.getByLabel("Study year", { exact: true }).selectOption("third");
   await page.getByLabel("Interests", { exact: true }).fill("python");
   await page.getByLabel("Remote preference", { exact: true }).selectOption("true");
@@ -60,6 +78,19 @@ test("confirmed signup, profile, ranking, filters, save/apply/status/notes and r
   await page.getByRole("button", { name: /Python Engineering Intern.*View details/ }).click();
   await expect(page.getByRole("heading", { name: "Score breakdown" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Eligibility requirements" })).toBeVisible();
+  await page.locator("summary:visible").filter({hasText:"Tailor resume for this job"}).click();
+  await page.getByRole("button", {name:"Request tailored draft",exact:true}).click();
+  await expect.poll(async () => page.locator("textarea").evaluateAll(nodes => nodes.some(node => node instanceof HTMLTextAreaElement && node.value.includes("Persistent solver project")))).toBeTruthy();
+  const accept = page.getByRole("button", {name:"Accept item", exact:true});
+  const itemCount = await accept.count();
+  expect(itemCount).toBeGreaterThan(0);
+  for(let i=0;i<itemCount;i++) await accept.nth(i).click();
+  await page.getByRole("button", {name:"Save tailored draft",exact:true}).click();
+  await expect(page.getByRole("button", {name:"Approve this revision",exact:true})).toBeEnabled();
+  await page.getByRole("button", {name:"Approve this revision",exact:true}).click();
+  await page.getByRole("button", {name:"Request approved-version PDF",exact:true}).click();
+  await page.getByRole("button", {name:"Get download link",exact:true}).click();
+  await expect(page.getByRole("link", {name:"Download approved resume",exact:true})).toHaveAttribute("href", /^blob:/);
   await page.getByRole("button", { name: "Save opportunity", exact: true }).click();
   await expect(page.getByRole("combobox", { name: "Application status", exact: true })).toHaveValue("saved");
   await page.goto("/applications?view=saved");

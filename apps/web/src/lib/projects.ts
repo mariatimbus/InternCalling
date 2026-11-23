@@ -1,4 +1,4 @@
-/** PROVISIONAL UI/service contract; no agreed endpoint or database schema. */
+/** Live editor contract; persisted through /api/backend/workspace/collections. */
 import type { CollectionService } from "./experience";
 import { validateExperience, emptyExperience } from "./experience";
 import { validateResumeUrl } from "./resume-link";
