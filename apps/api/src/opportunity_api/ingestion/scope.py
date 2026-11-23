@@ -1,8 +1,8 @@
 """Assess cleaned postings against the A14 student-role, STEM and Europe scope.
 
 C3 normalizes before classification. Clearly outside postings are rejected;
-ambiguous postings, including remote roles without geographic eligibility,
-are retained for review and cannot be published automatically.
+remote roles without a non-European restriction are accepted; other ambiguous
+postings are retained for review and cannot be published automatically.
 """
 
 import re
@@ -150,7 +150,7 @@ EUROPE_COUNTRIES: frozenset[str] = frozenset(
     }
 )
 
-# Remote describes a work arrangement, not permission to work from Europe.
+# Remote with no listed non-European country is treated as open to Europe.
 REMOTE_PATTERN = re.compile(r"\bremote\b|\bwork\s+from\s+home\b", re.IGNORECASE)
 EUROPE_PATTERN = re.compile(
     r"\b(?:"
@@ -177,6 +177,11 @@ class ScopeDecision:
 
 def _is_student_role(title: str) -> bool:
     return any(pattern.search(title) for pattern in ROLE_PATTERNS)
+
+
+def maybe_student_title(title: str) -> bool:
+    """Cheap pre-filter for sources that charge one request per posting detail."""
+    return _is_student_role(title) or re.search(r"\b(?:student|trainee)\b", title, re.I) is not None
 
 
 def _is_stem(title: str, description: str) -> bool:
@@ -211,8 +216,9 @@ def assess_scope(title: str, description: str | None, location: str | None) -> S
         return ScopeDecision(False, "outside Europe", code="outside_europe")
     if outside and european:
         reviews.append("mixed European and non-European locations need review")
-    elif not european:
-        reviews.append("European availability is not established, including for remote roles")
+    elif not european and not REMOTE_PATTERN.search(place):
+        reviews.append("European availability is not established")
+    # Remote roles with no country restriction are open to European students.
     if reviews:
         return ScopeDecision(False, "; ".join(reviews), True, "scope_ambiguous")
     return ScopeDecision(True, "in scope")

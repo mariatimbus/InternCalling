@@ -55,11 +55,14 @@ Provider switches live in
 `apps/api/src/opportunity_api/ingestion/sources/providers.json`:
 
 ```json
-{"greenhouse": true, "lever": true, "smartrecruiters": true}
+{"greenhouse": true, "lever": true, "smartrecruiters": false, "ashby": true, "arbeitnow": true}
 ```
 
-Every supported provider must have a JSON boolean; unknown/missing keys and coerced
-strings are rejected. Company switches remain in the adjacent `employers.json` registry.
+Every supported provider must have a JSON boolean; unknown keys and coerced strings
+are rejected (`ashby`/`arbeitnow` default to off when absent). SmartRecruiters is off:
+its `robots.txt` now disallows every crawler except LinkedIn's. Ashby uses the public
+posting API; Arbeitnow is a free multi-company board (newest 10 pages per run, with
+postings linking back to Arbeitnow). Company switches remain in the adjacent `employers.json` registry.
 A company runs only when **both** its provider and company entry are enabled. Preserve
 existing source keys (`provider.identifier`) and provider IDs across configuration edits.
 The registry currently enables 20 companies; endpoint availability can change.
@@ -408,8 +411,9 @@ without live HTTP or hosted database calls. No schema migration or public API ch
 ## C8 scheduler and conservative freshness
 
 `scheduled-ingestion.yml` runs fixture-only smoke separately from configured live
-sources. Its daily trigger is **06:17 UTC**; GitHub schedules run the workflow on
-the repository's default branch after release. Manual dispatch defaults to dry-run.
+sources. It is scheduled **every 10 minutes** (GitHub runs schedules best-effort, on
+the default branch after release; a busy hour can delay or skip a slot). A full run
+over ~180 sources takes about 4-5 minutes; `concurrency` queues rather than overlaps. Manual dispatch defaults to dry-run.
 The live job runs only on main/develop when `INGESTION_ENABLED=true`; it uses the
 `ingestion-production` environment and its `INGESTION_DATABASE_URL` secret. No
 credentials belong in provider JSON, workflow arguments, artifacts or logs.
@@ -418,7 +422,11 @@ Before enabling, Maria/Dalia must review/apply the freshness migration, approve
 the exact database target, set the environment's review/access controls and secret,
 review a manual dry-run report, and resolve outstanding C6/C7 source integration.
 This commit prepares existing ATS operation; it does not pretend C6/C7 are merged.
-New/changed opportunities still use the existing inactive publication-review policy.
+The scheduled job passes `--publish`: in-scope postings (student role, STEM, Europe or
+unrestricted remote) that need no review go live immediately; ambiguous postings stay
+inactive for review. Without `--publish` the CLI keeps the inactive review policy.
+`--allow-partial` keeps a run green when individual boards fail, but fails when every
+source fails; failed sources are still listed in the report and summary.
 
 The same commands are used locally and in Actions (from `apps/api`):
 
@@ -429,7 +437,7 @@ uv run python -m opportunity_api.ingestion.cli --apply --allow-hosted --freshnes
 uv run python -m opportunity_api.ingestion.summary report-apply-001.json
 ```
 
-Reports use exclusive output paths. Actions retains JSON artifacts for 30 days and
+Reports use exclusive output paths. Actions retains JSON artifacts for 3 days and
 writes a count/health summary even after a partial failure. Source health notices
 make the job fail with `--fail-on-anomaly`, after healthy-source writes have been
 retained; failures are explicit rather than silently hiding partial operation.
@@ -447,7 +455,8 @@ Freshness behavior:
   outages. Three healthy missing snapshots inactivate with `source_missing`.
 - Known past deadlines inactivate with `deadline_expired`; null deadlines remain
   unknown. These reasons record the inactivation event. Returning rows reset
-  missing counts but never reactivate automatically; publication requires review.
+  missing counts; with `--publish` a returning `source_missing` row goes live again,
+  an expired one never does. Without `--publish` reactivation requires review.
 - No opportunity is deleted. Dry-run predicts freshness effects without writes.
   Source baselines are server-only and RLS/grants deny browser access.
 - New high rejection (>95%) or duplicate (>80%) ratios at volume >=20 are flagged;
@@ -461,4 +470,4 @@ company, set `enabled:false` in `employers.json`. Disabled companies do not cons
 missing-run allowances. To stop all scheduled writes, set `INGESTION_ENABLED=false`.
 After a parser/source fix, inspect the retained report, rerun a fresh dry-run with a
 new report filename, then reprocess only the approved provider/company configuration.
-There is no automatic reactivation or schema creation in the CLI.
+The CLI never creates schema; it only reactivates returning rows with `--publish`.

@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from urllib.parse import quote, urlencode, urlsplit
 
 from ..models import RawOpportunity
+from ..scope import maybe_student_title
 from .base import SourceAdapter
 from .http import PublicJSONClient
 
@@ -88,6 +89,9 @@ class ATSAdapter(SourceAdapter):
         self.source_name = employer.source_name
 
     def raw(self, row, *, title, url, location=None, description=None):
+        if isinstance(location, str) and len(location) > 255:
+            # Some boards list dozens of cities; keep the posting with a shortened list.
+            location = location[:252].rsplit(",", 1)[0].rsplit(";", 1)[0] + "..."
         return RawOpportunity(
             source=self.source_name,
             source_id=identity(row["id"]),
@@ -201,11 +205,20 @@ class SmartRecruitersAdapter(ATSAdapter):
                 if posting_id in seen:
                     raise ValueError("repeated posting across pages")
                 seen.add(posting_id)
+                name = row.get("name")
+                if isinstance(name, str) and name.strip() and not maybe_student_title(name):
+                    # One detail request per posting is too slow for large boards; a
+                    # non-student title is out of scope, so the list row is enough.
+                    yield dict(row, applyUrl=self.public_url(posting_id))
+                    continue
                 yield self.client.get(self.endpoint + "/" + posting_id)
             offset += len(rows)
             if offset >= total:
                 return
         raise ValueError("pagination limit reached")
+
+    def public_url(self, posting_id):
+        return f"https://jobs.smartrecruiters.com/{quote(self.employer.identifier)}/{posting_id}"
 
     def parse_record(self, raw):
         location = raw.get("location", {})
@@ -225,3 +238,71 @@ class SmartRecruitersAdapter(ATSAdapter):
             location=place or None,
             description=description or None,
         )
+
+
+class AshbyAdapter(ATSAdapter):
+    provider = "ashby"
+
+    @property
+    def endpoint(self):
+        return f"https://api.ashbyhq.com/posting-api/job-board/{self.employer.identifier}"
+
+    def records(self):
+        rows = self.client.get(self.endpoint)["jobs"]
+        if not isinstance(rows, list):
+            raise ValueError("expected jobs array")
+        yield from (row for row in rows if row.get("isListed", True))
+
+    def parse_record(self, raw):
+        places = [raw.get("location")]
+        places += [row.get("location") for row in raw.get("secondaryLocations") or []]
+        country = (raw.get("address") or {}).get("postalAddress", {}).get("addressCountry")
+        places.append(country)
+        if raw.get("isRemote") or raw.get("workplaceType") == "Remote":
+            places.append("Remote")
+        place = ", ".join(dict.fromkeys(p for p in places if isinstance(p, str) and p.strip()))
+        return self.raw(
+            raw,
+            title=raw["title"],
+            url=raw.get("jobUrl") or raw.get("applyUrl"),
+            location=place or None,
+            description=raw.get("descriptionPlain"),
+        )
+
+
+# Newest first; ten pages (~2,500 postings) stay well inside the board's rate limit.
+ARBEITNOW_PAGES = 10
+
+
+class ArbeitnowAdapter(ATSAdapter):
+    """Public multi-company board (free API; postings link back to Arbeitnow)."""
+
+    provider = "arbeitnow"
+    endpoint = "https://www.arbeitnow.com/api/job-board-api"
+
+    def records(self):
+        seen = set()
+        for page in range(1, ARBEITNOW_PAGES + 1):
+            payload = self.client.get(f"{self.endpoint}?page={page}")
+            rows = payload["data"]
+            if not isinstance(rows, list):
+                raise ValueError("expected data array")
+            for row in rows:
+                if row.get("slug") not in seen:
+                    seen.add(row.get("slug"))
+                    yield row
+            if not rows or not (payload.get("links") or {}).get("next"):
+                return
+
+    def parse_record(self, raw):
+        place = raw.get("location") or ""
+        if raw.get("remote"):
+            place = ", ".join(filter(None, [place, "Remote"]))
+        record = self.raw(
+            dict(raw, id=raw["slug"]),
+            title=raw["title"],
+            url=raw["url"],
+            location=place or None,
+            description=raw.get("description"),
+        )
+        return record.model_copy(update={"organization": text(raw["company_name"])[:255]})
