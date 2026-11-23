@@ -1,45 +1,54 @@
-# API deployment (Render)
+# API deployment (Vercel)
 
-The FastAPI backend runs on Render as a Docker web service; the frontend stays
-on Vercel. Pipeline: `.github/workflows/api-deploy.yml`.
+The FastAPI backend is a separate Vercel project, `interncalling-api`
+(`https://interncalling-api.vercel.app`), with root directory `apps/api`.
+The frontend stays in the `interncalling` project.
+
+- `apps/api/api/index.py` exposes the ASGI app; `apps/api/vercel.json` rewrites
+  every path to it and bundles `src/**` (including the PDF font).
+- Vercel's Git integration deploys `main` to production and other branches to previews.
+- `.github/workflows/api-deploy.yml`:
 
 | Trigger | Jobs |
 | --- | --- |
-| PR touching `apps/api`, migrations or deploy files | `container`: build image, non-root check, local smoke test |
-| Push to `main` (same paths) or manual run on `main` | `container` → `migrate` (Supabase `db push`) → `deploy` (Render) → production smoke |
+| PR touching `apps/api`, migrations or deploy files | `container`: build the Docker image (portable fallback) and run smoke checks |
+| Push to `main` (same paths) or manual run on `main` | `container` → `migrate` (Supabase `db push`) → `production-smoke` |
 
-`migrate` and `deploy` use the GitHub `production` environment. Configure it with
-Maria as required reviewer so every production change is approved by a human.
+`migrate` and `production-smoke` use the GitHub `production` environment; add Maria
+as required reviewer.
 
-## One-time setup (Maria)
+## Configuration
 
-1. **Render:** New → Blueprint → this repository (`render.yaml`). Enter the secret
-   env vars in the Render dashboard: `DATABASE_URL` (Supabase pooled Postgres URL,
-   `postgresql+psycopg://...`), `APP_SUPABASE_URL`, `APP_SUPABASE_PUBLISHABLE_KEY`,
-   `APP_SUPABASE_JWT_SECRET` (only if the project still uses HS256 tokens),
-   `APP_OLLAMA_URL` (optional; empty disables AI features and CV extraction).
-   `autoDeploy` is off: only the workflow deploys, after migrations.
-2. **Render → Settings → Deploy Hook:** copy the URL.
-   **Render → Account → API Keys:** create a key.
-3. **GitHub → Settings → Environments → `production`:**
-   - secrets: `RENDER_DEPLOY_HOOK_URL`, `RENDER_API_KEY`, `SUPABASE_ACCESS_TOKEN`,
-     `SUPABASE_DB_PASSWORD`
-   - variables: `RENDER_SERVICE_ID` (`srv-...`), `API_PUBLIC_URL`
-     (e.g. `https://opportunity-api.onrender.com`), `SUPABASE_PROJECT_REF`
-4. **Vercel:** set `NEXT_PUBLIC_API_BASE_URL` and the server-only `API_BASE_URL` to
-   `API_PUBLIC_URL`, `AUTH_APP_ORIGIN=https://interncalling.vercel.app`, then redeploy.
-5. Run the workflow once manually on `main` and check that every job is green.
+**Vercel → `interncalling-api` → Settings → Environment Variables (Production):**
 
-## Notes
+| Variable | Value |
+| --- | --- |
+| `DATABASE_URL` | Supabase **transaction pooler** URL (port 6543), `postgresql+psycopg://...` |
+| `APP_SUPABASE_URL` | `https://<ref>.supabase.co` |
+| `APP_SUPABASE_PUBLISHABLE_KEY` | `sb_publishable_...` (CV Storage with the user's own token) |
+| `CORS_ORIGINS` | `https://interncalling.vercel.app` |
+| `APP_DEBUG` | `false` |
+| `APP_OLLAMA_URL` | optional; empty disables AI matching and CV extraction |
 
-- The image runs `uvicorn` as UID 10001 with `--proxy-headers`, so the per-IP rate
-  limiter sees real client addresses behind Render's proxy. The container port
-  is not publicly reachable except through that proxy.
-- `/dev/console` is only mounted when `APP_DEBUG=true`; production keeps it off
-  and the smoke test fails if it is reachable.
-- `CORS_ORIGINS` must list the exact Vercel origin. Add preview origins only
-  deliberately; wildcards are rejected by the settings validator.
-- Rollback: Render → Deploys → *Rollback* to the previous live deploy. Migrations
-  are forward-only; ship a new corrective migration instead of editing an applied one.
-- First run: confirm that the deploy hook accepts `&ref=<sha>` and returns
-  `deploy.id`. If the response format differs, the workflow stops before smoke tests.
+**Vercel → `interncalling` (web):** `NEXT_PUBLIC_API_BASE_URL` and `API_BASE_URL` =
+`https://interncalling-api.vercel.app`, plus `NEXT_PUBLIC_SUPABASE_URL`,
+`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `AUTH_APP_ORIGIN`.
+
+**GitHub → Environments → `production`:** secret `SUPABASE_DB_PASSWORD`; variables
+`SUPABASE_PROJECT_REF`, `SUPABASE_POOLER_HOST` (default `aws-1-eu-central-1.pooler.supabase.com`)
+and optional `API_PUBLIC_URL`. `migrate` builds a session-pooler URL (port 5432) from
+these, so no Supabase personal access token is needed.
+
+## Serverless notes
+
+- With `VERCEL` set, SQLAlchemy uses `NullPool` (a connection per request), and
+  psycopg prepared statements are disabled, as the transaction pooler requires.
+- Request bodies are limited to 4.5 MB by Vercel, so CVs larger than that fail
+  even though the API accepts 5 MiB. The web app's proxy has the same limit.
+- Functions run for at most 60 s (`maxDuration`); slow CV extraction may time out.
+- The in-memory rate limiter is per function instance, so it is weaker than on a
+  single server. Use Vercel's firewall rules if abuse appears.
+- `/dev/console` is only mounted when `APP_DEBUG=true`; the smoke test fails if it is reachable.
+- Rollback: Vercel → Deployments → promote the previous deployment. Migrations are
+  forward-only; ship a corrective migration instead of editing an applied one.
+- `apps/api/Dockerfile` remains a tested, portable fallback for container hosts.
