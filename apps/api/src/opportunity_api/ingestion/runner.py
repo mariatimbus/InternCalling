@@ -184,6 +184,8 @@ class IngestionRunner:
                 if not decision.accepted and not decision.requires_review:
                     source.rejected += 1
                     report.issue(name, identity, stage, decision.code, decision.reason, "rejected")
+                    if not self.dry_run:
+                        self.store.withdraw(name, raw.source_id)
                     continue
                 source.accepted += 1
                 if decision.requires_review:
