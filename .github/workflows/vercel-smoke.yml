@@ -1,0 +1,33 @@
+name: Vercel production smoke
+
+on:
+  deployment_status:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vercel-production-smoke
+  cancel-in-progress: true
+
+jobs:
+  production-smoke:
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Production')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # Run only trusted main-branch verification code, regardless of deployment SHA.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22"
+      - name: Check production pages and guest access
+        env:
+          DEPLOYMENT_URL: https://interncalling.vercel.app
+        run: node scripts/deploy/smoke.mjs
