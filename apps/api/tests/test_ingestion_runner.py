@@ -272,3 +272,34 @@ def test_publish_mode_hides_live_postings_that_scope_now_rejects(session):
         [StaticAdapter("ashby", [marketing])]
     )
     assert _active(session) == {"ashby-job-1": (False, None)}
+
+
+def test_rerun_needs_one_catalogue_snapshot_and_no_per_record_reads(session):
+    from sqlalchemy import event
+
+    engine = session.get_bind()
+    records = [make_raw(source, i, deadline_raw=None) for source in ("a", "b") for i in range(5)]
+
+    def run():
+        # Same session settings as the CLI: rows stay loaded across per-source commits.
+        with Session(engine, autoflush=False, expire_on_commit=False) as cli_session:
+            store = OpportunityStore(cli_session, publish=True)
+            return IngestionRunner(store).run(
+                [StaticAdapter("a", records[:5]), StaticAdapter("b", records[5:])]
+            )
+
+    run()
+    statements = []
+
+    def listener(*args):
+        statements.append(args[2])
+
+    event.listen(engine, "before_cursor_execute", listener)
+    try:
+        report = run()
+    finally:
+        event.remove(engine, "before_cursor_execute", listener)
+    assert report.totals().updated == 10
+    reads = [s for s in statements if s.lstrip().upper().startswith("SELECT")]
+    assert len(reads) == 1  # one snapshot for both sources; unchanged rows write nothing
+    assert not any("SAVEPOINT" in s.upper() for s in statements)
