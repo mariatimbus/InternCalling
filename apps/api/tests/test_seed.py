@@ -214,7 +214,8 @@ def test_api_unknown_year_does_not_match(client, db_factory):
             for field in ("deadline", "posted_at"):
                 if fields[field]:
                     fields[field] = datetime.fromisoformat(fields[field])
-            session.add(Opportunity(**fields))
+            # Listed publicly only when active; this test is about the study-year filter.
+            session.add(Opportunity(**{**fields, "is_active": True}))
         session.commit()
     response = client.get("/api/v1/opportunities", params={"study_year": 2, "page_size": 100})
     assert response.status_code == 200

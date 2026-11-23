@@ -82,11 +82,16 @@ def list_opportunities(
     degree_level: OpportunityDegreeLevel | None = None,
     study_year: Annotated[int | None, Query(ge=1, le=6)] = None,
     location: str | None = None,
-    is_active: bool | None = None,
+    # Public listings never include hidden (inactive or under review) postings.
+    is_active: bool = True,
     deadline_after: datetime | None = None,
     deadline_before: datetime | None = None,
     search: str | None = None,
 ) -> PaginatedOpportunityResponse:
+    if not is_active:
+        raise APIError(
+            "Hidden opportunities are not listed.", status_code=422, code="validation_error"
+        )
     filters = dict(
         opportunity_type=opportunity_type,
         degree_level=degree_level,
