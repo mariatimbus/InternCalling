@@ -1,4 +1,4 @@
-/** PROVISIONAL UI contract. No backend routes/schema are agreed. */
+/** Live editor contract; persisted through /api/backend/workspace/collections. */
 export type ExperienceDraft = { role: string; organization: string; location: string; startDate: string; endDate: string; current: boolean; description: string; achievements: string };
 export type Experience = Omit<ExperienceDraft, "achievements"> & { id: string; revision: number; position: number; achievements: string[] };
 export interface CollectionService<T, D> {

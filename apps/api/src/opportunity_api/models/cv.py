@@ -15,6 +15,7 @@ JSON = sa.JSON(none_as_null=True).with_variant(postgresql.JSONB(none_as_null=Tru
 
 class CVDocument(TimestampMixin, Base):
     __tablename__ = "cv_documents"
+    __table_args__ = (sa.UniqueConstraint("id", "user_id"),)
     id: orm.Mapped[uuid.UUID] = orm.mapped_column(sa.Uuid, primary_key=True, default=uuid.uuid4)
     user_id: orm.Mapped[uuid.UUID] = orm.mapped_column(
         sa.Uuid, sa.ForeignKey("users.id", ondelete="CASCADE"), index=True

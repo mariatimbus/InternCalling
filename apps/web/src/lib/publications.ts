@@ -1,4 +1,4 @@
-/** PROVISIONAL UI/service model. Backend fields and routes are unconfirmed. */
+/** Live editor contract; persisted through /api/backend/workspace/collections. */
 import type { CollectionService } from "./experience";
 import { partialDate } from "./experience";
 import { validateResumeUrl } from "./resume-link";
