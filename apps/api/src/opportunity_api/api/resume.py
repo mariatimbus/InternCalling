@@ -9,10 +9,10 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from starlette.concurrency import run_in_threadpool
 
-from ..ai.client import AIInvalidOutput, AIUnavailable
 from ..ai.documents import PDF
+from ..ai.extract import extract_cv_facts
+from ..ai.rules import RULES_MODEL
 from ..ai.schemas import CVExtraction
-from ..core.config import get_settings
 from ..core.errors import APIError
 from ..models import CVDocument, Profile, ResumeState
 from ..schemas.profile import ProfilePatch
@@ -220,22 +220,15 @@ def start_review(
         reject("The stored PDF changed. Upload it again.", code="resume_changed")
     text = read_document(data, doc.media_type)
     try:
-        extraction = model.generate(get_settings().ollama_extract_model, text, CVExtraction)
-        extraction.verify_evidence(text)
-    except AIUnavailable as exc:
+        extraction, extractor = extract_cv_facts(db, text, model)
+    except ValueError as exc:
         raise APIError(
-            "Extraction is offline. Your PDF is saved; complete manually or retry.",
-            status_code=503,
-            code="ai_unavailable",
-        ) from exc
-    except (AIInvalidOutput, ValueError) as exc:
-        raise APIError(
-            "The extracted draft could not be validated. Complete manually or retry.",
+            "No explicit profile facts were found in this PDF. Complete your profile manually.",
             status_code=422,
             code="invalid_extraction",
         ) from exc
     doc.extraction = extraction.model_dump(mode="json")
-    doc.extraction_model = get_settings().ollama_extract_model
+    doc.extraction_model = extractor
     doc.profile_snapshot = profile_values(user)
     doc.status = "extracted"
     proposed = {
@@ -254,7 +247,15 @@ def start_review(
         "warnings": [
             "Only explicit core profile facts and skills were extracted. "
             "Review every value; add other profile sections manually."
-        ],
+        ]
+        + (
+            [
+                "These proposals come from keyword rules, not AI: fields your CV states "
+                "unusually may be missing or need correcting."
+            ]
+            if extractor == RULES_MODEL
+            else []
+        ),
     }
     record_id = uuid4()
     result["jobId"] = str(record_id)
