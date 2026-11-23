@@ -58,6 +58,29 @@ def _parse_text(data: bytes, media_type: str) -> str:
     return text.strip()
 
 
+PARSER_MEMORY_BYTES = 512 * 1024 * 1024
+
+
+def _mapped_bytes() -> int:
+    """Current virtual memory size (Linux), used as the base for RLIMIT_AS."""
+    try:
+        with open("/proc/self/status") as status:
+            for line in status:
+                if line.startswith("VmSize:"):
+                    return int(line.split()[1]) * 1024
+    except OSError:
+        pass
+    return 0
+
+
+def _start_method() -> str:
+    """`fork` on Linux: `spawn` re-runs the host's __main__ (e.g. the Vercel launcher),
+    so the child never answers in serverless runtimes. Elsewhere keep `spawn`."""
+    import sys
+
+    return "fork" if sys.platform.startswith("linux") else "spawn"
+
+
 def _parse_worker(connection, data: bytes, media_type: str):
     try:
         import logging
@@ -68,7 +91,10 @@ def _parse_worker(connection, data: bytes, media_type: str):
 
         resource.setrlimit(resource.RLIMIT_CPU, (5, 5))
         if sys.platform.startswith("linux"):
-            resource.setrlimit(resource.RLIMIT_AS, (512 * 1024 * 1024, 512 * 1024 * 1024))
+            # Budget on top of what the (forked) process already maps, so the cap limits
+            # the parser without starving an interpreter that has the API loaded.
+            limit = _mapped_bytes() + PARSER_MEMORY_BYTES
+            resource.setrlimit(resource.RLIMIT_AS, (limit, limit))
         connection.send((True, _parse_text(data, media_type)))
     except InvalidDocument as exc:
         connection.send((False, str(exc)))
@@ -84,7 +110,7 @@ def extract_text(data: bytes, media_type: str) -> str:
 
     if not data or len(data) > MAX_FILE_BYTES:
         raise InvalidDocument("Use a nonempty CV up to 5 MiB")
-    context = multiprocessing.get_context("spawn")
+    context = multiprocessing.get_context(_start_method())
     reader, writer = context.Pipe(duplex=False)
     process = context.Process(target=_parse_worker, args=(writer, data, media_type))
     process.start()
