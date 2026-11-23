@@ -1,0 +1,8 @@
+.venv
+tests
+.pytest_cache
+.ruff_cache
+.coverage
+*.db
+.env
+.env.*

@@ -1,14 +1,14 @@
 name: API container and deploy
 
 # PRs: build the production image and smoke-test it locally.
-# main: apply Supabase migrations, deploy to Render, then smoke-test production.
+# main: apply Supabase migrations, then smoke-test the Vercel-hosted API.
 on:
   pull_request:
     branches: [develop, main]
-    paths: ["apps/api/**", "supabase/migrations/**", "render.yaml", "scripts/deploy/api-smoke.mjs", ".github/workflows/api-deploy.yml"]
+    paths: ["apps/api/**", "supabase/migrations/**", "apps/api/vercel.json", "scripts/deploy/api-smoke.mjs", ".github/workflows/api-deploy.yml"]
   push:
     branches: [main]
-    paths: ["apps/api/**", "supabase/migrations/**", "render.yaml", "scripts/deploy/api-smoke.mjs", ".github/workflows/api-deploy.yml"]
+    paths: ["apps/api/**", "supabase/migrations/**", "apps/api/vercel.json", "scripts/deploy/api-smoke.mjs", ".github/workflows/api-deploy.yml"]
   workflow_dispatch:
 
 permissions:
@@ -80,16 +80,15 @@ jobs:
       - name: Apply migrations
         run: npx supabase db push
 
-  deploy:
+  production-smoke:
+    # Vercel's Git integration deploys apps/api from main; this verifies the result
+    # after migrations have been applied.
     needs: migrate
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 15
     environment: production
     env:
-      RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
-      RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
-      RENDER_SERVICE_ID: ${{ vars.RENDER_SERVICE_ID }}
-      API_URL: ${{ vars.API_PUBLIC_URL }}
+      API_URL: ${{ vars.API_PUBLIC_URL || 'https://interncalling-api.vercel.app' }}
       FRONTEND_ORIGIN: https://interncalling.vercel.app
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -98,29 +97,9 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "22"
-      - name: Require configuration
-        run: test -n "$RENDER_DEPLOY_HOOK_URL" && test -n "$RENDER_API_KEY" && test -n "$RENDER_SERVICE_ID" && test -n "$API_URL"
-      - name: Trigger Render deploy of this commit
-        id: trigger
+      - name: Wait for the API deployment
         run: |
-          # The hook URL is a credential: never echo it.
-          response=$(curl -fsS -X POST "${RENDER_DEPLOY_HOOK_URL}&ref=${GITHUB_SHA}")
-          deploy_id=$(node -e 'const b=JSON.parse(process.argv[1]); if(!/^dep-[a-z0-9]+$/.test(b?.deploy?.id??"")) process.exit(1); console.log(b.deploy.id)' "$response")
-          echo "deploy_id=$deploy_id" >> "$GITHUB_OUTPUT"
-      - name: Wait until the deploy is live
-        env:
-          DEPLOY_ID: ${{ steps.trigger.outputs.deploy_id }}
-        run: |
-          for _ in $(seq 1 120); do
-            status=$(curl -fsS -H "Authorization: Bearer $RENDER_API_KEY" -H "Accept: application/json" \
-              "https://api.render.com/v1/services/$RENDER_SERVICE_ID/deploys/$DEPLOY_ID" | node -e 'let s="";process.stdin.on("data",c=>s+=c).on("end",()=>console.log(JSON.parse(s).status??""))')
-            echo "Render deploy status: $status"
-            case "$status" in
-              live) exit 0 ;;
-              build_failed|update_failed|pre_deploy_failed|canceled|deactivated) exit 1 ;;
-            esac
-            sleep 10
-          done
-          echo "Timed out waiting for Render deploy"; exit 1
+          for _ in $(seq 1 60); do curl -fsS "$API_URL/health/db" >/dev/null && exit 0; sleep 10; done
+          echo "API did not become healthy"; exit 1
       - name: Smoke-test production
         run: node scripts/deploy/api-smoke.mjs
