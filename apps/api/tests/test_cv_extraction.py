@@ -213,8 +213,8 @@ def test_review_rejects_profile_changes_and_missing_facts(client, cv_setup):
     )
 
 
-@pytest.mark.parametrize("failure,status", [(AIUnavailable, 503), (AIInvalidOutput, 422)])
-def test_extraction_failure_leaves_file_and_profile_unchanged(client, cv_setup, failure, status):
+@pytest.mark.parametrize("failure", [AIUnavailable, AIInvalidOutput])
+def test_model_failure_falls_back_to_rules_without_writing_profile(client, cv_setup, failure):
     headers, _ = cv_setup
     document_id = upload(client, headers)["id"]
 
@@ -223,9 +223,25 @@ def test_extraction_failure_leaves_file_and_profile_unchanged(client, cv_setup, 
             raise failure("safe fixture error")
 
     client.app.dependency_overrides[get_model] = lambda: FailingModel()
-    assert client.post(f"/api/v1/cv/{document_id}/extract", headers=headers).status_code == status
-    assert client.get(f"/api/v1/cv/{document_id}", headers=headers).json()["status"] == "uploaded"
+    response = client.post(f"/api/v1/cv/{document_id}/extract", headers=headers)
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["extraction_model"] == "rules-v1" and body["status"] == "extracted"
+    assert body["extraction"]["university"]["value"] == "Fixture University"
     assert client.get("/api/v1/profile", headers=headers).json()["university"] is None
+
+
+def test_no_facts_from_model_or_rules_is_rejected(client, cv_setup):
+    headers, _ = cv_setup
+    client.app.dependency_overrides[get_model] = lambda: None
+    response = client.post(
+        "/api/v1/cv?filename=resume.docx",
+        headers={**headers, "Content-Type": DOCX},
+        content=docx("Hello world. This file states no profile facts at all."),
+    )
+    document_id = response.json()["id"]
+    assert client.post(f"/api/v1/cv/{document_id}/extract", headers=headers).status_code == 422
+    assert client.get(f"/api/v1/cv/{document_id}", headers=headers).json()["status"] == "uploaded"
 
 
 def test_upload_limits_and_storage_failure(client, cv_setup):
