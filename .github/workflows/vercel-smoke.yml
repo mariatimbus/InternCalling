@@ -1,6 +1,8 @@
 name: Vercel production smoke
 
 on:
+  # Vercel currently reports Git commit statuses for this installation.
+  status:
   deployment_status:
   workflow_dispatch:
 
@@ -15,6 +17,8 @@ jobs:
   production-smoke:
     if: >-
       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'status' && github.event.context == 'Vercel' &&
+       github.event.state == 'success' && contains(github.event.branches.*.name, 'main')) ||
       (github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Production')
     runs-on: ubuntu-latest
     timeout-minutes: 5
