@@ -14,15 +14,40 @@ os.environ["APP_RATE_LIMIT_PER_MINUTE"] = "0"
 os.environ["APP_OLLAMA_URL"] = ""
 os.environ["APP_SUPABASE_PUBLISHABLE_KEY"] = "sb_publishable_local_e2e_fixture"
 
+import atexit
+import shutil
+import tempfile
+
 import uvicorn
 from opportunity_api.core.database import Base, get_db
 from opportunity_api.main import create_app
 from opportunity_api.models import Opportunity, OpportunityType
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
+from sqlalchemy.pool import NullPool
 
-engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+# The web app issues parallel API requests even with one Playwright worker. A single
+# shared in-memory connection (StaticPool) is not safe across threads and caused
+# intermittent InterfaceError/IntegrityError in CI. Use a disposable file database with
+# one connection per request; WAL + busy_timeout make concurrent writers wait, not fail.
+# Approach first proposed by Bianca in #48.
+_directory = tempfile.mkdtemp(prefix="interncalling-e2e-")
+atexit.register(shutil.rmtree, _directory, ignore_errors=True)
+engine = create_engine(
+    f"sqlite:///{_directory}/e2e.sqlite3",
+    connect_args={"check_same_thread": False, "timeout": 30},
+    poolclass=NullPool,
+)
+
+
+@event.listens_for(engine, "connect")
+def _sqlite_pragmas(connection, _record):
+    cursor = connection.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.execute("PRAGMA busy_timeout=30000")
+    cursor.close()
+
+
 Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 with Session() as db:
