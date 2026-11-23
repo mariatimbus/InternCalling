@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import sys
+import time
 from pathlib import Path
 
 from sqlalchemy import select
@@ -12,6 +13,7 @@ from opportunity_api.models import Opportunity
 
 from .database import checked_url, explicit_database_url, ingestion_session
 from .persistence import OpportunityStore
+from .prefetch import prefetch
 from .registry import build_registry
 from .runner import IngestionRunner
 
@@ -90,9 +92,15 @@ def main(argv: list[str] | None = None) -> int:
                 store = OpportunityStore(session, publish=args.publish and args.apply)
                 # Verify an existing schema/connection before requesting live boards.
                 session.execute(select(Opportunity).limit(0))
+                started = time.monotonic()
+                # Hosts download in parallel; each finished source is processed at once.
                 report = IngestionRunner(
                     store, dry_run=args.dry_run, track_freshness=args.freshness
-                ).run(adapters)
+                ).run(prefetch(adapters))
+                print(
+                    f"Ingested {len(adapters)} sources in {time.monotonic() - started:.0f}s.",
+                    file=sys.stderr,
+                )
         except Exception:
             print(
                 "Ingestion database or execution failed; sensitive details omitted.",
