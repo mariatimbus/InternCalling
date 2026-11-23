@@ -286,7 +286,7 @@ def test_review_conflict_and_invalid_collection_roll_back_all_fields(client, own
     )
 
 
-def test_parsing_offline_does_not_change_profile_or_remove_pdf(client, owner, cv):
+def test_parsing_offline_falls_back_to_rules_and_keeps_pdf(client, owner, cv):
     doc, _ = cv
 
     class Offline:
@@ -294,16 +294,37 @@ def test_parsing_offline_does_not_change_profile_or_remove_pdf(client, owner, cv
             raise AIUnavailable()
 
     client.app.dependency_overrides[get_model] = lambda: Offline()
-    assert (
-        client.post(
-            BASE + "/resume/review/start",
-            headers=key(owner),
-            json={"source": {"id": doc["id"], "revision": doc["revision"]}},
-        ).status_code
-        == 503
+    job = write(
+        client,
+        "/resume/review/start",
+        key(owner),
+        {"source": {"id": doc["id"], "revision": doc["revision"]}},
     )
+    result = client.get(BASE + f"/resume/review/{job['id']}/result", headers=owner).json()
+    assert result["proposed"]["profile"]["university"] == "Fixture University"
+    assert any("keyword rules" in warning for warning in result["warnings"])
     assert client.get(BASE + "/resume", headers=owner).json() == doc
     assert client.get(BASE + "/snapshot", headers=owner).json()["profile"]["university"] == ""
+
+
+def test_parsing_without_any_model_uses_rules_and_catalog_skills(client, owner, cv):
+    doc, _ = cv
+    client.app.dependency_overrides[get_model] = lambda: None
+    seeder = auth_headers(client, "catalog-seeder@example.invalid")
+    client.put("/api/v1/profile/skills", headers=seeder, json={"names": ["python", "rust"]})
+    assert client.get(BASE + "/capabilities", headers=owner).json()["parsing"] is True
+    payload = review_payload(client, owner, cv)
+    assert payload["profile"] == {
+        "degree_level": "bachelor",
+        "field_of_study": "Computer Science",
+        "graduation_year": "2027",
+        "location": "Berlin",
+        "university": "Fixture University",
+    }
+    assert payload["skills"]["add"] == ["python"]
+    receipt = write(client, "/resume/review/confirm", owner, payload)
+    assert receipt["snapshot"]["profile"]["university"] == "Fixture University"
+    assert receipt["snapshot"]["skills"] == ["python"]
 
 
 def test_tailoring_exports_exact_approved_edits_and_invalidates_stale_download(
