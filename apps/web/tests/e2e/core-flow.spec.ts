@@ -19,17 +19,10 @@ async function signUp(page: Page, email: string) {
 }
 async function onboard(page: Page) {
   await expect(page).toHaveURL(/\/onboarding/);
-  await page.getByRole("button", { name: "Complete manually instead", exact: true }).click();
   await page.getByLabel("Bachelor's", { exact: true }).check();
-  await page.getByRole("button", { name: "Continue", exact: true }).click();
   for (const [label, value] of [["University", "Fixture University"], ["Field of study", "Computer Science"],
-    ["Graduation year", "2027"], ["Location", "Berlin, Germany"]]) {
-    await page.getByLabel(label, { exact: true }).fill(value);
-    await page.getByRole("button", { name: "Continue", exact: true }).click();
-  }
-  await page.getByRole("button", { name: "Skip", exact: true }).click();
-  await page.getByRole("button", { name: "Find my matches", exact: true }).click();
-  await page.getByRole("button", {name: "Continue to opportunities", exact: true}).click();
+    ["Graduation year", "2027"], ["City", "Berlin, Germany"]]) await page.getByLabel(label, { exact: true }).fill(value);
+  await page.getByRole("button", { name: "Show my internships", exact: true }).click();
   await expect(page).toHaveURL(/\/jobs/);
 }
 
