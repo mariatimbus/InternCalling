@@ -199,3 +199,11 @@ def test_dotted_bachelor_abbreviations(line):
 def test_coursework_is_not_a_field_of_study():
     text = "Fixture University\nBachelor student\nRelevant Coursework: Statistics, Physics"
     assert rules.extract(text, []).field_of_study is None
+
+
+def test_coursework_lines_are_not_skills():
+    text = (
+        "Fixture University\nBachelor student\n"
+        "Relevant Coursework: Statistics, Java\nSkills: Python"
+    )
+    assert rules.extract(text, ["statistics", "java", "python"]).values_for("skills") == ["python"]
