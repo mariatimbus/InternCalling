@@ -212,7 +212,8 @@ def test_validation_alias_utc_lists_and_unsupported_shape():
         ("Software Intern", "Python", "Milwaukee, USA", "rejected"),
         ("Software Intern", "Python", "Remote - US only", "rejected"),
         ("Software Intern", "Python", "Remote excluding Europe", "rejected"),
-        ("Software Intern", "Python", "Remote", "review"),
+        ("Software Intern", "Python", "Remote", "accepted"),
+        ("Software Intern", "Python", "Worldwide", "review"),
         ("Software Intern", "Python", None, "review"),
         ("Software Intern", "Python", "Berlin", "review"),
         ("Software Intern", "Python", "Germany / USA", "review"),
@@ -229,7 +230,7 @@ def test_scope_three_outcomes(title, description, location, status):
 def test_cleanup_before_scope_review_persistence_and_structured_rejections(store):
     records = [
         raw("1", title="Software Intern", description="<p>Soft<b>ware</b></p>", location="Germany"),
-        raw("2", location="Remote"),
+        raw("2", location="Worldwide"),
         raw("3", location="Remote - US only"),
         raw("4", deadline_raw="01/02/2027", study_year_raw="2 years completed"),
     ]
@@ -438,7 +439,7 @@ def test_regression_validator_cannot_bypass_final_scope(store, changed):
 def test_regression_final_ambiguous_scope_is_review_not_plain_inactive(store):
     def move_to_remote(value):
         result = validate(value)
-        result.location = "Remote"
+        result.location = "Worldwide"
         return result
 
     plain = IngestionRunner(store).run([FixtureAdapter("fixture", [raw("plain")])])
@@ -505,7 +506,7 @@ def test_regression_review_report_distinguishes_unsaved_dry_run_and_rollback(sto
     assert missing.review_records()[0]["persistence"] == "not_persisted"
     assert missing.review_records()[0]["opportunity_id"] is None
     dry = IngestionRunner(store, dry_run=True).run(
-        [FixtureAdapter("fixture", [raw(location="Remote")])]
+        [FixtureAdapter("fixture", [raw(location="Worldwide")])]
     )
     assert dry.review_records()[0]["persistence"] == "dry_run"
 
@@ -514,7 +515,7 @@ def test_regression_review_report_distinguishes_unsaved_dry_run_and_rollback(sto
             raise RuntimeError("fixture failure")
 
     failed = IngestionRunner(FailCommit(store.session)).run(
-        [FixtureAdapter("fixture", [raw(location="Remote")])]
+        [FixtureAdapter("fixture", [raw(location="Worldwide")])]
     )
     assert failed.review_records()[0]["persistence"] == "rolled_back"
     assert failed.review_records()[0]["opportunity_id"] is None
@@ -576,7 +577,7 @@ def test_regression_review_duplicate_hold_rollback_is_reported_truthfully(
 
 
 def test_regression_export_review_report_roundtrip_and_retention(store, tmp_path):
-    records = [raw("review", location="Remote"), raw("plain"), raw("missing", source_url=None)]
+    records = [raw("review", location="Worldwide"), raw("plain"), raw("missing", source_url=None)]
     report = IngestionRunner(store).run([FixtureAdapter("fixture", records)])
     destination = report.export_json(tmp_path / "run-001.json")
     saved_payload = json.loads(destination.read_text(encoding="utf-8"))
