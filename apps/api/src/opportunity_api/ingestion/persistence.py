@@ -165,6 +165,7 @@ class OpportunityStore:
     def __init__(self, session: Session, *, publish: bool = False) -> None:
         self.session = session
         self.publish = publish
+        self._live: dict[str, set[str]] = {}
         self._index: Deduplicator | None = None
         self._preview: _PreviewState | None = None
 
@@ -324,6 +325,32 @@ class OpportunityStore:
         if changed:
             row.updated_at = datetime.now(UTC)
         return changed
+
+    def withdraw(self, source: str, source_id: str | None) -> bool:
+        """Hide a live posting that the current scope rules now reject (publish mode)."""
+        if not self.publish or not source_id:
+            return False
+        if source not in self._live:  # one query per source, not per rejected record
+            live = select(Opportunity.source_id).where(
+                Opportunity.source == source, Opportunity.is_active.is_(True)
+            )
+            self._live[source] = set(self.session.scalars(live))
+        if source_id not in self._live[source]:
+            return False
+        self._begin_write()
+        with self.session.begin_nested():
+            row = self.session.scalar(
+                select(Opportunity).where(
+                    Opportunity.source == source, Opportunity.source_id == source_id
+                )
+            )
+            if row is None or not row.is_active:
+                return False
+            row.is_active = False
+            row.updated_at = datetime.now(UTC)
+            self.session.flush()
+        self._live[source].discard(source_id)
+        return True
 
     def _republishable(self, row: Opportunity, record: NormalizedOpportunity) -> bool:
         """Auto-publish a seen, unambiguous posting; never revive an expired one."""
