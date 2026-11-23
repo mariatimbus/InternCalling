@@ -173,6 +173,15 @@ def test_filter_by_active(client: TestClient, db_factory):
     assert response.json()["items"][0]["is_active"] is True
 
 
+def test_hidden_postings_are_never_listed_but_stay_readable_by_id(client: TestClient, db_factory):
+    hidden = make_opportunity(is_active=False)
+    seed(db_factory, make_opportunity(is_active=True), hidden)
+
+    assert client.get(URL).json()["total"] == 1
+    assert client.get(URL, params={"is_active": "false"}).status_code == 422
+    assert client.get(f"{URL}/{hidden.id}").json()["is_active"] is False
+
+
 def test_filter_by_location(client: TestClient, db_factory):
     seed(
         db_factory,
