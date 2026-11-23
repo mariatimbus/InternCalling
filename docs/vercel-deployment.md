@@ -14,7 +14,8 @@ Pipeline:
    automatically builds and publishes production. A failed build does not
    replace the last successful production deployment.
 3. The `Vercel production smoke` workflow checks public pages and guest access
-   after Vercel reports a successful Production deployment. It can also be run
+   after Vercel reports a successful `main` commit status (or a Production
+   deployment event). It can also be run
    manually from `main`. It does not certify authenticated backend behavior.
 
 GitHub does not need a copied Vercel token or deployment hook secret. Vercel's
