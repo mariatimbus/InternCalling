@@ -155,3 +155,27 @@ def test_skill_creation_recovers_from_concurrent_insert(client, headers, db_fact
     response = client.put("/api/v1/profile/skills", headers=headers, json={"names": ["rust"]})
     assert response.status_code == 200
     assert [skill["name"] for skill in response.json()] == ["rust"]
+
+
+def test_profile_bootstrap_race_returns_the_existing_row(db_factory):
+    """Two first requests race: the loser must reuse the winner's profile, not fail."""
+    from uuid import uuid4
+
+    from opportunity_api.api.deps import get_or_create_profile
+    from opportunity_api.models import Profile, User
+
+    user_id = uuid4()
+    with db_factory() as setup:
+        setup.add(User(id=user_id, email="race@example.com", full_name="Race"))
+        setup.commit()
+    with db_factory() as loser:
+        user = loser.get(User, user_id)
+        assert user.profile is None  # loaded before the winner commits
+        with db_factory() as winner:
+            winner.add(Profile(user_id=user_id, headline="winner"))
+            winner.commit()
+        profile = get_or_create_profile(loser, user)
+        loser.commit()
+        assert profile.headline == "winner"
+    with db_factory() as check:
+        assert len(check.query(Profile).filter_by(user_id=user_id).all()) == 1
