@@ -6,7 +6,8 @@ Repeated imports preserve row IDs and avoid duplicate rows; A15 still counts
 unchanged matched upserts as updates.
 
 ``NormalizedOpportunity`` remains the existing normalize/validate contract at
-this import path. New postings are inactive pending publication review.
+this import path. New postings are inactive pending publication review, unless the
+store runs with ``publish=True``: then in-scope postings that need no review go live.
 """
 
 from collections.abc import Iterable
@@ -161,8 +162,9 @@ class _PreviewState:
 class OpportunityStore:
     """Session-bound create/update gateway for opportunities."""
 
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, *, publish: bool = False) -> None:
         self.session = session
+        self.publish = publish
         self._index: Deduplicator | None = None
         self._preview: _PreviewState | None = None
 
@@ -267,7 +269,7 @@ class OpportunityStore:
                 row = Opportunity(
                     source=record.source,
                     source_id=storage_id(record),
-                    is_active=False,
+                    is_active=self.publish and not record._requires_review,
                     **_row_values(record),
                 )
                 self.session.add(row)
@@ -316,9 +318,19 @@ class OpportunityStore:
         if (changed or record._requires_review) and row.is_active:
             row.is_active = False
             changed = True
+        if self._republishable(row, record):
+            row.is_active, row.inactive_reason = True, None
+            changed = True
         if changed:
             row.updated_at = datetime.now(UTC)
         return changed
+
+    def _republishable(self, row: Opportunity, record: NormalizedOpportunity) -> bool:
+        """Auto-publish a seen, unambiguous posting; never revive an expired one."""
+        if not self.publish or record._requires_review or row.is_active:
+            return False
+        expired = row.deadline is not None and utc(row.deadline) < datetime.now(UTC)
+        return row.inactive_reason in (None, "source_missing") and not expired
 
     def commit(self) -> None:
         self.session.commit()

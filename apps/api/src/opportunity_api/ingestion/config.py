@@ -14,6 +14,9 @@ class ProviderConfig(BaseModel):
     greenhouse: bool
     lever: bool
     smartrecruiters: bool
+    # Newer providers default off so older switch files stay valid.
+    ashby: bool = False
+    arbeitnow: bool = False
 
     def enabled(self, provider: str) -> bool:
         return self.model_dump()[provider]

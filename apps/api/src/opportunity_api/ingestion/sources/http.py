@@ -9,7 +9,7 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 from urllib.robotparser import RobotFileParser
 
 USER_AGENT = "OpportunityTracker/0.1"
-MAX_BYTES = 10_000_000
+MAX_BYTES = 40_000_000
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -20,7 +20,8 @@ class NoRedirect(HTTPRedirectHandler):
 class PublicJSONClient:
     """Share one instance across companies to enforce a per-host request interval.
 
-    Robots failures fail closed (404 means no rules). Retry only temporary errors,
+    Robots failures fail closed, except an unavailable robots.txt (4xx other than 429),
+    which RFC 9309 treats as no rules. Retry only temporary errors,
     at most twice, respecting bounded Retry-After seconds. Never retry parse errors.
     """
 
@@ -79,7 +80,7 @@ class PublicJSONClient:
             try:
                 text = self._read(origin + "/robots.txt", self.interval).decode("utf-8")
             except HTTPError as exc:
-                if exc.code != 404:
+                if not 400 <= exc.code < 500 or exc.code == 429:
                     raise
                 text = "User-agent: *\nDisallow:"
             rules.parse(text.splitlines())
