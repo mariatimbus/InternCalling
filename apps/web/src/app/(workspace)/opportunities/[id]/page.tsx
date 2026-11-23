@@ -1,9 +1,12 @@
 import Link from "next/link";
-import { OpportunityDeadline, OpportunityFacts, OpportunitySource } from "@/components/jobs/opportunity-details";
+import { OpportunityDetailView } from "@/components/jobs/opportunity-detail-view";
+import { StandaloneOpportunitySave } from "@/components/workspace/recommended-jobs";
+import { saveOpportunity } from "@/app/(workspace)/jobs/save-action";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/error-state";
 import { ApiError } from "@/lib/api/client";
-import type { Opportunity } from "@/lib/api/types";
+import type { Application, Opportunity } from "@/lib/api/types";
+import { readOpportunityAssessment } from "@/lib/api/opportunity-assessment";
 import { requireCompletedAccount } from "@/lib/auth/account";
 import { detailReturnParams, type JobsQuery } from "@/lib/jobs-url";
 
@@ -29,9 +32,16 @@ export default async function OpportunityPage({ params, searchParams }: {
       failed = !(error instanceof ApiError && (error.status === 404 || error.status === 422));
     }
   }
+  const [assessment, tracker] = job ? await Promise.all([
+    readOpportunityAssessment(api, id),
+    api.request<{ items: Application[] }>("/api/v1/applications").catch(() => null),
+  ]) : [null, null];
+  const trackerItems = Array.isArray(tracker?.items) ? tracker.items : null;
+  const status = trackerItems?.find((row) => row.opportunity_id === id)?.status;
+  const canSave = job?.is_active === true && trackerItems !== null && !status;
 
-  return <div className="mx-auto w-full max-w-4xl space-y-5 px-5 py-8 sm:px-8">
-    <Link href={jobsHref} className="inline-flex min-h-11 items-center rounded-control text-sm text-accent underline underline-offset-4">
+  return <div className={`mx-auto w-full max-w-4xl px-5 py-4 sm:px-8 ${job ? "flex h-full min-h-64 flex-col gap-3" : "space-y-5"}`}>
+    <Link href={jobsHref} className="inline-flex min-h-11 shrink-0 items-center self-start rounded-control text-sm text-accent underline underline-offset-4">
       Back to Jobs
     </Link>
     {failed ? <ErrorState title="Opportunity details could not be loaded"
@@ -40,17 +50,14 @@ export default async function OpportunityPage({ params, searchParams }: {
         {Array.from(context, ([name, value]) => <input key={name} name={name} type="hidden" value={value} />)}
         <Button type="submit">Try again</Button>
       </form>} />
-      : job ? <article className="space-y-7 rounded-panel border border-line bg-card px-5 py-7 sm:px-8">
-        <header className="space-y-3">
-          <h1 className="page-title">{job.title}</h1>
-          {job.organization && <p className="reading-text break-words">{job.organization}</p>}
-          {job.location && <p className="metadata-text break-words">{job.location}</p>}
-          {!job.is_active && <p className="text-sm font-medium">Closed on InternCalling</p>}
-          <OpportunityDeadline value={job.deadline} />
-          <OpportunitySource opportunity={job} />
-        </header>
-        <OpportunityFacts opportunity={job} />
-      </article>
+      : job ? <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-panel border border-line bg-card">
+        <OpportunityDetailView opportunity={job} assessment={assessment} standalone
+          saveControl={status || canSave
+            ? <StandaloneOpportunitySave key={id} id={id} title={job.title} status={status} saveAction={canSave ? saveOpportunity : undefined} />
+            : job.is_active && trackerItems === null
+              ? <p role="status" className="metadata-text">Save unavailable. Reload to try again.</p>
+              : undefined} />
+      </div>
       : <div className="rounded-panel bg-surface p-6">
         <h1 className="section-title">Opportunity not found</h1>
         <p className="mt-2 text-sm text-muted">The opportunity may have been removed. Any history still supplied by the tracker remains in Saved or Applied.</p>
