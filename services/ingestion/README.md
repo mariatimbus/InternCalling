@@ -413,7 +413,10 @@ without live HTTP or hosted database calls. No schema migration or public API ch
 `scheduled-ingestion.yml` runs fixture-only smoke separately from configured live
 sources. It is scheduled **every 10 minutes** (GitHub runs schedules best-effort, on
 the default branch after release; a busy hour can delay or skip a slot). A full run
-over ~180 sources takes about 4-5 minutes; `concurrency` queues rather than overlaps. Manual dispatch defaults to dry-run.
+over ~170 sources takes under 2 minutes locally: hosts download in parallel (one
+worker per host, so per-host spacing and robots rules are unchanged) and each finished
+source is written while slower hosts are still downloading. `concurrency` queues
+rather than overlaps runs. Manual dispatch defaults to dry-run.
 The live job runs only on main/develop when `INGESTION_ENABLED=true`; it uses the
 `ingestion-production` environment and its `INGESTION_DATABASE_URL` secret. No
 credentials belong in provider JSON, workflow arguments, artifacts or logs.
