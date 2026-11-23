@@ -41,8 +41,13 @@ these, so no Supabase personal access token is needed.
 
 ## Serverless notes
 
-- With `VERCEL` set, SQLAlchemy uses `NullPool` (a connection per request), and
-  psycopg prepared statements are disabled, as the transaction pooler requires.
+- Both Vercel projects run in `fra1` (Frankfurt), next to the Supabase database
+  (eu-central-1); the default `iad1` added transatlantic round trips to every query.
+- With `VERCEL` set, SQLAlchemy keeps a small pool (fluid compute reuses instances),
+  and psycopg prepared statements are disabled, as the transaction pooler requires.
+- CV parsing runs in a `fork`ed child on Linux. `spawn` re-runs the host's
+  `__main__` (the Vercel launcher), so the child never answered and every upload
+  failed with "CV parsing exceeded the processing limit".
 - Request bodies are limited to 4.5 MB by Vercel, so CVs larger than that fail
   even though the API accepts 5 MiB. The web app's proxy has the same limit.
 - Functions run for at most 60 s (`maxDuration`); slow CV extraction may time out.
