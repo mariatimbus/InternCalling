@@ -6,6 +6,7 @@ import { CompanyAvatar } from "./company-avatar";
 import { EligibilityBadge } from "./eligibility-badge";
 import { MatchScore } from "./match-score";
 import type { JobSummary } from "./job-card";
+import { descriptionSnippet } from "@/lib/job-description";
 
 export type CardDensity = "comfortable" | "compact";
 
@@ -49,7 +50,7 @@ export function OpportunityCardContent({ job, heading, action, density = "comfor
       {showMatch && job.eligibility !== "unknown" && <EligibilityBadge status={job.eligibility} />}
       {job.skills.slice(0, 3).map((skill) => <Badge key={skill} className="max-w-full [overflow-wrap:anywhere]">{skill}</Badge>)}
     </div>
-    {job.description && <p className="reading-text line-clamp-2 [overflow-wrap:anywhere]">{job.description}</p>}
+    {descriptionSnippet(job.description) && <p className="reading-text line-clamp-2 [overflow-wrap:anywhere]">{descriptionSnippet(job.description)}</p>}
     {(job.duration || job.compensation || job.workMode) && <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted">
       {job.duration && <span>{job.duration}</span>}
       {job.compensation && <span>{job.compensation}</span>}
@@ -73,7 +74,7 @@ export function OpportunityCardContent({ job, heading, action, density = "comfor
           </div>
         </div>
       </div>
-      {job.description && <p className="reading-text mt-6 line-clamp-3">{job.description}</p>}
+      {descriptionSnippet(job.description) && <p className="reading-text mt-6 line-clamp-3">{descriptionSnippet(job.description)}</p>}
       <div className="mt-6 space-y-2.5 text-xs text-muted">
         {job.compensation && <p className="flex items-start gap-2"><Icon name="wallet" className="size-3.5" />{job.compensation}</p>}
         {job.workMode && <p className="flex items-center gap-2"><Icon name="clock" className="size-3.5" />{job.workMode}</p>}
