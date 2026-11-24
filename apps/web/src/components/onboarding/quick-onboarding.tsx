@@ -5,7 +5,7 @@ import type { ActionState } from "@/lib/auth/action-state";
 import { prefillOnboarding, type OnboardingDraft } from "@/lib/onboarding";
 import { createProfileServices } from "@/lib/profile-services";
 import { validateResumeSelection, type ResumeMetadata } from "@/lib/resume-pdf";
-import { isParsingJob, isParsingResult } from "@/lib/resume-review";
+import { isParsingJob, isParsingResult, sectionChanges, type ReviewChanges } from "@/lib/resume-review";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -13,6 +13,14 @@ const sleep = (ms: number, signal: AbortSignal) => new Promise<void>((resolve, r
   const timer = setTimeout(resolve, ms);
   signal.addEventListener("abort", () => { clearTimeout(timer); reject(new DOMException("Aborted", "AbortError")); }, { once: true });
 });
+const sectionNames: Record<string, [string, string]> = { experience: ["experience", "experiences"], projects: ["project", "projects"], languages: ["language", "languages"], certificates: ["certificate", "certificates"], honours: ["award", "awards"], publications: ["publication", "publications"] };
+/** "Also adding 3 experiences, 2 projects to your profile." */
+function foundSummary(changes: ReviewChanges): string {
+  const counts = new Map<string, number>();
+  for (const change of changes.collections) counts.set(change.section, (counts.get(change.section) ?? 0) + 1);
+  const parts = [...counts].map(([section, count]) => `${count} ${sectionNames[section][count === 1 ? 0 : 1]}`);
+  return `Also adding ${parts.join(", ")} to your profile.`;
+}
 const textFields = [["university", "University"], ["field_of_study", "Field of study"], ["graduation_year", "Graduation year"], ["location", "City"]] as const;
 
 /** One screen: an optional CV fills the form, one button saves it and opens the internships. */
@@ -20,8 +28,17 @@ export function QuickOnboarding({ initial, suggestions }: { initial: OnboardingD
   const services = useMemo(() => createProfileServices(), []), listId = useId(), skillId = useId(), fileInput = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState(initial), [skill, setSkill] = useState("");
   const [resume, setResume] = useState<ResumeMetadata | null>(null), [reusable, setReusable] = useState(false), [reading, setReading] = useState(false), [note, setNote] = useState("");
-  const [state, action, pending] = useActionState(finishOnboarding, {} as ActionState);
   const lifetime = useRef<AbortController | null>(null);
+  const [sections, setSections] = useState<ReviewChanges | null>(null);
+  const [state, action, pending] = useActionState(async (previous: ActionState, form: FormData) => {
+    // Experience, projects and the rest found in the CV are saved with the profile.
+    const signal = lifetime.current?.signal;
+    if (sections && signal) {
+      try { await services.review.confirm(sections, { signal }); setSections(null); }
+      catch { return { error: "We couldn't save the experience and projects from your CV. Try again, or continue and add them in Profile." }; }
+    }
+    return finishOnboarding(previous, form);
+  }, {} as ActionState);
   useEffect(() => {
     const operation = new AbortController(); lifetime.current = operation;
     services.pdf.load({ signal: operation.signal }).then(value => { if (!operation.signal.aborted) { setResume(value); setReusable(!!value); } }).catch(() => {});
@@ -42,8 +59,10 @@ export function QuickOnboarding({ initial, suggestions }: { initial: OnboardingD
       const result = await services.review.result(job.id, { signal });
       if (!isParsingResult(result)) throw new Error("invalid result");
       setDraft(current => prefillOnboarding(current, result.proposed));
-      setNote("Filled in from your CV. Fix anything that looks wrong.");
-    } catch { if (!signal.aborted) { setNote("We couldn't read this CV. Fill in the details below."); setReusable(!!source); } }
+      const found = sectionChanges(result, crypto.randomUUID());
+      setSections(found);
+      setNote("Filled in from your CV. Fix anything that looks wrong." + (found ? " " + foundSummary(found) : ""));
+    } catch { if (!signal.aborted) { setNote("We couldn't read this CV. Fill in the details below."); setReusable(!!source); setSections(null); } }
     finally { if (!signal.aborted) setReading(false); }
   }
   function addSkill() {

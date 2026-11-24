@@ -11,7 +11,14 @@ const onboardingRules=await load("../src/lib/onboarding.ts");
 const cvRules=await load("../src/lib/cv-onboarding.ts",{"./onboarding":onboardingRules});
 const {ResumeReviewController}=await load("../src/lib/resume-review-controller.ts",{"./resume-review":model});
 const signal=()=>new AbortController().signal;
-async function fixture(){const service=preview.createResumeReviewPreviewService({delayMs:0});const c=new ResumeReviewController(service,service.getSource(),undefined,0);await c.process();assert.equal(c.state.phase,"review");return {service,c};}
+// Most tests check explicit choices, so they start from an unselected draft (selected=false).
+async function fixture(selected=false){const service=preview.createResumeReviewPreviewService({delayMs:0});const c=new ResumeReviewController(service,service.getSource(),undefined,0);await c.process();assert.equal(c.state.phase,"review");if(!selected)c.edit(draft=>{Object.assign(draft,model.createReviewDraft(c.state.result));});return {service,c};}
+test("CV proposals start selected: changed facts, new skills and complete new entries",async()=>{const {c,service}=await fixture(true),result=c.state.result,draft=c.state.draft;
+  for(const key of Object.keys(draft.profile)){const proposed=result.proposed.profile[key];assert.equal(draft.profile[key].apply,!!proposed?.trim()&&proposed.trim()!==result.snapshot.profile[key].trim(),key);}
+  const saved=new Set(result.snapshot.skills);for(const row of draft.skills)assert.equal(row.apply,!saved.has(row.name.trim().toLowerCase()),row.name);
+  for(const row of draft.collections){const candidate=result.proposed.collections.find(item=>item.key===row.key);if(model.alreadySaved(result,candidate))assert.equal(row.decision,"skip",row.key);}
+  assert.ok(draft.collections.some(row=>row.decision==="add"));
+  c.prepare();assert.deepEqual(c.state.errors,{});await c.confirm();assert.equal(c.state.phase,"success");assert.ok(service.snapshot().collections.experience.length>=result.snapshot.collections.experience.length);c.dispose();});
 function chooseCollection(draft,result,key,decision,targetId=""){const choice=draft.collections.find(row=>row.key===key),candidate=result.proposed.collections.find(row=>row.key===key);choice.decision=decision;choice.targetId=targetId;for(const [field,value]of Object.entries(choice.fields))value.apply=model.providedReviewValue(candidate.values[field]);}
 function chooseHeadline(c,text="Corrected introduction"){c.edit(draft=>{draft.profile.headline={apply:true,value:text};});c.prepare();assert.equal(c.state.phase,"confirm");}
 test("strict result guards reject missing/invalid structures and unknown fields",async()=>{const {c}=await fixture(),result=c.state.result;assert.equal(model.isParsingResult(result),true);for(const value of [null,{}, {...result,snapshot:null},{...result,proposed:{...result.proposed,profile:{headline:42}}},{...result,proposed:{...result.proposed,collections:[{key:"bad",section:"experience",values:{unexpected:"x"},warnings:[]}]}}])assert.equal(model.isParsingResult(value),false);c.dispose();});
@@ -46,7 +53,7 @@ test("component exposes existing/proposed editing and explicit review/confirm, w
   const service=preview.createResumeReviewPreviewService({delayMs:0}),f=await component(service),before=service.snapshot();
   button(f.render(),"Start review").props.onClick();assert.match(JSON.stringify(f.render()),/Processing status/);
   for(let i=0;i<10&&!nodes(f.render()).some(n=>n.props?.path==="profile.headline");i++)await tick();
-  let field=nodes(f.render()).find(n=>n.props?.path==="profile.headline");assert.equal(field.props.existing,"Existing introduction");assert.equal(field.props.choice.value,"Proposed introduction");assert.equal(field.props.choice.apply,false);
+  let field=nodes(f.render()).find(n=>n.props?.path==="profile.headline");assert.equal(field.props.existing,"Existing introduction");assert.equal(field.props.choice.value,"Proposed introduction");assert.equal(field.props.choice.apply,true);  // CV proposals start selected
   field.props.onChange("Edited by reviewer");field=nodes(f.render()).find(n=>n.props?.path==="profile.headline");field.props.onApply(true);
   button(f.render(),"Review selected changes").props.onClick();assert.ok(button(f.render(),"Confirm selected changes"));assert.deepEqual(service.snapshot(),before);
   button(f.render(),"Back to review").props.onClick();field=nodes(f.render()).find(n=>n.props?.path==="profile.headline");assert.equal(field.props.choice.value,"Edited by reviewer");
@@ -77,3 +84,5 @@ test("checking a missing blank field explicitly clears it without inventing a bo
   nodes(rendered).find(n=>n.type==="input"&&n.props.type==="checkbox").props.onChange({target:{checked:true}});
   button(f.render(),"Review selected changes").props.onClick();assert.ok(button(f.render(),"Confirm selected changes"));button(f.render(),"Confirm selected changes").props.onClick();await tick();assert.equal(service.snapshot().profile.bio,"");f.cleanup();
 });
+test("onboarding saves only complete new CV entries, never profile fields or skills",async()=>{const {c,service}=await fixture(),result=c.state.result;const changes=model.sectionChanges(result,"onboarding-1");assert.ok(changes);assert.deepEqual(changes.profile,{});assert.deepEqual(changes.skills,{add:[]});assert.ok(changes.collections.length>0&&changes.collections.every(change=>change.operation==="add"));for(const change of changes.collections){const candidate=result.proposed.collections.find(row=>row.key===change.proposalKey);assert.equal(model.alreadySaved(result,candidate),false);}
+  const saved=await service.confirm(changes,{signal:new AbortController().signal});assert.ok(saved.snapshot);c.dispose();});
