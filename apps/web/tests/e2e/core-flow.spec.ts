@@ -79,7 +79,7 @@ test("confirmed signup, profile, ranking, filters, save/apply/status/notes and r
   });
   await scoreBreakdown.locator("summary").click();
   await expect(scoreBreakdown.getByText("5 points", { exact: true })).toBeVisible();
-  await expect(scoreBreakdown.getByText("10 points", { exact: true })).toBeVisible();
+  await expect(scoreBreakdown.getByText("15 points", { exact: true })).toBeVisible(); // remote, as preferred
   const eligibilityDetails = detail.locator("details").filter({
     has: page.getByText("Eligibility details", { exact: true }),
   });
