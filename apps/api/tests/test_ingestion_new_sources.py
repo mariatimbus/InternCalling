@@ -180,3 +180,41 @@ def test_ashby_does_not_repeat_the_country():
 )
 def test_business_titles_with_a_company_ai_are_not_stem(title):
     assert assess_scope(title, "Python data cloud", "Paris").code == "not_stem"
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("2026-09-09T10:50:29-04:00", "2026-09-09T14:50:29+00:00"),  # Greenhouse
+        ("2026-11-05T02:20:02.702+00:00", "2026-11-05T02:20:02.702000+00:00"),  # Ashby
+        ("2026-10-01T08:00:00Z", "2026-10-01T08:00:00+00:00"),  # SmartRecruiters
+        (1786469891368, "2026-08-11T17:38:11.368000+00:00"),  # Lever (ms)
+        (1786469891, "2026-08-11T17:38:11+00:00"),  # Arbeitnow (s)
+        ("2026-10-01T08:00:00", None),  # no timezone: unknown, not guessed
+        ("next week", None),
+        (True, None),
+        (None, None),
+    ],
+)
+def test_source_publication_dates(value, expected):
+    from opportunity_api.ingestion.sources.ats import published
+
+    result = published(value)
+    assert (result.isoformat() if result else None) == expected
+
+
+def test_posted_at_is_the_source_date_not_our_first_seen_time():
+    job = {
+        "id": "a1",
+        "title": "Data Intern",
+        "location": "Berlin",
+        "jobUrl": "https://jobs.ashbyhq.com/fixture/a1",
+        "publishedAt": "2026-10-01T08:00:00+00:00",
+    }
+    future = dict(job, id="a2", publishedAt="2999-01-01T00:00:00+00:00")
+    records = list(AshbyAdapter(employer("ashby"), Client({"jobs": [job, future]})).fetch())
+    assert records[0].posted_at.isoformat() == "2026-10-01T08:00:00+00:00"
+    assert records[1].posted_at is None  # implausible future dates stay unknown
+    from opportunity_api.ingestion.normalize import normalize
+
+    assert normalize(records[0])["posted_at"] == records[0].posted_at
