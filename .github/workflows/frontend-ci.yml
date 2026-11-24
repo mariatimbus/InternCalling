@@ -3,11 +3,10 @@ name: Frontend CI
 on:
   push:
     branches: [develop, main]
+  # No path filter: `frontend` is a required check on main, so it must report on every
+  # PR (a migration-only release otherwise stays blocked waiting for it).
   pull_request:
     branches: [develop, main]
-    paths:
-      - "apps/web/**"
-      - ".github/workflows/frontend-ci.yml"
   workflow_dispatch:
 
 # Least-privilege token: this workflow only needs to read the repo.
