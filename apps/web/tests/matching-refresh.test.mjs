@@ -66,6 +66,7 @@ test("confirmed profile/skill writes feed fresh Jobs requests and the real score
       "@/components/jobs/jobs-search": { JobsSearch: "JobsSearch" }, "@/components/ui/button": { Button: "Button" },
       "@/components/ui/empty-state": { EmptyState: "EmptyState" }, "@/components/ui/error-state": { ErrorState: "ErrorState" },
       "./save-action": { saveOpportunity() {} },
+      "./assessment-action": { loadOpportunityAssessment() {} },
       "@/lib/jobs-url": await load("../src/lib/jobs-url.ts"),
     });
     const searchParams = Promise.resolve({ q: "Python", type: "internship", page: "1" });
@@ -86,7 +87,7 @@ test("confirmed profile/skill writes feed fresh Jobs requests and the real score
     assert.equal(trace.at(-1).field_of_study, "Computing");
     assert.equal(trace.at(-1).location, "Berlin");
     assert.deepEqual(trace.at(-1).skills, ["python"]);
-    assert.equal(after[0].match.components.skills, 6);
+    assert.equal(after[0].match.components.skills, 13); // 1 of at least 3 counted skills: round(40 / 3)
     const listing = calls.filter(c => c.path.startsWith("/api/v1/opportunities/recommended?"));
     assert.equal(listing.length, 2);
     const query = new URL("http://fixture.invalid" + listing.at(-1).path).searchParams;
@@ -98,10 +99,10 @@ test("confirmed profile/skill writes feed fresh Jobs requests and the real score
     const state = [];
     let cursor = 0;
     const { RecommendedJobs } = await load("../src/components/workspace/recommended-jobs.tsx", {
-      react: { useSyncExternalStore: (_subscribe, snapshot) => snapshot(), useState(initial) { const slot = cursor++; if (!(slot in state)) state[slot] = initial; return [state[slot], next => { state[slot] = next; }]; } },
-      "react/jsx-runtime": runtime, "@/lib/opportunities": opportunityHelpers,
+      react: { useSyncExternalStore: (_subscribe, snapshot) => snapshot(), useEffect() {}, useRef: (current) => ({ current }), useState(initial) { const slot = cursor++; if (!(slot in state)) state[slot] = initial; return [state[slot], next => { state[slot] = next; }]; } },
+      "@/lib/company-logo": await load("../src/lib/company-logo.ts"), "react/jsx-runtime": runtime, "@/lib/opportunities": opportunityHelpers,
       "@/components/applications/application-controls": { ApplicationControls: "ApplicationControls" },
-    "@/components/jobs/job-card": { JobCard: "JobCard" }, "@/components/jobs/match-score": { MatchScore: "MatchScore" },
+      "@/components/jobs/job-card": { JobCard: "JobCard" }, "@/components/jobs/match-score": { MatchScore: "MatchScore" },
       "@/components/jobs/eligibility-badge": { EligibilityBadge: "EligibilityBadge" }, "@/components/ui/badge": { Badge: "Badge" },
       "@/components/ui/drawer": { Drawer: "Drawer" }, "@/components/ui/button": { Button: "Button" },
       "@/components/jobs/tailoring-entry-point": { TailoringEntryPoint: "TailoringEntryPoint" },
@@ -110,11 +111,15 @@ test("confirmed profile/skill writes feed fresh Jobs requests and the real score
       }),
       "next/link": { default: "Link" },
       "@/components/jobs/company-avatar": { CompanyAvatar: "CompanyAvatar" }, "@/components/ui/icon": { Icon: "Icon" },
+      "@/components/jobs/opportunity-detail-view": {
+        OpportunityDetailView: "OpportunityDetailView",
+        opportunityDisplayDate: () => undefined,
+      },
     });
     RecommendedJobs({ items: before }); cursor = 0;
     const rendered = RecommendedJobs({ items: after });
     assert.equal(nodes(rendered).find(n => n.type === "JobCard").props.job.matchScore, after[0].match.score);
-    assert.equal(nodes(rendered).find(n => typeof n.type === "function" && n.type.name === "Brief").props.item.match, after[0].match);
+    assert.equal(nodes(rendered).find(n => n.type === "OpportunityDetailView").props.opportunity, after[0].opportunity);
 
     const previous = after[0].match;
     await saveProfile({ headline: "New introduction", bio: "New biography" });

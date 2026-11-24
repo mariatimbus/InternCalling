@@ -100,13 +100,20 @@ def test_match_returns_explainable_components(client, db_factory, headers):
 
     assert response.status_code == 200
     body = response.json()
-    assert set(body["components"]) == {"skills", "field_fit", "interests", "location", "ai"}
-    # possibly_eligible (study_year not on profile) → capped
+    assert set(body["components"]) == {
+        "skills",
+        "field_fit",
+        "interests",
+        "location",
+        "recency",
+        "ai",
+    }
+    # possibly_eligible (study_year not on profile) → small discount, no hard cap
     assert body["eligibility"] == "possibly_eligible"
-    assert body["score"] <= 49
+    assert body["score"] == round(sum(body["components"].values()) * 0.95)
     # AI is unconfigured in tests → zero AI component, deterministic reasons only
     assert body["components"]["ai"] == 0
-    assert any("Field of study matches" in reason for reason in body["reasons"])
+    assert any("fits your background" in reason for reason in body["reasons"])
 
 
 def test_match_unknown_opportunity_is_404(client, headers):
@@ -139,5 +146,5 @@ def test_profile_preferences_reach_matching(client, db_factory, headers):
     seed(db_factory, job)
     set_profile(client, headers, preferred_tech_domains=["data_science"], remote_preferred=True)
     result = client.get(f"{URL}/{job.id}/match", headers=headers).json()
-    assert result["components"]["interests"] == 5
-    assert result["components"]["location"] == 10
+    assert result["components"]["field_fit"] == 25  # preferred domain matches the title
+    assert result["components"]["location"] == 15  # remote, as preferred
