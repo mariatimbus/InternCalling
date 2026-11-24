@@ -67,6 +67,7 @@ test("confirmed profile/skill writes feed fresh Jobs requests and the real score
       "@/components/ui/empty-state": { EmptyState: "EmptyState" }, "@/components/ui/error-state": { ErrorState: "ErrorState" },
       "./save-action": { saveOpportunity() {} },
       "./assessment-action": { loadOpportunityAssessment() {} },
+      "./saved-search-actions": { savedSearchAction() {} }, "@/components/jobs/saved-searches": { SavedSearches: "SavedSearches" },
       "@/lib/jobs-url": await load("../src/lib/jobs-url.ts"),
     });
     const searchParams = Promise.resolve({ q: "Python", type: "internship", page: "1" });
