@@ -1,10 +1,12 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import type { Profile, Skill } from "@/lib/api/types";
+import { completionItems, isProfileFieldComplete } from "@/lib/profile-completion";
 import { refreshCompletion } from "@/app/(workspace)/profile/completion-actions";
+import { Button } from "@/components/ui/button";
 import { ProfileCompletion } from "./profile-completion";
-import { ProfileEditor } from "./profile-editor";
+import { ProfileEditor, type ProfileEditorHandle } from "./profile-editor";
 import { ProfileSkills } from "./profile-skills";
 import { PublicationsSection } from "./publications-section";
 import { LanguagesSection } from "./languages-section";
@@ -13,9 +15,10 @@ import { CertificatesSection } from "./certificates-section";
 import { ProjectsSection } from "./projects-section";
 import { ExperienceSection } from "./experience-section";
 import { ResumePdfSection } from "./resume-pdf-section";
-import { ResumeEditor } from "./resume-editor";
 
-export function ProfileHub({ initialProfile, initialSkills }: { initialProfile: Profile; initialSkills: Skill[] | null }) {
+export function ProfileHub({ initialProfile, initialSkills, preferences, insightsEnabled = false }: {
+  initialProfile: Profile; initialSkills: Skill[] | null; preferences?: ReactNode; insightsEnabled?: boolean;
+}) {
   const [profile, setProfile] = useState(initialProfile);
   const [skills, setSkills] = useState(initialSkills);
   const [profileKnown, setProfileKnown] = useState(true);
@@ -23,6 +26,8 @@ export function ProfileHub({ initialProfile, initialSkills }: { initialProfile: 
   const [pending, setPending] = useState(false);
   const inFlight = useRef(false);
   const revision = useRef(0);
+  const editor = useRef<ProfileEditorHandle>(null);
+  const skillsSection = useRef<HTMLDivElement>(null);
   async function retry() {
     if (inFlight.current) return;
     inFlight.current = true; setPending(true);
@@ -36,16 +41,40 @@ export function ProfileHub({ initialProfile, initialSkills }: { initialProfile: 
     } catch { if (startedAt === revision.current) { setProfileKnown(false); setSkillsKnown(false); } }
     finally { inFlight.current = false; setPending(false); }
   }
+  const fields = insightsEnabled && profileKnown ? completionItems.filter(
+    (item) => item.key !== "skills" && !isProfileFieldComplete(profile, item.key),
+  ) : [];
+  const addSkills = insightsEnabled && skillsKnown && skills?.length === 0;
   return <>
-    <ProfileCompletion profile={profileKnown ? profile : null} skills={skillsKnown ? skills : null} pending={pending} onRetry={() => { void retry(); }} />
-    <ProfileEditor initialProfile={initialProfile} onConfirmed={(saved) => { revision.current++; setProfile(saved); setProfileKnown(true); }} onUnavailable={() => { revision.current++; setProfileKnown(false); }} />
-    <div><ProfileSkills initialSkills={initialSkills} persistedSkills={skills} onConfirmed={(saved) => { revision.current++; setSkills(saved); setSkillsKnown(true); }} onUnavailable={() => { revision.current++; setSkillsKnown(false); }} /></div>
-    <ResumePdfSection linkInitiallyOpen={!!initialProfile.resume_url}><ResumeEditor initialResumeUrl={initialProfile.resume_url} /></ResumePdfSection>
-    <ExperienceSection />
-    <ProjectsSection />
-    <CertificatesSection />
-    <HonoursSection />
-    <LanguagesSection />
-    <PublicationsSection />
+    <div data-profile-completion-row className="mx-auto w-full max-w-xl shrink-0">
+      <ProfileCompletion profile={profileKnown ? profile : null} skills={skillsKnown ? skills : null} pending={pending} onRetry={() => { void retry(); }} />
+    </div>
+    <div className="xl:grid xl:min-h-0 xl:flex-1 xl:grid-cols-2 xl:grid-rows-[minmax(0,1fr)] xl:items-start xl:gap-6">
+    <section data-profile-left-column aria-label="Profile and resume" className="flow-root min-w-0 pb-4">
+      <ProfileEditor ref={editor} initialProfile={initialProfile} compactDesktop onConfirmed={(saved) => { revision.current++; setProfile(saved); setProfileKnown(true); }} onUnavailable={() => { revision.current++; setProfileKnown(false); }} />
+      <ResumePdfSection profileLayout />
+    </section>
+    <section aria-label="Experience and preferences" tabIndex={0}
+      className="flow-root min-w-0 xl:h-full xl:overflow-y-auto xl:overscroll-y-contain xl:pb-9 xl:pr-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus">
+      {insightsEnabled && (fields.length > 0 || addSkills) && <section className="mt-8 rounded-panel bg-card p-6 sm:p-9" aria-labelledby="profile-insights-title">
+        <h2 id="profile-insights-title" className="section-title">Profile Insights</h2>
+        <ul className="mt-4 space-y-2">
+          {fields.map(({ key, label }) => key !== "skills" && <li key={key}>
+            <Button variant="secondary" size="sm" onClick={() => editor.current?.edit(key)}>{"Add " + label.toLowerCase()}</Button>
+          </li>)}
+          {addSkills && <li><Button variant="secondary" size="sm"
+            onClick={() => skillsSection.current?.querySelector<HTMLButtonElement>("[data-add-skills]")?.click()}>Add skills</Button></li>}
+        </ul>
+      </section>}
+      <ExperienceSection />
+      <ProjectsSection />
+      <CertificatesSection />
+      <HonoursSection />
+      <LanguagesSection />
+      <PublicationsSection />
+      <div ref={skillsSection}><ProfileSkills initialSkills={initialSkills} persistedSkills={skills} onConfirmed={(saved) => { revision.current++; setSkills(saved); setSkillsKnown(true); }} onUnavailable={() => { revision.current++; setSkillsKnown(false); }} /></div>
+      {preferences}
+    </section>
+    </div>
   </>;
 }

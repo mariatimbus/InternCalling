@@ -137,16 +137,30 @@ test("authorized links expire and require a fresh access request", async () => {
 const jsx=(type,props)=>({type,props:props??{}}),runtime={jsx,jsxs:jsx};
 function nodes(tree){return !tree||typeof tree!=="object"?[]:[tree,...[tree.props?.children].flat(Infinity).flatMap(nodes)];}
 const button=(tree,label)=>nodes(tree).find(n=>n.type==="Button"&&n.props.children===label);
-async function component(service) {
+async function component(service, props = {}) {
   const values=[],refs=[],effects=[];let index=0,refIndex=0;
   const react={useId:()=>"pdf-fixture",useRef(current){const slot=refIndex++;return refs[slot]??={current};},useEffect(effect){effects.push(effect);},useState(initial){const slot=index++;if(!(slot in values))values[slot]=typeof initial==="function"?initial():initial;return [values[slot],next=>{values[slot]=typeof next==="function"?next(values[slot]):next;}];}};
   const helpers=await load("../src/lib/resume-pdf-controller.ts",{"./resume-pdf":model});
   const {ResumePdfSection}=await load("../src/components/profile/resume-pdf-section.tsx",{react,"react/jsx-runtime":runtime,"@/lib/resume-pdf-controller":helpers,"@/lib/resume-pdf":model,"@/components/ui/button":{Button:"Button"},"@/components/ui/error-state":{ErrorState:"ErrorState"}});
-  const render=()=>{index=0;refIndex=0;return ResumePdfSection({service,children:jsx("ExistingLinkEditor",{}),linkInitiallyOpen:true});};
+  const render=()=>{index=0;refIndex=0;return ResumePdfSection({service,children:jsx("ExistingLinkEditor",{}),linkInitiallyOpen:true,...props});};
   const initial=render(),cleanup=effects[0]();await new Promise(r=>setImmediate(r));
   const select=file=>nodes(render()).find(n=>n.type==="input").props.onChange({target:{files:[file],value:"selected"}});
   return {render,initial,select,cleanup};
 }
+test("Profile resume disables unavailable upload and keeps confirmed PDF actions when connected", async () => {
+  const unavailable = await component(undefined, { profileLayout: true });
+  assert.equal(nodes(unavailable.render()).find(n => n.type === "input").props.disabled, true);
+  assert.match(JSON.stringify(unavailable.render()), /PDF upload is currently unavailable/);
+  assert.doesNotMatch(JSON.stringify(unavailable.render()), /Use a link instead|ExistingLinkEditor/);
+  unavailable.cleanup();
+  const connected = await component({ load: async () => metadata() }, { profileLayout: true });
+  const tree = connected.render();
+  assert.equal(nodes(tree).find(n => n.type === "input").props.disabled, false);
+  assert.match(JSON.stringify(tree), /Upload one PDF, up to 5 MiB/);
+  assert.match(JSON.stringify(tree), /Extracting information from it is currently unavailable/);
+  for (const label of ["View PDF", "Download PDF", "Remove PDF"]) assert.equal(button(tree, label).props.disabled, false);
+  connected.cleanup();
+});
 test("real component keeps file selection local, exposes fallback and never fabricates uploaded state", async()=>{
   const f=await component();f.select(pdf());const tree=f.render();
   assert.equal(button(tree,"Upload unavailable").props.disabled,true);

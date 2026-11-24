@@ -1,42 +1,22 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import type { Application, Eligibility, Match, Opportunity } from "@/lib/api/types";
+import type { Application, Eligibility, Opportunity, Skill } from "@/lib/api/types";
 import type { OpportunityAssessment } from "@/lib/api/opportunity-assessment";
 import { CompanyAvatar } from "@/components/jobs/company-avatar";
 import { TailoringEntryPoint } from "@/components/jobs/tailoring-entry-point";
+import { ApplicationControls } from "@/components/applications/application-controls";
 import { Badge } from "@/components/ui/badge";
 import { Icon, type IconName } from "@/components/ui/icon";
 import { opportunityTypeLabel } from "@/lib/opportunities";
+import { isSkillList } from "@/lib/profile-skills";
+import { prepareOpportunityCopilot, type OpportunityCopilotData } from "@/lib/opportunity-copilot";
 import { degreeLabels, safeJobSource, studyYears } from "@/components/jobs/opportunity-details";
 
-const scoreComponents = [
-  ["skills", "Skills"],
-  ["field_fit", "Field of study"],
-  ["interests", "Interests"],
-  ["location", "Location"],
-  ["ai", "AI similarity"],
-] as const;
+type DetailHeadingLevel = "h3" | "h4" | "h5";
 
-const aiEvaluation = /^AI similarity: (?:0\.\d{2}|1\.00) \(embeddings\)$/;
-const capReason = "Eligibility not fully confirmed; score capped";
-
-function matchExplanation(match: Match, ReasonHeading: "h3" | "h4") {
-  const reasons = match.reasons ?? [];
-  const aiPoints = match.components?.ai;
-  const positiveReasons = reasons.filter((reason) =>
-    /^(?:Skill overlap|Field keywords found|Matches interests): \S/.test(reason)
-    || reason === "Remote-friendly location"
-    || reason === "Location matches the student's preference"
-    || (aiPoints > 0 && aiEvaluation.test(reason))
-  );
-  const aiEvaluated = aiPoints > 0 || reasons.some((reason) => aiEvaluation.test(reason));
-  const components = scoreComponents.flatMap(([key, label]) => {
-    const points = match.components?.[key];
-    return Number.isFinite(points) && (key !== "ai" || aiEvaluated) ? [{ label, points }] : [];
-  });
-
+function matchExplanation({ score, positiveReasons, components, capped }: NonNullable<OpportunityCopilotData["match"]>, ReasonHeading: DetailHeadingLevel) {
   return <>
-    <p className="card-title text-2xl tabular-nums">{match.score + "/100"}</p>
+    <p className="card-title text-2xl tabular-nums">{score + "/100"}</p>
     <p className="metadata-text mt-1">Measures how closely this opportunity fits your profile.</p>
     <ReasonHeading className="card-title mt-4 text-sm">Why this fits</ReasonHeading>
     {positiveReasons.length > 0
@@ -55,7 +35,7 @@ function matchExplanation(match: Match, ReasonHeading: "h3" | "h4") {
         </dl>
         : <p className="metadata-text">No component values were provided.</p>}
     </details>
-    {reasons.includes(capReason) && <p className="metadata-text mt-2">The maximum Match Score is 49/100 while eligibility is unconfirmed.</p>}
+    {capped && <p className="metadata-text mt-2">The maximum Match Score is 49/100 while eligibility is unconfirmed.</p>}
   </>;
 }
 
@@ -73,44 +53,17 @@ const ruleOutcomes: Record<Eligibility["status"], string> = {
   unknown: "Unverified",
 };
 
-// A9 returns human-readable reasons, but no structured missing-data source.
-// Only the known reasons that identify a source get a source-specific next step.
-const checkOfficialListing = "Check the official listing.";
-const eligibilityNextSteps = new Map([
-  ["Student has not declared a degree level", "Add your degree level to your profile."],
-  ["Student study year is not known", "Check your current study year against the accepted years."],
-  ["Student graduation year is not known", "Add your expected graduation year to your profile."],
-  ["Student location is not known; cannot compare", "Add your location to your profile."],
-  ["Opportunity does not specify a degree level", checkOfficialListing],
-  ["Opportunity does not specify accepted study years", checkOfficialListing],
-  ["No structured graduation restriction available", checkOfficialListing],
-  ["Opportunity does not specify a location", checkOfficialListing],
-]);
-
-function eligibilityExplanation(eligibility: Eligibility, DetailHeading: "h3" | "h4") {
-  const rules = eligibility.reasons ?? [];
-  const checks = new Map<string, { labels: string[]; status: Eligibility["status"]; nextStep?: string; reason?: string }>();
-  for (const { rule, status, reason } of rules) {
-    if (status === "eligible") continue;
-    const nextStep = status === "not_eligible" ? undefined : eligibilityNextSteps.get(reason);
-    const key = nextStep ? status + nextStep : rule;
-    const label = rule.replaceAll("_", " ");
-    const grouped = checks.get(key);
-    if (grouped) grouped.labels.push(label);
-    else checks.set(key, { labels: [label], status, nextStep, reason: status === "not_eligible" ? reason : undefined });
-  }
-  const toCheck = Array.from(checks).sort(([, a], [, b]) =>
-    Number(b.status === "not_eligible") - Number(a.status === "not_eligible"));
+function eligibilityExplanation({ status, rules, toCheck }: NonNullable<OpportunityCopilotData["eligibility"]>, DetailHeading: DetailHeadingLevel, copilotEnabled: boolean) {
   return <>
-    <p className={eligibility.status === "not_eligible" ? "card-title text-lg" : "reading-text font-semibold"}>
-      {eligibilityVerdicts[eligibility.status]}
+    <p className={status === "not_eligible" ? "card-title text-lg" : "reading-text font-semibold"}>
+      {eligibilityVerdicts[status]}
     </p>
     <DetailHeading className="card-title mt-4 text-sm">What to check</DetailHeading>
     {toCheck.length > 0 ? <ul className="reading-text mt-2 list-disc space-y-2 pl-5 text-sm [overflow-wrap:anywhere]">
       {toCheck.map(([key, { labels, status, nextStep, reason }]) => <li key={key}>
         <strong className="capitalize">{labels.join(", ")}</strong>
         <span className={status === "not_eligible" ? "font-semibold" : "metadata-text"}>{" · " + ruleOutcomes[status]}</span>
-        {(nextStep || reason) && <span className="block">{nextStep ?? reason}</span>}
+        {(reason || (!copilotEnabled && nextStep)) && <span className="block">{reason ?? nextStep}</span>}
       </li>)}
     </ul> : <p className="metadata-text mt-2">{rules.length === 0
       ? "No per-rule eligibility details are available."
@@ -118,8 +71,8 @@ function eligibilityExplanation(eligibility: Eligibility, DetailHeading: "h3" | 
     {rules.length > 0 && <details className="mt-4 border-t border-line pt-2">
       <summary className="cursor-pointer rounded-sm py-2 text-sm font-semibold text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">Eligibility details</summary>
       <ul aria-label="Eligibility criteria" className="mt-2 space-y-3">
-        {rules.map(({ rule, status, reason }) => <li key={rule} className="min-w-0 [overflow-wrap:anywhere]">
-          <p className="reading-text text-sm font-semibold capitalize">{rule.replaceAll("_", " ")}</p>
+        {rules.map(({ rule, label, status, reason }) => <li key={rule} className="min-w-0 [overflow-wrap:anywhere]">
+          <p className="reading-text text-sm font-semibold capitalize">{label}</p>
           <p className="metadata-text">{ruleOutcomes[status]}</p>
           {reason && <p className="reading-text text-sm">{reason}</p>}
         </li>)}
@@ -181,7 +134,65 @@ function briefDescription(listing: Opportunity, officialUrl: string | null) {
   return [...content, description.slice(cursor)];
 }
 
-export function OpportunityDetailView({ opportunity: job, assessment, status, companyLogoUrl, detailContext = "", standalone = false, saveControl, applicationControls }: {
+function skillComparison(skills: OpportunityCopilotData["skills"], Heading: "h3" | "h4") {
+  if (skills.status !== "ready") return <p className="metadata-text">
+    {skills.status === "profile-unavailable" ? "Profile skills could not be loaded." : "Skill comparison is unavailable without the full opportunity details."}
+  </p>;
+  const groups = [
+    { label: "Skills matched", skills: skills.matched,
+      empty: "No listed skills match those in your profile." },
+    { label: "Potential gaps", skills: skills.gaps,
+      empty: "No additional listed skills to check." },
+  ];
+  return <div className="grid gap-3 @sm:grid-cols-2">
+    {groups.map(({ label, skills, empty }) => <section key={label} className="min-w-0">
+      <Heading className="card-title text-sm">{label}</Heading>
+      {label === "Potential gaps" && <p className="metadata-text mt-1">Listed in this opportunity, not added to your profile</p>}
+      {skills.length > 0 ? <ul aria-label={label} className="mt-2 flex flex-wrap gap-2">
+        {skills.map(({ id, name }) => <li key={id} className="max-w-full [overflow-wrap:anywhere]"><Badge className="!text-foreground">{name}</Badge></li>)}
+      </ul> : <p className="metadata-text mt-2">{empty}</p>}
+    </section>)}
+  </div>;
+}
+
+function opportunityDecision(copilot: OpportunityCopilotData, standalone: boolean, copilotEnabled: boolean) {
+  const SectionHeading = standalone ? "h2" : "h3";
+  const AssessmentHeading = copilotEnabled ? (standalone ? "h3" : "h4") : SectionHeading;
+  const DetailHeading = copilotEnabled && !standalone ? "h5" : AssessmentHeading === "h2" ? "h3" : "h4";
+  const ActionHeading = standalone ? "h3" : "h4";
+  const assessmentCards = <div className="grid items-start gap-4 @sm:grid-cols-2">
+    <section className="min-w-0 rounded-card border border-line bg-card p-4">
+      <AssessmentHeading className="card-title">Match Score</AssessmentHeading>
+      <div className="mt-3" aria-live="polite">
+        {copilot.loading ? <p className="metadata-text">Loading match score…</p>
+          : copilot.match ? matchExplanation(copilot.match, DetailHeading)
+            : <>
+              {copilotEnabled && <DetailHeading className="card-title text-sm">Why this fits</DetailHeading>}
+              <p className="metadata-text">Match score could not be loaded.</p>
+            </>}
+      </div>
+    </section>
+    <section className="min-w-0 rounded-card border border-line bg-card p-4">
+      <AssessmentHeading className="card-title">Eligibility</AssessmentHeading>
+      <div className="mt-3" aria-live="polite">
+        {copilot.loading ? <p className="metadata-text">Loading eligibility…</p>
+          : !copilot.eligibility ? <p className="metadata-text">Eligibility could not be loaded.</p>
+            : eligibilityExplanation(copilot.eligibility, DetailHeading, copilotEnabled)}
+      </div>
+    </section>
+  </div>;
+  return copilotEnabled ? <section aria-label="Opportunity Copilot" className="space-y-4 rounded-panel border border-accent/20 bg-primary/10 p-3 sm:p-4">
+        <SectionHeading className="section-title">Opportunity Copilot</SectionHeading>
+        {assessmentCards}
+        {skillComparison(copilot.skills, ActionHeading)}
+        {copilot.eligibility?.suggestProfile && <div aria-live="polite">
+          <ActionHeading className="card-title text-sm">Suggested next action</ActionHeading>
+          <Link href="/profile" prefetch={false} className="inline-flex min-h-11 items-center rounded-sm text-sm font-semibold text-accent underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">Complete your profile</Link>
+        </div>}
+      </section> : assessmentCards;
+}
+
+export function OpportunityDetailView({ opportunity: job, assessment, status, companyLogoUrl, detailContext = "", standalone = false, saveControl, tracking, copilotEnabled = false, profileSkills = null, catalogStatus }: {
   opportunity: Opportunity | Application["opportunity"];
   assessment: OpportunityAssessment | null;
   status?: Application["status"];
@@ -189,14 +200,23 @@ export function OpportunityDetailView({ opportunity: job, assessment, status, co
   detailContext?: string;
   standalone?: boolean;
   saveControl?: ReactNode;
-  applicationControls?: ReactNode;
+  tracking?: { application: Application | null; showSave?: boolean };
+  copilotEnabled?: boolean;
+  profileSkills?: Skill[] | null;
+  catalogStatus?: "loading" | "loaded" | "failed";
 }) {
   const Heading = standalone ? "h1" : "h2";
   const SectionHeading = standalone ? "h2" : "h3";
   const listing = "url" in job ? job : null;
+  const listedSkills = isSkillList(listing?.skills) && listing.skills.every(({ id }) => !!id.trim()) ? listing.skills : null;
   const company = job.organization?.trim();
   const monogram = company ? Array.from(company)[0].toUpperCase() : "–";
   const officialUrl = safeJobSource(listing?.url);
+  const sourceNotice = !officialUrl && catalogStatus && {
+    loading: "Loading official listing…",
+    loaded: "No official link is available for this opportunity.",
+    failed: "The official listing could not be loaded. Open full details to try again.",
+  }[catalogStatus];
   const description = listing && briefDescription(listing, officialUrl);
   const facts: { label: string; icon: IconName; value?: string }[] = [
     { label: "Degree level", icon: "profile", value: listing?.degree_level ? degreeLabels[listing.degree_level] : undefined },
@@ -205,6 +225,7 @@ export function OpportunityDetailView({ opportunity: job, assessment, status, co
     { label: "Published", icon: "clock", value: opportunityDisplayDate(listing?.posted_at) },
   ];
   const knownFacts = facts.filter(({ value }) => value);
+  const copilot = prepareOpportunityCopilot(assessment, listedSkills, profileSkills);
   return <article className="@container flex min-h-0 min-w-0 flex-1 flex-col">
     <div role="region" aria-label="Opportunity information" tabIndex={0}
       className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain p-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus sm:p-4">
@@ -224,6 +245,12 @@ export function OpportunityDetailView({ opportunity: job, assessment, status, co
             </div>
           </div>
         </div>
+        {(tracking || listing) && <div className="mt-3">
+          <ApplicationControls key={`${job.id}:${tracking?.application?.updated_at ?? "new"}`}
+            opportunityId={job.id} application={tracking?.application} showSave={tracking?.showSave}
+            inline allowTracking={!!tracking}
+            tailoring={listing ? <TailoringEntryPoint title={job.title} organization={job.organization ?? ""} embedded /> : undefined} />
+        </div>}
         <div className="mt-3 flex flex-wrap gap-2">
           {listing?.is_active === false && <Badge>Closed on InternCalling</Badge>}
           {listing?.is_active === true && <Badge>Active on InternCalling</Badge>}
@@ -242,8 +269,8 @@ export function OpportunityDetailView({ opportunity: job, assessment, status, co
           </div>)}
         </dl>
       </section>}
-      {listing && listing.skills.length > 0 && <ul aria-label="Skills" className="flex flex-wrap gap-2">
-        {listing.skills.map((skill) => <li key={skill.id} className="max-w-full [overflow-wrap:anywhere]"><Badge className="!text-foreground">{skill.name}</Badge></li>)}
+      {!!listedSkills?.length && <ul aria-label="Skills" className="flex flex-wrap gap-2">
+        {listedSkills.map((skill) => <li key={skill.id} className="max-w-full [overflow-wrap:anywhere]"><Badge className="!text-foreground">{skill.name}</Badge></li>)}
       </ul>}
         {!standalone && <Link href={"/opportunities/" + encodeURIComponent(job.id) + (detailContext ? "?" + detailContext : "")}
           prefetch={false} className="inline-flex min-h-11 items-center rounded-full border border-border px-4 py-2 text-sm font-medium text-accent hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">
@@ -253,33 +280,15 @@ export function OpportunityDetailView({ opportunity: job, assessment, status, co
         <SectionHeading className="card-title">About the opportunity</SectionHeading>
         <p className="reading-text mt-3 max-w-prose whitespace-pre-wrap [overflow-wrap:anywhere]">{description}</p>
       </section>}
-      <div className="grid items-start gap-4 @sm:grid-cols-2">
-        <section className="min-w-0 rounded-card border border-line bg-card p-4">
-          <SectionHeading className="card-title">Match Score</SectionHeading>
-          <div className="mt-3" aria-live="polite">
-            {!assessment ? <p className="metadata-text">Loading match score…</p>
-              : assessment.match && Number.isFinite(assessment.match.score) ? matchExplanation(assessment.match, standalone ? "h3" : "h4")
-                : <p className="metadata-text">Match score could not be loaded.</p>}
-          </div>
-        </section>
-        <section className="min-w-0 rounded-card border border-line bg-card p-4">
-          <SectionHeading className="card-title">Eligibility</SectionHeading>
-          <div className="mt-3" aria-live="polite">
-            {!assessment ? <p className="metadata-text">Loading eligibility…</p>
-              : !assessment.eligibility ? <p className="metadata-text">Eligibility could not be loaded.</p>
-                : eligibilityExplanation(assessment.eligibility, standalone ? "h3" : "h4")}
-          </div>
-        </section>
-      </div>
-      {applicationControls}
-      {listing && !standalone && <TailoringEntryPoint title={job.title} organization={job.organization ?? ""} />}
+      {opportunityDecision(copilot, standalone, copilotEnabled)}
     </div>
-    {(officialUrl || saveControl) && <footer aria-label="Opportunity actions" className="flex shrink-0 flex-wrap items-start gap-2 border-t border-line bg-surface p-3">
+    {(officialUrl || saveControl || sourceNotice) && <footer aria-label="Opportunity actions" className="flex shrink-0 flex-wrap items-center gap-2 border-t border-line bg-surface p-3">
       {officialUrl && <a href={officialUrl} target="_blank" rel="noopener noreferrer"
         className="inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">
         {listing?.is_active ? "Apply on official site" : "View official listing"} <Icon name="external-link" className="size-4" /><span className="sr-only"> (opens in a new tab)</span>
       </a>}
       {saveControl}
+      {sourceNotice && <p role="status" className="metadata-text">{sourceNotice}</p>}
     </footer>}
   </article>;
 }

@@ -13,7 +13,10 @@ import { ErrorState } from "@/components/ui/error-state";
 const labels: Record<ProfileField, string> = { headline: "Headline", bio: "Bio", degree_level: "Degree level", university: "University", field_of_study: "Field of study", graduation_year: "Graduation year", location: "Location" };
 
 export type ProfileEditorHandle = { edit: (field: ProfileField) => void };
-export function ProfileEditor({ initialProfile, onConfirmed, onUnavailable, ref }: { initialProfile: Profile; onConfirmed?: (profile: Profile) => void; onUnavailable?: () => void; ref?: Ref<ProfileEditorHandle> }) {
+export function ProfileEditor({ initialProfile, onConfirmed, onUnavailable, ref, compactDesktop = false }: {
+  initialProfile: Profile; onConfirmed?: (profile: Profile) => void; onUnavailable?: () => void;
+  ref?: Ref<ProfileEditorHandle>; compactDesktop?: boolean;
+}) {
   const [profile, setProfile] = useState(initialProfile);
   const [draft, setDraft] = useState(() => profileDraft(initialProfile));
   const [editing, setEditing] = useState(false);
@@ -57,7 +60,7 @@ export function ProfileEditor({ initialProfile, onConfirmed, onUnavailable, ref 
   }
   const input = (key: Exclude<ProfileField, "bio" | "degree_level">) => <Input label={labels[key]} name={key} value={draft[key]} type={key === "graduation_year" ? "number" : "text"} min={key === "graduation_year" ? 1900 : undefined} max={key === "graduation_year" ? 2100 : undefined} step={key === "graduation_year" ? 1 : undefined} maxLength={key === "graduation_year" ? undefined : 255} disabled={saving} error={fields[key]} onChange={(event) => update(key, event.target.value)} />;
 
-  return <section className="mt-8 rounded-panel bg-card p-6 sm:p-9" aria-labelledby="profile-details-title">
+  return <section data-profile-compact={compactDesktop ? "editor" : undefined} className={`mt-8 rounded-panel bg-card p-6 sm:p-9 ${compactDesktop ? "xl:mt-5 xl:p-4" : ""}`} aria-labelledby="profile-details-title">
     <div className="flex flex-wrap items-center justify-between gap-4"><h2 ref={sectionTitle} id="profile-details-title" tabIndex={-1} className="section-title">Profile details</h2>{!editing && <Button onClick={() => { focusField.current = "headline"; setDraft(profileDraft(profile)); setSuccess(""); setEditing(true); }}>Edit profile</Button>}</div>
     {success && <p role="status" className="mt-5 text-sm leading-6">{success}</p>}
     {editing ? <form ref={form} onSubmit={submit} noValidate aria-busy={saving} className="mt-6 space-y-6">
@@ -74,6 +77,12 @@ export function ProfileEditor({ initialProfile, onConfirmed, onUnavailable, ref 
       {error && <ErrorState variant="danger" title="Profile could not be saved" description={error} />}
       {saving && <p role="status" className="text-sm text-muted">Saving your profile…</p>}
       <div className="flex flex-wrap gap-3"><Button type="submit" disabled={saving}>{saving ? "Saving…" : "Save"}</Button><Button variant="secondary" disabled={saving} onClick={close}>Cancel</Button></div>
-    </form> : <dl className="mt-6 grid gap-6 sm:grid-cols-2">{(Object.keys(labels) as ProfileField[]).map((key) => <div key={key} className={key === "bio" ? "min-w-0 sm:col-span-2" : "min-w-0"}><dt className="metadata-text">{labels[key]}</dt><dd className="mt-2 whitespace-pre-wrap break-words text-sm leading-6">{display(key)}</dd></div>)}</dl>}
+    </form> : <dl className={`mt-6 grid gap-6 sm:grid-cols-2 ${compactDesktop ? "xl:mt-4 xl:grid-cols-3 xl:gap-3" : ""}`}>
+      {(Object.keys(labels) as ProfileField[]).map((key) => <div key={key} className={key === "bio"
+        ? `min-w-0 sm:col-span-2 ${compactDesktop ? "xl:col-span-3" : ""}` : "min-w-0"}>
+        <dt className="metadata-text">{labels[key]}</dt>
+        <dd className={`mt-2 whitespace-pre-wrap break-words text-sm leading-6 ${compactDesktop ? "xl:mt-1" : ""}`}>{display(key)}</dd>
+      </div>)}
+    </dl>}
   </section>;
 }
