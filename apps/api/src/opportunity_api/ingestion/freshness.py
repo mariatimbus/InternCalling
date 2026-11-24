@@ -8,6 +8,7 @@ from opportunity_api.models import IngestionSourceState, Opportunity
 
 from .dedupe import utc
 from .normalize import canonical_url
+from .scope import assess_scope
 
 
 class FreshnessTracker:
@@ -18,7 +19,7 @@ class FreshnessTracker:
         self.missing_limit = missing_limit
         self.clock = clock or (lambda: datetime.now(UTC))
 
-    def assess(self, name, observations, source, report, *, dry_run=False):
+    def assess(self, name, observations, source, report, *, dry_run=False, european_source=False):
         now = self.clock()
         today = now.date()
         state_query = select(IngestionSourceState).where(IngestionSourceState.source == name)
@@ -94,6 +95,18 @@ class FreshnessTracker:
                 if healthy and missing >= self.missing_limit
                 else None
             )
+            if (
+                row.is_active
+                and not reason
+                and not assess_scope(
+                    row.title, row.description, row.location, european_source=european_source
+                ).accepted
+            ):
+                # Rules tighten over time and a posting the source stopped listing is never
+                # re-fetched. Hidden like a scope withdrawal: no reason, so it can return.
+                source.inactivated += 1
+                if not dry_run:
+                    row.is_active = False
             if row.is_active and reason:
                 source.inactivated += 1
                 if not dry_run:
