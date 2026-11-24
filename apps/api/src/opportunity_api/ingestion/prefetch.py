@@ -21,6 +21,7 @@ class Prefetched(SourceAdapter):
 
     def __init__(self, adapter: SourceAdapter, records: list, error: Exception | None):
         self.source_name = adapter.source_name
+        self.european_source = bool(getattr(adapter, "european_source", False))
         self._records, self._error = records, error
 
     def fetch(self) -> Iterator[RawOpportunity]:

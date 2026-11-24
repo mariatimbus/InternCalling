@@ -68,6 +68,7 @@ class IngestionRunner:
     ) -> None:
         name = adapter.source_name
         source = report.source(name)
+        european = bool(getattr(adapter, "european_source", False))
         pending: list[tuple[NormalizedOpportunity, str]] = []
         created_before, updated_before = source.created, source.updated
 
@@ -179,6 +180,7 @@ class IngestionRunner:
                     clean_text(fields["title"]),
                     fields.get("description"),
                     clean_text(fields.get("location")),
+                    european_source=european,
                 )
                 if not decision.accepted and not decision.requires_review:
                     source.rejected += 1
@@ -206,7 +208,10 @@ class IngestionRunner:
                 # to a hook that can legitimately transform them.
                 stage = "scope"
                 final_scope = assess_scope(
-                    normalized.title, normalized.description, normalized.location
+                    normalized.title,
+                    normalized.description,
+                    normalized.location,
+                    european_source=european,
                 )
                 if not final_scope.accepted and not final_scope.requires_review:
                     source.accepted -= 1
