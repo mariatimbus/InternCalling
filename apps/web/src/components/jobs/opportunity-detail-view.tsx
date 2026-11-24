@@ -12,24 +12,28 @@ import { degreeLabels, safeJobSource, studyYears } from "@/components/jobs/oppor
 
 const scoreComponents = [
   ["skills", "Skills"],
-  ["field_fit", "Field of study"],
+  ["field_fit", "Role fit"],
   ["interests", "Interests"],
   ["location", "Location"],
+  ["recency", "Recently posted"],
   ["ai", "AI similarity"],
 ] as const;
 
 const aiEvaluation = /^AI similarity: (?:0\.\d{2}|1\.00) \(embeddings\)$/;
-const capReason = "Eligibility not fully confirmed; score capped";
+// Matching v2 reasons (see docs/api.md): what fits, what the posting also asks for, and notes.
+const fitReason = /^(?:Matches \d+ of \d+ skills|Matches interests): \S|^\S.* role fits your background$|^Involves .+ work from your background$/;
+const fitPhrases = new Set(["In a location you chose", "Remote, as you prefer", "Remote-friendly", "In your country", "Posted this week"]);
+const gapReason = /^(?:Also asks for: |None of your skills are mentioned; it asks for )\S/;
+const discountReasons = new Set(["Requirements not stated in the posting", "Some requirements are not stated in the posting"]);
 
 function matchExplanation(match: Match, ReasonHeading: "h3" | "h4") {
   const reasons = match.reasons ?? [];
   const aiPoints = match.components?.ai;
   const positiveReasons = reasons.filter((reason) =>
-    /^(?:Skill overlap|Field keywords found|Matches interests): \S/.test(reason)
-    || reason === "Remote-friendly location"
-    || reason === "Location matches the student's preference"
-    || (aiPoints > 0 && aiEvaluation.test(reason))
+    fitReason.test(reason) || fitPhrases.has(reason) || (aiPoints > 0 && aiEvaluation.test(reason))
   );
+  const gaps = reasons.filter((reason) => gapReason.test(reason));
+  const note = reasons.find((reason) => discountReasons.has(reason));
   const aiEvaluated = aiPoints > 0 || reasons.some((reason) => aiEvaluation.test(reason));
   const components = scoreComponents.flatMap(([key, label]) => {
     const points = match.components?.[key];
@@ -45,6 +49,12 @@ function matchExplanation(match: Match, ReasonHeading: "h3" | "h4") {
         {positiveReasons.map((reason) => <li key={reason}>{reason}</li>)}
       </ul>
       : <p className="metadata-text mt-2">No positive match reasons were provided for this opportunity.</p>}
+    {gaps.length > 0 && <>
+      <ReasonHeading className="card-title mt-4 text-sm">To stand out</ReasonHeading>
+      <ul className="reading-text mt-2 list-disc space-y-1 pl-5 text-sm [overflow-wrap:anywhere]">
+        {gaps.map((reason) => <li key={reason}>{reason}</li>)}
+      </ul>
+    </>}
     <details className="mt-4 border-t border-line pt-2">
       <summary className="cursor-pointer rounded-sm py-2 text-sm font-semibold text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">Score breakdown</summary>
       {components.length > 0
@@ -56,7 +66,7 @@ function matchExplanation(match: Match, ReasonHeading: "h3" | "h4") {
         </dl>
         : <p className="metadata-text">No component values were provided.</p>}
     </details>
-    {reasons.includes(capReason) && <p className="metadata-text mt-2">The maximum Match Score is 49/100 while eligibility is unconfirmed.</p>}
+    {note && <p className="metadata-text mt-2">{note}, so the score is slightly lower.</p>}
   </>;
 }
 

@@ -11,10 +11,11 @@ The A9 eligibility engine is the gate:
 
 - ``not_eligible`` → score 0, always. A hard requirement failure can never
   surface as a good recommendation, no matter how strong the skill overlap.
-- ``possibly_eligible`` / ``unknown`` → the raw component sum is capped at
-  ``UNCONFIRMED_CAP``: an unconfirmed match can never outrank a confirmed
-  eligible one.
-- ``eligible`` → no cap.
+- ``possibly_eligible`` (nothing failed, some requirements not stated) → x0.95.
+- ``unknown`` (no requirement stated or known at all) → x0.9.
+  Most postings never state a degree or study year; missing data is not a reason
+  to bury an otherwise strong match, but a confirmed fit still ranks a bit higher.
+- ``eligible`` → the full score.
 
 Only eligibility rules backed by real data gate the score (degree level,
 study year, location). Graduation currently has no structured source
@@ -45,15 +46,20 @@ from opportunity_api.schemas.matching import (
 )
 
 from .ai import AIScorer
-from .scoring import score_field_fit, score_interests, score_location, score_skills
+from .scoring import (
+    score_field_fit,
+    score_interests,
+    score_location,
+    score_recency,
+    score_skills,
+)
 
 GATE_RULES = (check_degree_level, check_study_year, check_location)
 
-UNCONFIRMED_CAP = 49
-_NOT_ELIGIBLE_GATE = (
-    EligibilityStatus.possibly_eligible,
-    EligibilityStatus.unknown,
-)
+UNCONFIRMED_FACTOR = {
+    EligibilityStatus.possibly_eligible: 0.95,
+    EligibilityStatus.unknown: 0.9,
+}
 
 
 def to_student_input(profile: MatchingProfile) -> StudentInput:
@@ -115,9 +121,13 @@ def score_match(
         )
 
     score = min(100, sum(components.model_dump().values()))
-    if eligibility.status in _NOT_ELIGIBLE_GATE:
-        score = min(score, UNCONFIRMED_CAP)
-        reasons.append("Eligibility not fully confirmed; score capped")
+    if factor := UNCONFIRMED_FACTOR.get(eligibility.status):
+        score = round(score * factor)
+        reasons.append(
+            "Requirements not stated in the posting"
+            if eligibility.status == EligibilityStatus.unknown
+            else "Some requirements are not stated in the posting"
+        )
 
     reasons = _dedupe_preserve_order(reasons)
     return MatchResult(
@@ -135,13 +145,15 @@ def _components(
     field_points, field_reasons = score_field_fit(profile, opportunity)
     interest_points, interest_reasons = score_interests(profile, opportunity)
     location_points, location_reasons = score_location(profile, opportunity)
+    recency_points, recency_reasons = score_recency(opportunity)
     components = ComponentScores(
         skills=skills_points,
         field_fit=field_points,
         interests=interest_points,
         location=location_points,
+        recency=recency_points,
     )
-    reasons = skills_reasons + field_reasons + interest_reasons + location_reasons
+    reasons = skills_reasons + field_reasons + location_reasons + interest_reasons + recency_reasons
     return components, reasons
 
 
