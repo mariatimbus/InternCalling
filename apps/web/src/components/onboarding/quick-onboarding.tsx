@@ -5,7 +5,8 @@ import type { ActionState } from "@/lib/auth/action-state";
 import { prefillOnboarding, type OnboardingDraft } from "@/lib/onboarding";
 import { createProfileServices } from "@/lib/profile-services";
 import { validateResumeSelection, type ResumeMetadata } from "@/lib/resume-pdf";
-import { isParsingJob, isParsingResult, sectionChanges, type ReviewChanges } from "@/lib/resume-review";
+import { isParsingJob, isParsingResult, type ParsingResult } from "@/lib/resume-review";
+import { entryFields, entryLabel, onboardingChanges, onboardingEntries, sectionLabels, type OnboardingEntry } from "@/lib/onboarding-cv";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -13,14 +14,6 @@ const sleep = (ms: number, signal: AbortSignal) => new Promise<void>((resolve, r
   const timer = setTimeout(resolve, ms);
   signal.addEventListener("abort", () => { clearTimeout(timer); reject(new DOMException("Aborted", "AbortError")); }, { once: true });
 });
-const sectionNames: Record<string, [string, string]> = { experience: ["experience", "experiences"], projects: ["project", "projects"], languages: ["language", "languages"], certificates: ["certificate", "certificates"], honours: ["award", "awards"], publications: ["publication", "publications"] };
-/** "Also adding 3 experiences, 2 projects to your profile." */
-function foundSummary(changes: ReviewChanges): string {
-  const counts = new Map<string, number>();
-  for (const change of changes.collections) counts.set(change.section, (counts.get(change.section) ?? 0) + 1);
-  const parts = [...counts].map(([section, count]) => `${count} ${sectionNames[section][count === 1 ? 0 : 1]}`);
-  return `Also adding ${parts.join(", ")} to your profile.`;
-}
 const textFields = [["university", "University"], ["field_of_study", "Field of study"], ["graduation_year", "Graduation year"], ["location", "City"]] as const;
 
 /** One screen: an optional CV fills the form, one button saves it and opens the internships. */
@@ -29,16 +22,24 @@ export function QuickOnboarding({ initial, suggestions }: { initial: OnboardingD
   const [draft, setDraft] = useState(initial), [skill, setSkill] = useState("");
   const [resume, setResume] = useState<ResumeMetadata | null>(null), [reusable, setReusable] = useState(false), [reading, setReading] = useState(false), [note, setNote] = useState("");
   const lifetime = useRef<AbortController | null>(null);
-  const [sections, setSections] = useState<ReviewChanges | null>(null);
+  // Experience, projects and the rest found in the CV: ticked entries are saved with the profile.
+  const [parsed, setParsed] = useState<{ result: ParsingResult; requestId: string } | null>(null);
+  const [entries, setEntries] = useState<OnboardingEntry[]>([]), [entryErrors, setEntryErrors] = useState<Record<string, string>>({});
   const [state, action, pending] = useActionState(async (previous: ActionState, form: FormData) => {
-    // Experience, projects and the rest found in the CV are saved with the profile.
     const signal = lifetime.current?.signal;
-    if (sections && signal) {
-      try { await services.review.confirm(sections, { signal }); setSections(null); }
-      catch { return { error: "We couldn't save the experience and projects from your CV. Try again, or continue and add them in Profile." }; }
+    if (parsed && signal) {
+      const { changes, errors } = onboardingChanges(parsed.result, entries, parsed.requestId);
+      setEntryErrors(errors);
+      if (Object.keys(errors).length) return { error: "Fix the highlighted CV entries, or untick them." };
+      if (changes) {
+        try { await services.review.confirm(changes, { signal }); setParsed(null); setEntries([]); }
+        catch { return { error: "We couldn't save the entries from your CV. Try again, or untick them and add them later in Profile." }; }
+      }
     }
     return finishOnboarding(previous, form);
   }, {} as ActionState);
+  const updateEntry = (key: string, change: Partial<OnboardingEntry> | ((entry: OnboardingEntry) => OnboardingEntry)) =>
+    setEntries(list => list.map(entry => entry.key !== key ? entry : typeof change === "function" ? change(entry) : { ...entry, ...change }));
   useEffect(() => {
     const operation = new AbortController(); lifetime.current = operation;
     services.pdf.load({ signal: operation.signal }).then(value => { if (!operation.signal.aborted) { setResume(value); setReusable(!!value); } }).catch(() => {});
@@ -59,10 +60,10 @@ export function QuickOnboarding({ initial, suggestions }: { initial: OnboardingD
       const result = await services.review.result(job.id, { signal });
       if (!isParsingResult(result)) throw new Error("invalid result");
       setDraft(current => prefillOnboarding(current, result.proposed));
-      const found = sectionChanges(result, crypto.randomUUID());
-      setSections(found);
-      setNote("Filled in from your CV. Fix anything that looks wrong." + (found ? " " + foundSummary(found) : ""));
-    } catch { if (!signal.aborted) { setNote("We couldn't read this CV. Fill in the details below."); setReusable(!!source); setSections(null); } }
+      const found = onboardingEntries(result);
+      setParsed({ result, requestId: crypto.randomUUID() }); setEntries(found); setEntryErrors({});
+      setNote("Filled in from your CV. Fix anything that looks wrong.");
+    } catch { if (!signal.aborted) { setNote("We couldn't read this CV. Fill in the details below."); setReusable(!!source); setParsed(null); setEntries([]); } }
     finally { if (!signal.aborted) setReading(false); }
   }
   function addSkill() {
@@ -91,6 +92,39 @@ export function QuickOnboarding({ initial, suggestions }: { initial: OnboardingD
         </div>
         <datalist id={listId}>{suggestions.map(name => <option key={name} value={name} />)}</datalist>
       </div>
+      {entries.length > 0 && <fieldset className="min-w-0">
+        <legend className="metadata-text font-medium">From your CV</legend>
+        <ul className="mt-1.5 divide-y divide-line rounded-control border border-border">
+          {entries.map(entry => {
+            const errors = Object.entries(entryErrors).filter(([key]) => key === entry.key || key.startsWith(entry.key + "."));
+            return <li key={entry.key} className="flex items-start gap-3 px-3 py-1.5">
+              <input type="checkbox" checked={entry.include} onChange={event => updateEntry(entry.key, { include: event.target.checked })}
+                aria-label={`Add ${entryLabel(entry)}`} className="mt-3 size-4 shrink-0 accent-primary" />
+              <details className="min-w-0 flex-1" open={errors.length > 0 || undefined}>
+                <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 text-sm [&::-webkit-details-marker]:hidden">
+                  <span className={`min-w-0 flex-1 truncate ${entry.include ? "text-foreground" : "text-muted line-through"}`}>{entryLabel(entry)}</span>
+                  <span className="shrink-0 text-xs text-muted">{sectionLabels[entry.section]}</span>
+                  <span className="shrink-0 text-xs text-accent underline">Edit</span>
+                </summary>
+                <div className="grid gap-3 pb-3 pt-1 sm:grid-cols-2">
+                  {entryFields[entry.section].map(field => {
+                    const value = entry.values[field.key], error = entryErrors[entry.key + "." + field.key];
+                    const set = (next: string | boolean | string[]) => updateEntry(entry.key, current => ({ ...current, values: { ...current.values, [field.key]: next } }));
+                    if (field.kind === "check") return <label key={field.key} className="flex min-h-11 items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" checked={value === true} onChange={event => set(event.target.checked)} className="size-4 accent-primary" />{field.label}</label>;
+                    if (field.kind === "long") return <label key={field.key} className="block text-sm sm:col-span-2"><span className="metadata-text">{field.label}</span>
+                      <textarea value={typeof value === "string" ? value : ""} rows={3} maxLength={5000} onChange={event => set(event.target.value)} className="mt-1 w-full rounded-control border border-border bg-background/60 px-3 py-2 text-base sm:text-sm" />
+                      {error && <span role="alert" className="mt-1 block text-xs">{error}</span>}</label>;
+                    return <Input key={field.key} label={field.label} placeholder={field.hint} error={error} maxLength={255}
+                      value={Array.isArray(value) ? value.join(", ") : typeof value === "string" ? value : ""}
+                      onChange={event => set(event.target.value)} />;
+                  })}
+                  {entryErrors[entry.key] && <p role="alert" className="text-xs sm:col-span-2">{entryErrors[entry.key]}</p>}
+                </div>
+              </details>
+            </li>;
+          })}
+        </ul>
+      </fieldset>}
       {state.error && <p role="alert" className="text-sm">{state.error}</p>}
       <Button type="submit" disabled={pending || reading}>{pending ? "Saving…" : "Show my internships"}</Button>
     </form>
