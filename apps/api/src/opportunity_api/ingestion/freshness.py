@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from opportunity_api.models import IngestionSourceState, Opportunity
 
@@ -127,3 +127,19 @@ class FreshnessTracker:
             state.duplicate_ratio = duplicates
         if not dry_run:
             self.session.commit()
+
+
+def expire_past_deadlines(session, now: datetime | None = None) -> int:
+    """Hide every live posting whose deadline has passed, from any source.
+
+    Source freshness only visits configured feeds; hand-curated and seed postings
+    otherwise stay live after their deadline. Never deletes; the caller commits.
+    """
+    now = now or datetime.now(UTC)
+    result = session.execute(
+        update(Opportunity)
+        .where(Opportunity.is_active.is_(True), Opportunity.deadline < now)
+        .values(is_active=False, inactive_reason="deadline_expired", updated_at=now)
+        .execution_options(synchronize_session=False)
+    )
+    return result.rowcount or 0
