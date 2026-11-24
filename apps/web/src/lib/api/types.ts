@@ -21,7 +21,7 @@ export type OpportunityPage = { items: Opportunity[]; page: number; page_size: n
 export type Match = {
   score: number;
   eligibility: "eligible" | "possibly_eligible" | "not_eligible" | "unknown";
-  components: { skills: number; field_fit: number; interests: number; location: number; ai: number };
+  components: { skills: number; field_fit: number; interests: number; location: number; recency?: number; ai: number };
   reasons: string[];
 };
 export type Application = {
