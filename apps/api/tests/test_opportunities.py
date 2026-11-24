@@ -280,3 +280,14 @@ def test_null_study_year_serializes_as_null(client: TestClient, db_factory):
 
     assert response.status_code == 200
     assert response.json()["items"][0]["study_year"] is None
+
+
+def test_company_domain_comes_from_the_employer_registry(client: TestClient, db_factory):
+    seed(
+        db_factory,
+        make_opportunity(source="greenhouse.stripe", title="Known"),
+        make_opportunity(source="arbeitnow.board", title="Board"),
+    )
+    items = {item["title"]: item for item in client.get(URL).json()["items"]}
+    assert items["Known"]["company_domain"] == "stripe.com"
+    assert items["Board"]["company_domain"] is None  # job boards have no single company site
