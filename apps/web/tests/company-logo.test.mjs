@@ -8,7 +8,10 @@ async function moduleUrl(path, replace = {}) {
   const { outputText } = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } });
   return `data:text/javascript;base64,${Buffer.from(outputText).toString("base64")}`;
 }
-const helperUrl = await moduleUrl("../src/lib/company-logo.ts");
+const registry = JSON.parse(await readFile(new URL("../../api/src/opportunity_api/ingestion/sources/employers.json", import.meta.url), "utf8"));
+const helperUrl = await moduleUrl("../src/lib/company-logo.ts", {
+  'import employers from "../../../api/src/opportunity_api/ingestion/sources/employers.json";': `const employers = ${JSON.stringify(registry)};`,
+});
 const { companyLogoUrl, logoDomain } = await import(helperUrl);
 const { GET } = await import(await moduleUrl("../src/app/company-logos/[file]/route.ts", { '"@/lib/company-logo"': JSON.stringify(helperUrl) }));
 const call = (file) => GET(new Request("http://site.test/company-logos/" + file), { params: Promise.resolve({ file }) });
@@ -16,6 +19,11 @@ const call = (file) => GET(new Request("http://site.test/company-logos/" + file)
 test("only plain domains become logo paths", () => {
   assert.equal(companyLogoUrl("stripe.com"), "/company-logos/stripe.com.png");
   assert.equal(companyLogoUrl("deliveroo.co.uk"), "/company-logos/deliveroo.co.uk.png");
+  assert.equal(companyLogoUrl(null, "greenhouse.stripe"), "/company-logos/stripe.com.png");
+  assert.equal(companyLogoUrl(null, "ashby.doctolib"), "/company-logos/doctolib.fr.png");
+  assert.equal(companyLogoUrl(null, "ASHBY.DOCTOLIB"), "/company-logos/doctolib.fr.png");
+  assert.equal(companyLogoUrl("stripe.com", "ashby.doctolib"), "/company-logos/stripe.com.png");
+  assert.equal(companyLogoUrl(null, "unknown.source"), null);
   for (const bad of [null, "", "localhost", "evil.com/../x", "a b.com", "Stripe.com", "x".repeat(98) + ".com"]) assert.equal(companyLogoUrl(bad), null);
   assert.equal(logoDomain("stripe.com.png"), "stripe.com");
   assert.equal(logoDomain("stripe.com.svg"), null);

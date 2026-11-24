@@ -275,7 +275,7 @@ export function OpportunityDetailView({ opportunity: job, assessment, status, co
         <div className="grid items-start gap-5 @lg:grid-cols-[minmax(0,1fr)_11rem]">
         <div className="min-w-0">
         <div className="flex items-center gap-3">
-          <CompanyAvatar companyName={company} initials={monogram} logoUrl={companyLogoUrl ?? logoFor(listing?.company_domain)} />
+          <CompanyAvatar companyName={company} initials={monogram} logoUrl={companyLogoUrl ?? logoFor(listing?.company_domain, listing?.source)} />
           <p className="min-w-0 text-sm font-medium text-foreground/90 [overflow-wrap:anywhere]">{company || "Organization not specified"}</p>
         </div>
         <div className="mt-4 flex flex-wrap items-start gap-x-5 gap-y-3">
