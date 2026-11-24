@@ -6,6 +6,8 @@ INSERT INTO auth.users (id, email, raw_user_meta_data) VALUES
 INSERT INTO public.skills (id, name) VALUES ('c1000000-0000-4000-8000-000000000003', 'C1 fixture skill');
 INSERT INTO public.opportunities (id, title, opportunity_type, url, source, source_id) VALUES
  ('c1000000-0000-4000-8000-000000000004', 'C1 fixture', 'internship', 'https://example.invalid/c1-rls', 'c1-test', 'rls');
+INSERT INTO public.opportunities (id, title, opportunity_type, url, source, source_id, is_active) VALUES
+ ('c1000000-0000-4000-8000-000000000005', 'C1 hidden fixture', 'internship', 'https://example.invalid/c1-hidden', 'c1-test', 'hidden', false);
 INSERT INTO public.opportunity_skills VALUES
  ('c1000000-0000-4000-8000-000000000004', 'c1000000-0000-4000-8000-000000000003');
 DO $$ BEGIN
@@ -67,6 +69,9 @@ SET LOCAL ROLE anon;
 DO $$ BEGIN
  PERFORM * FROM public.skills;
  PERFORM * FROM public.opportunities;
+ IF EXISTS (SELECT 1 FROM public.opportunities WHERE NOT is_active) THEN
+  RAISE EXCEPTION 'Anonymous read of hidden opportunities allowed';
+ END IF;
  PERFORM * FROM public.opportunity_skills;
  BEGIN
   PERFORM * FROM public.profiles;
