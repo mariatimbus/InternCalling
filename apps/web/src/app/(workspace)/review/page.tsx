@@ -5,9 +5,9 @@ import type { ReviewQueue } from "@/lib/review";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
-import { opportunityDisplayDate } from "@/components/jobs/opportunity-detail-view";
 import { decide } from "./actions";
 export const metadata = { title: "Review | InternCalling" };
+const postedDate = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 
 export default async function ReviewPage() {
   const { api, user } = await requireAccount();
@@ -23,7 +23,7 @@ export default async function ReviewPage() {
       : "Postings the filters cannot decide on wait here."}</p>
     {queue.items.length ? <ul className="mt-7 space-y-4">
       {queue.items.map((item) => <li key={item.id} className="rounded-card border border-line bg-card p-6 [overflow-wrap:anywhere]">
-        <p className="metadata-text">{[item.organization, item.location, item.posted_at && `Posted ${opportunityDisplayDate(item.posted_at)}`].filter(Boolean).join(" · ")}</p>
+        <p className="metadata-text">{[item.organization, item.location, item.posted_at && `Posted ${postedDate.format(new Date(item.posted_at))}`].filter(Boolean).join(" · ")}</p>
         <h2 className="card-title mt-2">{item.title}</h2>
         {item.review_reason && <p className="mt-2 text-sm text-muted">Held because: {item.review_reason}</p>}
         {item.description && <details className="mt-3 text-sm">
