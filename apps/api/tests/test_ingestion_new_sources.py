@@ -70,7 +70,7 @@ def test_arbeitnow_paginates_dedupes_and_keeps_the_real_company():
     records = list(adapter.fetch())
     assert [r.source_id for r in records] == ["intern-1", "intern-2"]
     assert records[0].organization == "Acme GmbH"
-    assert records[0].location == "Munich, Remote, Europe" and records[1].location == "Europe"
+    assert records[0].location == "Munich, Remote" and records[1].location is None
     assert client.urls[1].endswith("?page=2")
 
 
@@ -140,7 +140,7 @@ def test_cities_and_title_based_stem_scope(title, location, code):
     assert assess_scope(title, "Python data cloud", location).code == code
 
 
-def test_arbeitnow_locations_are_european():
+def test_arbeitnow_towns_count_as_europe_without_changing_the_location():
     row = {
         "slug": "s",
         "company_name": "Acme",
@@ -149,8 +149,37 @@ def test_arbeitnow_locations_are_european():
         "location": "Greven",
     }
     client = Client({"data": [row], "links": {}})
-    [record] = list(ArbeitnowAdapter(employer("arbeitnow", "board"), client).fetch())
-    assert record.location == "Greven, Europe"
+    adapter = ArbeitnowAdapter(employer("arbeitnow", "board"), client)
+    [record] = list(adapter.fetch())
+    assert record.location == "Greven" and adapter.european_source
+    assert assess_scope("Backend Intern", "Python", "Greven", european_source=True).accepted
+    assert not assess_scope("Backend Intern", "Python", "Greven").accepted
+    us = assess_scope("Backend Intern", "Python", "Austin, TX", european_source=True)
+    assert us.code == "outside_europe"
+
+
+def test_ashby_does_not_repeat_the_country():
+    job = {
+        "id": "a1",
+        "title": "Data Intern",
+        "location": "Paris, France",
+        "address": {"postalAddress": {"addressCountry": "France"}},
+        "isRemote": True,
+        "jobUrl": "https://jobs.ashbyhq.com/fixture/a1",
+    }
+    [record] = list(AshbyAdapter(employer("ashby"), Client({"jobs": [job]})).fetch())
+    assert record.location == "Paris, France, Remote"
+
+
+@pytest.mark.parametrize(
+    "title",
+    [
+        "Stage Communication – Stratégie de communication innovante (Adopt AI)",
+        "Customer Service Intern (m/w/d)",
+    ],
+)
+def test_business_titles_with_a_company_ai_are_not_stem(title):
+    assert assess_scope(title, "Python data cloud", "Paris").code == "not_stem"
 
 
 @pytest.mark.parametrize(
