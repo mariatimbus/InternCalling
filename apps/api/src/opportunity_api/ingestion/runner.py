@@ -68,7 +68,7 @@ class IngestionRunner:
     ) -> None:
         name = adapter.source_name
         source = report.source(name)
-        self.store.reset_index()
+        european = bool(getattr(adapter, "european_source", False))
         pending: list[tuple[NormalizedOpportunity, str]] = []
         created_before, updated_before = source.created, source.updated
 
@@ -180,10 +180,13 @@ class IngestionRunner:
                     clean_text(fields["title"]),
                     fields.get("description"),
                     clean_text(fields.get("location")),
+                    european_source=european,
                 )
                 if not decision.accepted and not decision.requires_review:
                     source.rejected += 1
                     report.issue(name, identity, stage, decision.code, decision.reason, "rejected")
+                    if not self.dry_run:
+                        self.store.withdraw(name, raw.source_id)
                     continue
                 source.accepted += 1
                 if decision.requires_review:
@@ -205,7 +208,10 @@ class IngestionRunner:
                 # to a hook that can legitimately transform them.
                 stage = "scope"
                 final_scope = assess_scope(
-                    normalized.title, normalized.description, normalized.location
+                    normalized.title,
+                    normalized.description,
+                    normalized.location,
+                    european_source=european,
                 )
                 if not final_scope.accepted and not final_scope.requires_review:
                     source.accepted -= 1
@@ -359,7 +365,14 @@ class IngestionRunner:
         if self.freshness is not None:
             previous_freshness = (source.seen, source.missing, source.inactivated)
             try:
-                self.freshness.assess(name, observations, source, report, dry_run=self.dry_run)
+                self.freshness.assess(
+                    name,
+                    observations,
+                    source,
+                    report,
+                    dry_run=self.dry_run,
+                    european_source=european,
+                )
             except Exception:
                 self.store.rollback()
                 source.seen, source.missing, source.inactivated = previous_freshness

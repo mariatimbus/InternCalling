@@ -71,7 +71,7 @@ class FixtureClient:
                 review = dict(
                     row,
                     id="review",
-                    location={"name": "Remote"},
+                    location={"name": "Worldwide"},
                     absolute_url="https://example.invalid/jobs/review",
                 )
                 payload["jobs"] += [copy.deepcopy(row), senior, invalid, review]

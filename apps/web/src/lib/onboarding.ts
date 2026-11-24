@@ -37,3 +37,14 @@ export function readOnboardingForm(form: FormData): OnboardingDraft | null {
     return { degree_level: String(form.get("degree_level") ?? ""), university: String(form.get("university") ?? ""), field_of_study: String(form.get("field_of_study") ?? ""), graduation_year: String(form.get("graduation_year") ?? ""), location: String(form.get("location") ?? ""), skills: [...new Set(skills.map((value) => value.trim().toLowerCase()))] };
   } catch { return null; }
 }
+
+/** Fill the onboarding form from CV proposals: a proposed fact wins, saved answers stay where the CV is silent. */
+export function prefillOnboarding(draft: OnboardingDraft, proposed: { profile: Partial<Record<string, string | null>>; skills: string[] }): OnboardingDraft {
+  const pick = (key: "university" | "field_of_study" | "graduation_year" | "location") => proposed.profile[key]?.trim() || draft[key];
+  const degree = proposed.profile.degree_level?.trim() ?? "";
+  return {
+    degree_level: ["bachelor", "master"].includes(degree) ? degree : draft.degree_level,
+    university: pick("university"), field_of_study: pick("field_of_study"), graduation_year: pick("graduation_year"), location: pick("location"),
+    skills: [...new Set([...draft.skills, ...proposed.skills.map((skill) => skill.trim().toLowerCase()).filter(Boolean)])].slice(0, 100),
+  };
+}

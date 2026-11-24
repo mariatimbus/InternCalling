@@ -6,7 +6,7 @@ import { AccountProblem } from "@/components/auth/account-problem";
 import { AuthBoundary } from "@/components/auth/auth-boundary";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { BrandLogo } from "@/components/brand/brand-logo";
-import { CvOnboardingFlow } from "@/components/onboarding/cv-onboarding-flow";
+import { QuickOnboarding } from "@/components/onboarding/quick-onboarding";
 
 export const metadata = { title: "Your profile | InternCalling", robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
@@ -19,5 +19,5 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
   // Never replace a user's saved skills with an empty fallback after a failed read.
   if (own.status === "rejected") return <AccountProblem message="We could not load your skills. Try again before editing your profile." />;
   const profile = account.profile;
-  return <AuthBoundary config={account.config} userId={account.user.id}><div className="min-h-dvh"><header className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-6 py-6"><BrandLogo /><SignOutButton /></header><main id="main-content"><CvOnboardingFlow manualInitial={{ degree_level: profile.degree_level ?? "", university: profile.university ?? "", field_of_study: profile.field_of_study ?? "", graduation_year: profile.graduation_year?.toString() ?? "", location: profile.location ?? "", skills: own.value.map((skill) => skill.name) }} manualSuggestions={catalog.status === "fulfilled" ? catalog.value.map((skill) => skill.name) : []} /></main></div></AuthBoundary>;
+  return <AuthBoundary config={account.config} userId={account.user.id}><div className="min-h-dvh"><header className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3"><BrandLogo /><SignOutButton /></header><main id="main-content"><QuickOnboarding initial={{ degree_level: profile.degree_level ?? "", university: profile.university ?? "", field_of_study: profile.field_of_study ?? "", graduation_year: profile.graduation_year?.toString() ?? "", location: profile.location ?? "", skills: own.value.map((skill) => skill.name) }} suggestions={catalog.status === "fulfilled" ? catalog.value.map((skill) => skill.name) : []} /></main></div></AuthBoundary>;
 }

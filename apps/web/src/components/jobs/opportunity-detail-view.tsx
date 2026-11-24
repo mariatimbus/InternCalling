@@ -272,7 +272,7 @@ export function OpportunityDetailView({ opportunity: job, assessment, status, co
         </section>
       </div>
       {applicationControls}
-      {listing && !standalone && <TailoringEntryPoint title={job.title} organization={job.organization ?? ""} />}
+      {listing && !standalone && <TailoringEntryPoint jobId={job.id} title={job.title} organization={job.organization ?? ""} />}
     </div>
     {(officialUrl || saveControl) && <footer aria-label="Opportunity actions" className="flex shrink-0 flex-wrap items-start gap-2 border-t border-line bg-surface p-3">
       {officialUrl && <a href={officialUrl} target="_blank" rel="noopener noreferrer"

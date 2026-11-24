@@ -11,8 +11,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
-from ..ai.client import AIInvalidOutput, AIUnavailable, OllamaClient
+from ..ai.client import AIUnavailable, OllamaClient
 from ..ai.documents import DOCX, MAX_FILE_BYTES, PDF, InvalidDocument, extract_text
+from ..ai.extract import extract_cv_facts
 from ..ai.schemas import CVExtraction
 from ..core.config import get_settings
 from ..core.database import get_db
@@ -20,6 +21,7 @@ from ..core.errors import APIError
 from ..core.storage import PrivateCVStorage
 from ..models import CVDocument, Profile, User
 from ..schemas.cv import CVResponse, CVReview
+from ..workspace.common import lock_user
 from .deps import bearer_scheme, get_current_user
 from .profile import _get_or_create_skill
 
@@ -37,18 +39,19 @@ def get_storage(creds: Annotated[HTTPAuthorizationCredentials | None, Depends(be
     )
 
 
-def get_model():
+def get_model() -> OllamaClient | None:
+    """The optional extraction model; None means deterministic rules are used."""
     settings = get_settings()
+    if not settings.ollama_url:
+        return None
     try:
         return OllamaClient(settings.ollama_url, timeout=settings.ollama_timeout)
-    except AIUnavailable as exc:
-        raise APIError(
-            "CV extraction is unavailable", status_code=503, code="ai_unavailable"
-        ) from exc
+    except AIUnavailable:
+        return None
 
 
 Storage = Annotated[PrivateCVStorage, Depends(get_storage)]
-Model = Annotated[OllamaClient, Depends(get_model)]
+Model = Annotated[OllamaClient | None, Depends(get_model)]
 
 
 def owned(db: Session, user: User, document_id: UUID, *, lock=False) -> CVDocument:
@@ -97,14 +100,9 @@ def list_cvs(db: Db, user: CurrentUser):
     )
 
 
-@router.post("", response_model=CVResponse, status_code=201)
-async def upload_cv(
-    request: Request,
-    db: Db,
-    user: CurrentUser,
-    storage: Storage,
-    filename: Annotated[str, Query(pattern=r"^[A-Za-z0-9][A-Za-z0-9 ._-]{0,180}\.(pdf|docx)$")],
-):
+async def stage_cv(request, db, user, storage, filename):
+    # Fail before writing an object if the metadata migration is missing.
+    db.scalar(select(CVDocument.id).where(CVDocument.user_id == user.id).limit(1))
     media_type = request.headers.get("content-type", "").split(";")[0].strip()
     expected = PDF if filename.endswith(".pdf") else DOCX
     if media_type != expected:
@@ -132,6 +130,19 @@ async def upload_cv(
         sha256=hashlib.sha256(content).hexdigest(),
     )
     db.add(document)
+    return document
+
+
+@router.post("", response_model=CVResponse, status_code=201)
+async def upload_cv(
+    request: Request,
+    db: Db,
+    user: CurrentUser,
+    storage: Storage,
+    filename: Annotated[str, Query(pattern=r"^[A-Za-z0-9][A-Za-z0-9 ._-]{0,180}\.(pdf|docx)$")],
+):
+    document = await stage_cv(request, db, user, storage, filename)
+    path = document.storage_path
     try:
         db.commit()
     except Exception as exc:
@@ -167,28 +178,22 @@ def download_cv(document_id: UUID, db: Db, user: CurrentUser, storage: Storage):
 
 @router.post("/{document_id}/extract", response_model=CVResponse)
 def extract_cv(document_id: UUID, db: Db, user: CurrentUser, storage: Storage, model: Model):
+    lock_user(db, user)
     document = owned(db, user, document_id, lock=True)
     content = storage.download(document.storage_path)
     if hashlib.sha256(content).hexdigest() != document.sha256:
         raise APIError("CV content changed; upload it again", status_code=409, code="cv_changed")
     text = read_document(content, document.media_type)
     try:
-        extraction = model.generate(get_settings().ollama_extract_model, text, CVExtraction)
-        extraction.verify_evidence(text)
-    except AIUnavailable as exc:
+        extraction, extractor = extract_cv_facts(db, text, model)
+    except ValueError as exc:
         raise APIError(
-            "CV extraction is unavailable; your file is still saved",
-            status_code=503,
-            code="ai_unavailable",
-        ) from exc
-    except (AIInvalidOutput, ValueError) as exc:
-        raise APIError(
-            "Extraction could not be validated; edit your profile manually or try again",
+            "No explicit profile facts were found; edit your profile manually",
             status_code=422,
             code="invalid_extraction",
         ) from exc
     document.extraction = extraction.model_dump(mode="json")
-    document.extraction_model = get_settings().ollama_extract_model
+    document.extraction_model = extractor
     document.profile_snapshot = profile_values(user)
     document.status = "extracted"
     db.commit()
@@ -197,6 +202,7 @@ def extract_cv(document_id: UUID, db: Db, user: CurrentUser, storage: Storage, m
 
 @router.post("/{document_id}/review", response_model=CVResponse)
 def review_cv(document_id: UUID, payload: CVReview, db: Db, user: CurrentUser):
+    lock_user(db, user)
     document = owned(db, user, document_id, lock=True)
     if document.status != "extracted" or not document.extraction:
         raise APIError("Extract this CV before reviewing it", status_code=409, code="cv_not_ready")
@@ -240,6 +246,7 @@ def review_cv(document_id: UUID, payload: CVReview, db: Db, user: CurrentUser):
 
 @router.delete("/{document_id}", status_code=204)
 def delete_cv(document_id: UUID, db: Db, user: CurrentUser, storage: Storage):
+    lock_user(db, user)
     document = owned(db, user, document_id, lock=True)
     storage.delete(document.storage_path)
     db.delete(document)

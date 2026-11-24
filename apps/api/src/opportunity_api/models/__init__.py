@@ -7,8 +7,12 @@ from .opportunity import Opportunity, OpportunityDegreeLevel, OpportunityType
 from .profile import DegreeLevel, Profile
 from .skill import Skill, opportunity_skills, user_skills
 from .user import User
+from .workspace import ProfileEntry, ResumeState, WorkspaceRecord
 
 __all__ = [
+    "ProfileEntry",
+    "ResumeState",
+    "WorkspaceRecord",
     "CVDocument",
     "IngestionSourceState",
     "Application",

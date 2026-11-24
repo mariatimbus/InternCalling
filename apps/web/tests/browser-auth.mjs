@@ -59,28 +59,18 @@ try {
   console.log("PASS: invalid credentials show a useful message");
   await navigate("/sign-up"); await until("document.querySelector('input[name=email]')"); await screenshot("sign-up-desktop");
   await input("input[name=email]", email); await input("input[name=password]", password); await press("Create account");
-  await until("location.pathname === '/onboarding' && document.querySelector('h1')?.textContent.includes('studying towards')");
-  await check("new account enters onboarding with one main landmark", "document.querySelectorAll('main').length === 1 && document.querySelector('progress').value === 1");
-  await press("Continue"); await until("document.querySelector('[role=alert]')");
-  await check("required degree cannot be skipped", "![...document.querySelectorAll('button')].some(button => button.textContent === 'Skip') && !!document.querySelector('[role=alert]')");
+  await until("location.pathname === '/onboarding' && document.querySelector('h1')?.textContent.includes('Set up your profile')");
+  await check("new account enters onboarding with one main landmark and one form", "document.querySelectorAll('main').length === 1 && document.querySelectorAll('form').length === 1");
+  await screenshot("onboarding-desktop");
   await click("document.querySelector('input[value=bachelor]')");
-  await check("answering clears the old validation message", "!document.querySelector('#step-error')");
-  await screenshot("onboarding-desktop"); await press("Continue");
-  for (const [name, value] of [["university", "Local Test University"], ["field_of_study", "Computer Science"], ["graduation_year", "2027"], ["location", "Bucharest, Romania"]]) {
-    await until(`document.querySelector('input[name=${name}]')`);
-    if (name === "university") { await press("Continue"); await until("document.querySelector('[aria-invalid=true]')"); }
-    await input(`input[name=${name}]`, value); await press("Continue");
-  }
-  await until("document.body.textContent.includes('Search or add a skill')"); await viewport(320, 812); await screenshot("onboarding-mobile");
+  for (const [name, value] of [["university", "Local Test University"], ["field_of_study", "Computer Science"], ["graduation_year", "2027"], ["location", "Bucharest, Romania"]]) await input(`input[name=${name}]`, value);
+  await viewport(320, 812); await screenshot("onboarding-mobile");
   await check("onboarding fits a 320px viewport", "document.documentElement.scrollWidth === innerWidth");
-  await input("input[type=search]", "py"); await press("python"); await press("Back");
-  await check("Back preserves earlier answers", "document.querySelector('input[name=location]').value === 'Bucharest, Romania'");
-  await press("Continue"); await press("Continue"); await until("document.querySelector('h1')?.textContent.includes('Ready to find')"); await screenshot("summary-mobile");
-  await control({ failProfile: true }); await press("Find my matches"); await until("document.querySelector('[role=alert]')?.textContent.includes('could not reach')");
+  await control({ failProfile: true }); await press("Show my internships"); await until("document.querySelector('[role=alert]')?.textContent.includes('could not reach')");
   let state = await control(); const writes = state.events.filter((event) => ["PUT", "PATCH"].includes(event.type));
   assert.equal(writes.at(-2).path, "/api/v1/profile/skills"); assert.equal(writes.at(-1).path, "/api/v1/profile"); assert.equal(state.profiles[0].profile.degree_level, null);
   console.log("PASS: failed final save keeps profile incomplete; skills are persisted before the profile");
-  await control({ failProfile: false }); await press("Find my matches"); await until("location.pathname === '/jobs' && document.querySelectorAll('[aria-label=\"Recommended opportunities\" ] article h3').length === 3");
+  await control({ failProfile: false }); await press("Show my internships"); await until("location.pathname === '/jobs' && document.querySelectorAll('[aria-label=\"Recommended opportunities\" ] article h3').length === 3");
   await viewport(1440); await screenshot("jobs-desktop");
   await check("real feed reuses rounded cards with actual match scores", "document.body.textContent.includes('84') && !document.body.textContent.includes('Illustrative demo') && !document.body.textContent.includes('Demo student') && parseFloat(getComputedStyle(document.querySelector('article')).borderTopLeftRadius) >= 20");
   await check("desktop split panel remains visible", "document.querySelector('[aria-label=\"Selected opportunity\"]').getBoundingClientRect().width > 0");
@@ -150,13 +140,13 @@ try {
   await control({ googleDeny: false }); await navigate("/sign-up"); await until("document.querySelector('input[name=email]')");
   await viewport(320, 812); await screenshot("google-sign-up-mobile");
   await check("Google button fits the mobile sign-up page", "document.documentElement.scrollWidth === innerWidth && [...document.querySelectorAll('button')].some(button => button.textContent === 'Continue with Google')");
-  await press("Continue with Google"); await until("location.pathname === '/onboarding' && document.querySelector('h1')?.textContent.includes('studying towards')");
+  await press("Continue with Google"); await until("location.pathname === '/onboarding' && document.querySelector('h1')?.textContent.includes('Set up your profile')");
   state = await control(); assert.ok(state.events.some((event) => event.type === "google-oauth" && event.pkce && event.prompt === "select_account"));
   console.log("PASS: new Google user completes SDK PKCE callback and enters onboarding");
   await press("Sign out"); await until("location.pathname === '/sign-in'");
   await control({ seed: { email: "google-only@example.test", password, completed: true } });
   await press("Continue with Google"); await until("location.pathname === '/jobs' && document.querySelectorAll('[aria-label=\"Recommended opportunities\"] article h3').length === 3");
-  await check("returning Google user skips onboarding and sees their jobs", "!document.body.textContent.includes('What are you studying towards?')");
+  await check("returning Google user skips onboarding and sees their jobs", "!document.body.textContent.includes('Set up your profile')");
   await signOut();
   for (const path of ["/sign-in", "/sign-up"]) {
     await navigate(path); await until("document.querySelector('input[name=email]')");

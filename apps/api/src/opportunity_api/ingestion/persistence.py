@@ -6,9 +6,11 @@ Repeated imports preserve row IDs and avoid duplicate rows; A15 still counts
 unchanged matched upserts as updates.
 
 ``NormalizedOpportunity`` remains the existing normalize/validate contract at
-this import path. New postings are inactive pending publication review.
+this import path. New postings are inactive pending publication review, unless the
+store runs with ``publish=True``: then in-scope postings that need no review go live.
 """
 
+from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -18,7 +20,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, load_only
+from sqlalchemy.orm import Session
 
 from opportunity_api.models import Opportunity, OpportunityDegreeLevel, OpportunityType
 
@@ -27,6 +29,12 @@ from .normalize import canonical_url, clean_text
 from .report import IngestionError, Notice
 
 UpsertResult = Literal["created", "updated", "duplicate"]
+
+
+def _same(previous, value) -> bool:
+    if isinstance(previous, datetime) and isinstance(value, datetime):
+        return utc(previous) == utc(value)
+    return previous == value
 
 
 class NormalizedOpportunity(BaseModel):
@@ -161,38 +169,36 @@ class _PreviewState:
 class OpportunityStore:
     """Session-bound create/update gateway for opportunities."""
 
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, *, publish: bool = False) -> None:
         self.session = session
+        self.publish = publish
         self._index: Deduplicator | None = None
+        self._by_source: dict[str, dict[str, Opportunity]] = defaultdict(dict)
         self._preview: _PreviewState | None = None
 
     def reset_index(self) -> None:
         self._index = None
 
     def _identity_rows(self) -> Iterable[Opportunity]:
-        query = select(Opportunity).options(
-            load_only(
-                Opportunity.id,
-                Opportunity.source,
-                Opportunity.source_id,
-                Opportunity.url,
-                Opportunity.title,
-                Opportunity.organization,
-                Opportunity.location,
-                Opportunity.deadline,
-                Opportunity.opportunity_type,
-            )
-        )
+        # Full rows: comparing an update needs every field, and lazy-loading the rest
+        # cost one round trip per column per record on a distant database.
         with self.session.no_autoflush:
-            yield from self.session.scalars(query)
+            yield from self.session.scalars(select(Opportunity))
 
     def _identities(self) -> Deduplicator:
         if self._index is None:
             self._index = Deduplicator()
-            # One metadata-only snapshot per source, not a full scan per incoming row.
+            self._by_source = defaultdict(dict)
+            # One snapshot per run (rebuilt only after a rollback), not one per source.
             for row in self._identity_rows():
-                self._index.remember(row)
+                self._remember(row)
         return self._index
+
+    def _remember(self, row: Opportunity) -> None:
+        assert self._index is not None
+        self._index.remember(row)
+        if row.source_id:
+            self._by_source[row.source][row.source_id] = row
 
     def begin_preview(self) -> None:
         """Fresh detached catalogue per run; keep it across source index resets."""
@@ -249,6 +255,14 @@ class OpportunityStore:
         """Create or update by identity; never insert a duplicate."""
         self._begin_write()
         try:
+            match = self._identities().find(record, allow_update=True)
+            if (
+                match is not None
+                and match.kind != "fingerprint"
+                and match.record.source == record.source
+                and self._unchanged(match.record, record)
+            ):
+                return "updated"  # nothing to write: skip the savepoint round trips
             with self.session.begin_nested():
                 match = self._identities().find(record, allow_update=True)
                 if match is not None:
@@ -267,12 +281,12 @@ class OpportunityStore:
                 row = Opportunity(
                     source=record.source,
                     source_id=storage_id(record),
-                    is_active=False,
+                    is_active=self.publish and not record._requires_review,
                     **_row_values(record),
                 )
                 self.session.add(row)
                 self.session.flush()
-                self._identities().remember(row)
+                self._remember(row)
                 return "created"
         except IntegrityError:
             # Only the failed record's savepoint rolls back; prior successful rows survive.
@@ -298,17 +312,21 @@ class OpportunityStore:
             self.reset_index()
             raise
 
+    def _unchanged(self, row: Opportunity, record: NormalizedOpportunity) -> bool:
+        """True when an upsert would write nothing (the common case on a rerun)."""
+        if any(not _same(getattr(row, k), v) for k, v in _row_values(record).items()):
+            return False
+        if (record._requires_review and row.is_active) or self._republishable(row, record):
+            return False
+        return bool(explicit_id(row)) or not record.source_id
+
     def _apply(self, row: Opportunity, record: NormalizedOpportunity) -> bool:
         """Copy mutable fields onto ``row``. Returns True when anything changed."""
         changed = False
         values = _row_values(record)
         for field_name, value in values.items():
             previous = getattr(row, field_name)
-            same = (
-                utc(previous) == utc(value)
-                if isinstance(previous, datetime) and isinstance(value, datetime)
-                else previous == value
-            )
+            same = _same(previous, value)
             if not same:
                 setattr(row, field_name, value)
                 changed = True
@@ -316,13 +334,38 @@ class OpportunityStore:
         if (changed or record._requires_review) and row.is_active:
             row.is_active = False
             changed = True
+        if self._republishable(row, record):
+            row.is_active, row.inactive_reason = True, None
+            changed = True
         if changed:
             row.updated_at = datetime.now(UTC)
         return changed
 
+    def withdraw(self, source: str, source_id: str | None) -> bool:
+        """Hide a live posting that the current scope rules now reject (publish mode)."""
+        if not self.publish or not source_id:
+            return False
+        self._identities()  # the run's snapshot answers this without another query
+        row = self._by_source[source].get(source_id)
+        if row is None or not row.is_active:
+            return False
+        self._begin_write()
+        with self.session.begin_nested():
+            row.is_active = False
+            row.updated_at = datetime.now(UTC)
+            self.session.flush()
+        return True
+
+    def _republishable(self, row: Opportunity, record: NormalizedOpportunity) -> bool:
+        """Auto-publish a seen, unambiguous posting; never revive an expired one."""
+        if not self.publish or record._requires_review or row.is_active:
+            return False
+        expired = row.deadline is not None and utc(row.deadline) < datetime.now(UTC)
+        return row.inactive_reason in (None, "source_missing") and not expired
+
     def commit(self) -> None:
+        # Rows stay valid after commit, so the run keeps one identity snapshot.
         self.session.commit()
-        self.reset_index()
 
     def rollback(self) -> None:
         self.session.rollback()
