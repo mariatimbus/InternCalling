@@ -7,6 +7,7 @@ import { TailoringEntryPoint } from "@/components/jobs/tailoring-entry-point";
 import { Badge } from "@/components/ui/badge";
 import { Icon, type IconName } from "@/components/ui/icon";
 import { opportunityTypeLabel } from "@/lib/opportunities";
+import { companyLogoUrl as logoFor } from "@/lib/company-logo";
 import { degreeLabels, safeJobSource, studyYears } from "@/components/jobs/opportunity-details";
 
 const scoreComponents = [
@@ -210,7 +211,7 @@ export function OpportunityDetailView({ opportunity: job, assessment, status, co
       className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain p-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus sm:p-4">
       <header className="rounded-panel border border-accent/15 bg-primary/10 p-4 sm:p-5">
         <div className="flex items-center gap-3">
-          <CompanyAvatar companyName={company} initials={monogram} logoUrl={companyLogoUrl} />
+          <CompanyAvatar companyName={company} initials={monogram} logoUrl={companyLogoUrl ?? logoFor(listing?.company_domain)} />
           <p className="min-w-0 text-sm font-medium text-foreground/90 [overflow-wrap:anywhere]">{company || "Organization not specified"}</p>
         </div>
         <div className="mt-4 flex flex-wrap items-start gap-x-5 gap-y-3">

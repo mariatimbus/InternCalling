@@ -14,7 +14,7 @@ export type Skill = { id: string; name: string };
 export type Opportunity = {
   id: string; title: string; description: string | null; organization: string | null;
   location: string | null; url: string; deadline: string | null; posted_at: string | null;
-  opportunity_type: string; is_active: boolean; skills: Skill[];
+  opportunity_type: string; is_active: boolean; skills: Skill[]; company_domain?: string | null;
   degree_level?: "bachelor" | "master" | "both" | null; study_year?: number[] | null;
 };
 export type OpportunityPage = { items: Opportunity[]; page: number; page_size: number; total: number };
