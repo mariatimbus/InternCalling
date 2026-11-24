@@ -5,6 +5,7 @@ from .cv import CVDocument
 from .ingestion_state import IngestionSourceState
 from .opportunity import Opportunity, OpportunityDegreeLevel, OpportunityType
 from .profile import DegreeLevel, Profile
+from .saved_search import SavedSearch
 from .skill import Skill, opportunity_skills, user_skills
 from .user import User
 from .workspace import ProfileEntry, ResumeState, WorkspaceRecord
@@ -22,6 +23,7 @@ __all__ = [
     "OpportunityDegreeLevel",
     "OpportunityType",
     "Profile",
+    "SavedSearch",
     "Skill",
     "User",
     "opportunity_skills",

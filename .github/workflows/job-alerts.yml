@@ -1,0 +1,47 @@
+name: Job alerts (daily email)
+on:
+  schedule:
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Count matches only, or email students
+        type: choice
+        options: [dry-run, send]
+        default: dry-run
+permissions:
+  contents: read
+concurrency:
+  group: job-alerts
+  cancel-in-progress: false
+jobs:
+  alerts:
+    # Off until the team sets ALERTS_ENABLED=true and the SMTP secrets on ingestion-production.
+    if: vars.ALERTS_ENABLED == 'true' && github.ref == 'refs/heads/main'
+    environment: ingestion-production
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: ${{ secrets.INGESTION_DATABASE_URL }}
+      SMTP_HOST: ${{ secrets.SMTP_HOST }}
+      SMTP_PORT: ${{ secrets.SMTP_PORT }}
+      SMTP_USER: ${{ secrets.SMTP_USER }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      ALERTS_FROM: ${{ secrets.ALERTS_FROM }}
+      RUN_MODE: ${{ github.event.inputs.mode || 'send' }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86
+        with:
+          python-version: "3.13"
+      - run: uv sync --project apps/api --locked
+      - name: Email new matches for saved searches with alerts on
+        working-directory: apps/api
+        shell: bash
+        # Prints counts only: no addresses or titles in the log.
+        run: |
+          if [ "$RUN_MODE" = send ]; then
+            uv run python -m opportunity_api.alerts --send
+          else
+            uv run python -m opportunity_api.alerts
+          fi

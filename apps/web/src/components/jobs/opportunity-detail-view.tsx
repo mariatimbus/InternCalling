@@ -9,6 +9,7 @@ import { Icon, type IconName } from "@/components/ui/icon";
 import { opportunityTypeLabel } from "@/lib/opportunities";
 import { companyLogoUrl as logoFor } from "@/lib/company-logo";
 import { structureDescription } from "@/lib/job-description";
+import { discountNote, isFitReason, isGapReason } from "@/lib/match-reasons";
 import { degreeLabels, safeJobSource, studyYears } from "@/components/jobs/opportunity-details";
 
 const scoreComponents = [
@@ -21,20 +22,14 @@ const scoreComponents = [
 ] as const;
 
 const aiEvaluation = /^AI similarity: (?:0\.\d{2}|1\.00) \(embeddings\)$/;
-// Matching v2 reasons (see docs/api.md): what fits, what the posting also asks for, and notes.
-const fitReason = /^(?:Matches \d+ of \d+ skills|Matches interests): \S|^\S.* role fits your background$|^Involves .+ work from your background$/;
-const fitPhrases = new Set(["In a location you chose", "Remote, as you prefer", "Remote-friendly", "In your country", "Posted this week"]);
-const gapReason = /^(?:Also asks for: |None of your skills are mentioned; it asks for )\S/;
-const discountReasons = new Set(["Requirements not stated in the posting", "Some requirements are not stated in the posting"]);
-
 function matchExplanation(match: Match, ReasonHeading: "h3" | "h4") {
   const reasons = match.reasons ?? [];
   const aiPoints = match.components?.ai;
   const positiveReasons = reasons.filter((reason) =>
-    fitReason.test(reason) || fitPhrases.has(reason) || (aiPoints > 0 && aiEvaluation.test(reason))
+    isFitReason(reason) || (aiPoints > 0 && aiEvaluation.test(reason))
   );
-  const gaps = reasons.filter((reason) => gapReason.test(reason));
-  const note = reasons.find((reason) => discountReasons.has(reason));
+  const gaps = reasons.filter(isGapReason);
+  const note = discountNote(reasons);
   const aiEvaluated = aiPoints > 0 || reasons.some((reason) => aiEvaluation.test(reason));
   const components = scoreComponents.flatMap(([key, label]) => {
     const points = match.components?.[key];
@@ -55,6 +50,7 @@ function matchExplanation(match: Match, ReasonHeading: "h3" | "h4") {
       <ul className="reading-text mt-2 list-disc space-y-1 pl-5 text-sm [overflow-wrap:anywhere]">
         {gaps.map((reason) => <li key={reason}>{reason}</li>)}
       </ul>
+      <Link href="/profile#profile-skills-title" prefetch={false} className="mt-2 inline-flex min-h-10 items-center text-sm text-accent underline">Add the ones you already have</Link>
     </>}
     <details className="mt-4 border-t border-line pt-2">
       <summary className="cursor-pointer rounded-sm py-2 text-sm font-semibold text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">Score breakdown</summary>

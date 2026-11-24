@@ -45,7 +45,7 @@ test("Jobs briefs keep source and detail links independent and place tailoring a
     "@/components/jobs/match-score": { MatchScore: "MatchScore" }, "@/components/jobs/company-avatar": { CompanyAvatar: "CompanyAvatar" },
     "@/components/jobs/eligibility-badge": { EligibilityBadge: "EligibilityBadge" }, "@/components/ui/badge": badge,
     "@/components/ui/drawer": { Drawer: "Drawer" }, "@/components/ui/button": { Button: "Button" },
-    "@/lib/company-logo": await load("../src/lib/company-logo.ts"), "@/components/ui/icon": { Icon: "Icon" }, "@/lib/opportunities": await load("../src/lib/opportunities.ts"),
+    "@/lib/company-logo": await load("../src/lib/company-logo.ts"), "@/lib/match-reasons": await load("../src/lib/match-reasons.ts"), "@/components/ui/icon": { Icon: "Icon" }, "@/lib/opportunities": await load("../src/lib/opportunities.ts"),
     "@/components/jobs/tailoring-entry-point": { TailoringEntryPoint: "Entry" },
     "@/components/jobs/opportunity-details": detailUi,
     "@/lib/job-description": await load("../src/lib/job-description.ts"),
