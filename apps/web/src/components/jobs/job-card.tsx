@@ -12,6 +12,8 @@ export type JobSummary = {
   matchScore: number | null; eligibility: EligibilityStatus;
   description?: string;
   companyLogoUrl?: string | null;
+  /** The strongest match reason, e.g. "Matches 3 of 6 skills: python, react". */
+  matchReason?: string;
   deadlineLabel?: string;
   deadlineText?: string;
   category?: string;

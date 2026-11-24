@@ -40,7 +40,7 @@ const detailView = await load("../src/components/jobs/opportunity-detail-view.ts
   "@/components/jobs/match-score": { MatchScore: "MatchScore" },
   "@/components/jobs/tailoring-entry-point": { TailoringEntryPoint: "TailoringEntryPoint" },
   "@/components/ui/badge": { Badge: "Badge" }, "@/components/ui/icon": { Icon: "Icon" },
-  "@/lib/company-logo": await load("../src/lib/company-logo.ts"), "@/lib/opportunities": { opportunityTypeLabel: (type) => type },
+  "@/lib/company-logo": await load("../src/lib/company-logo.ts"), "@/lib/match-reasons": await load("../src/lib/match-reasons.ts"), "@/lib/opportunities": { opportunityTypeLabel: (type) => type },
   "@/components/jobs/opportunity-details": detailUi,
 });
 
@@ -402,7 +402,7 @@ test("the card shows pending, blocks repeated clicks, and only displays the conf
       useRef: () => lock,
       useEffect: () => {},
     },
-    "@/lib/company-logo": await load("../src/lib/company-logo.ts"), "react/jsx-runtime": runtime, "@/lib/opportunities": { opportunitySummary: () => ({}) },
+    "@/lib/company-logo": await load("../src/lib/company-logo.ts"), "@/lib/match-reasons": await load("../src/lib/match-reasons.ts"), "react/jsx-runtime": runtime, "@/lib/opportunities": { opportunitySummary: () => ({}) },
     "@/components/applications/application-controls": { ApplicationControls: "ApplicationControls" },
     "@/components/jobs/job-card": { JobCard: "JobCard" }, "@/components/jobs/match-score": { MatchScore: "MatchScore" },
     "@/components/jobs/eligibility-badge": { EligibilityBadge: "EligibilityBadge" }, "@/components/ui/badge": { Badge: "Badge" },
@@ -468,7 +468,7 @@ test("Recommended preserves API ranking even when a later card has a higher scor
 test("cards omit unknown metadata and keep official links, selection and Save independent", async () => {
   const { RecommendedJobs } = await load("../src/components/workspace/recommended-jobs.tsx", {
     react: { useSyncExternalStore: (_subscribe, snapshot) => snapshot(), useState: (value) => [value, () => {}], useEffect: () => {}, useRef: (current) => ({ current }) },
-    "@/lib/company-logo": await load("../src/lib/company-logo.ts"), "react/jsx-runtime": runtime, "@/lib/opportunities": {
+    "@/lib/company-logo": await load("../src/lib/company-logo.ts"), "@/lib/match-reasons": await load("../src/lib/match-reasons.ts"), "react/jsx-runtime": runtime, "@/lib/opportunities": {
       opportunitySummary: (job) => ({ title: job.title, company: "Fixture" }), opportunityTypeLabel: (type) => type,
     },
     "@/components/applications/application-controls": { ApplicationControls: "ApplicationControls" },
@@ -792,7 +792,7 @@ test("switching cards scopes both detail surfaces and ignores the earlier in-fli
         }
       },
     },
-    "@/lib/company-logo": await load("../src/lib/company-logo.ts"), "react/jsx-runtime": runtime, "@/lib/opportunities": { opportunitySummary: (job) => ({ id: job.id }) },
+    "@/lib/company-logo": await load("../src/lib/company-logo.ts"), "@/lib/match-reasons": await load("../src/lib/match-reasons.ts"), "react/jsx-runtime": runtime, "@/lib/opportunities": { opportunitySummary: (job) => ({ id: job.id }) },
     "@/components/applications/application-controls": { ApplicationControls: "ApplicationControls" },
     "@/components/jobs/job-card": { JobCard: "JobCard" }, "@/components/ui/badge": { Badge: "Badge" },
     "@/components/ui/drawer": { Drawer: "Drawer" }, "@/components/ui/button": { Button: "Button" },
