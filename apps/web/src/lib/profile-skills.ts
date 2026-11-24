@@ -1,3 +1,4 @@
+import type { ApiClient } from "./api/client";
 import type { Skill } from "./api/types";
 
 export type SkillsResult = { skills?: Skill[]; error?: string; success?: string };
@@ -12,6 +13,11 @@ export function validateSkillName(value: unknown): { name?: string; error?: stri
 export function isSkillList(value: unknown): value is Skill[] {
   return Array.isArray(value) && value.every((item) => !!item && typeof item === "object"
     && typeof item.id === "string" && typeof item.name === "string" && !!item.name.trim());
+}
+
+export async function readProfileSkills(api: ApiClient): Promise<Skill[] | null> {
+  const skills = await api.request<unknown>("/api/v1/profile/skills").catch(() => null);
+  return isSkillList(skills) && skills.every(({ id }) => !!id.trim()) ? skills : null;
 }
 
 export function uniqueSkills(skills: Skill[]): Skill[] {

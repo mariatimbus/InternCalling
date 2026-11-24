@@ -10,7 +10,7 @@ export default function PublicLayout({ children }: Readonly<{ children: React.Re
           <Link href="/" className="hidden min-h-11 items-center rounded-control text-muted hover:text-foreground sm:inline-flex">Home</Link>
           <Link href="/explore" className="inline-flex min-h-11 items-center rounded-control text-muted hover:text-foreground">Explore</Link>
           <Link href="/sign-in" className="inline-flex min-h-11 items-center text-muted hover:text-foreground">Sign in</Link>
-          <Link href="/jobs" className="inline-flex min-h-11 items-center rounded-control bg-primary px-4 py-2 font-medium text-on-primary hover:bg-primary-hover">Open workspace</Link>
+          <Link href="/jobs" className="hidden min-h-11 items-center rounded-control bg-primary px-4 py-2 font-medium text-on-primary hover:bg-primary-hover sm:inline-flex">Open workspace</Link>
         </nav>
       </header>
       <main id="main-content" tabIndex={-1} className="flex flex-1 flex-col">{children}</main>

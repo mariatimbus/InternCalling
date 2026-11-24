@@ -26,7 +26,7 @@ export async function proxy(request: NextRequest) {
       },
     });
     const { data, error } = await supabase.auth.getUser();
-    const protectedPath = /^\/(jobs|opportunities|profile|applications|settings|onboarding)(\/|$)/.test(request.nextUrl.pathname);
+    const protectedPath = /^\/(jobs|opportunities|profile|resumes|applications|settings|onboarding)(\/|$)/.test(request.nextUrl.pathname);
     if (protectedPath && !data.user && !isAuthNetworkError(error)) {
       const redirect = NextResponse.redirect(new URL("/sign-in", request.url));
       response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
@@ -36,4 +36,4 @@ export async function proxy(request: NextRequest) {
   return applyHeaders(response);
 }
 
-export const config = { matcher: ["/jobs/:path*", "/opportunities/:path*", "/profile/:path*", "/applications/:path*", "/settings/:path*", "/onboarding/:path*", "/sign-in", "/sign-up", "/forgot-password", "/reset-password", "/auth/:path*"] };
+export const config = { matcher: ["/jobs/:path*", "/opportunities/:path*", "/profile/:path*", "/resumes/:path*", "/applications/:path*", "/settings/:path*", "/onboarding/:path*", "/sign-in", "/sign-up", "/forgot-password", "/reset-password", "/auth/:path*"] };

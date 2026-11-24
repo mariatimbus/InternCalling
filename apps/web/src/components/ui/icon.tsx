@@ -1,7 +1,10 @@
 import type { ComponentPropsWithoutRef } from "react";
 
-export type IconName = "jobs" | "profile" | "applications" | "settings" | "arrow" | "external-link" | "bookmark" | "location" | "menu" | "search" | "filter" | "sliders" | "check" | "clock" | "globe" | "chevron" | "grid" | "columns" | "wallet" | "calendar";
+export type IconName = "jobs" | "profile" | "applications" | "settings" | "arrow" | "external-link" | "bookmark" | "location" | "menu" | "search" | "filter" | "sliders" | "check" | "clock" | "globe" | "chevron" | "grid" | "columns" | "wallet" | "calendar" | "resume" | "plus" | "more";
 const paths: Record<IconName, string> = {
+  resume: "M6 3h9l4 4v14H6z M14 3v5h5 M9 8h2 M9 12h7 M9 16h7",
+  plus: "M12 5v14 M5 12h14",
+  more: "M5 12h.01 M12 12h.01 M19 12h.01",
   grid: "M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z",
   columns: "M3 4h18v16H3z M12 4v16",
   wallet: "M3 6h17v14H3z M3 6V4h15v2 M15 11h6v5h-6z M17 13.5h1",

@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/error-state";
 import { ApiError } from "@/lib/api/client";
 import type { Application, Opportunity } from "@/lib/api/types";
-import { readOpportunityAssessment } from "@/lib/api/opportunity-assessment";
+import { readCatalogOpportunity, readOpportunityAssessment } from "@/lib/api/opportunity-assessment";
+import { opportunityCopilotEnabled } from "@/lib/feature-flags";
+import { readProfileSkills } from "@/lib/profile-skills";
 import { requireCompletedAccount } from "@/lib/auth/account";
 import { detailReturnParams, type JobsQuery } from "@/lib/jobs-url";
 
@@ -26,21 +28,24 @@ export default async function OpportunityPage({ params, searchParams }: {
 
   if (/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(id)) {
     try {
-      job = await api.request<Opportunity>("/api/v1" + path, { authentication: "none" });
+      job = await readCatalogOpportunity(api, id);
       if (!job) failed = true;
     } catch (error) {
       failed = !(error instanceof ApiError && (error.status === 404 || error.status === 422));
     }
   }
-  const [assessment, tracker] = job ? await Promise.all([
+  const copilotEnabled = opportunityCopilotEnabled();
+  const [assessment, tracker, profileSkills] = job ? await Promise.all([
     readOpportunityAssessment(api, id),
     api.request<{ items: Application[] }>("/api/v1/applications").catch(() => null),
-  ]) : [null, null];
+    copilotEnabled ? readProfileSkills(api) : null,
+  ]) : [null, null, null];
   const trackerItems = Array.isArray(tracker?.items) ? tracker.items : null;
-  const status = trackerItems?.find((row) => row.opportunity_id === id)?.status;
+  const application = trackerItems?.find((row) => row.opportunity_id === id);
+  const status = application?.status;
   const canSave = job?.is_active === true && trackerItems !== null && !status;
 
-  return <div className={`mx-auto w-full max-w-4xl px-5 py-4 sm:px-8 ${job ? "flex h-full min-h-64 flex-col gap-3" : "space-y-5"}`}>
+  return <div className={`mx-auto w-full max-w-7xl px-5 py-4 sm:px-8 ${job ? "flex h-full min-h-64 flex-col gap-3" : "space-y-5"}`}>
     <Link href={jobsHref} className="inline-flex min-h-11 shrink-0 items-center self-start rounded-control text-sm text-accent underline underline-offset-4">
       Back to Jobs
     </Link>
@@ -50,8 +55,10 @@ export default async function OpportunityPage({ params, searchParams }: {
         {Array.from(context, ([name, value]) => <input key={name} name={name} type="hidden" value={value} />)}
         <Button type="submit">Try again</Button>
       </form>} />
-      : job ? <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-panel border border-line bg-card">
-        <OpportunityDetailView opportunity={job} assessment={assessment} standalone
+      : job ? <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <OpportunityDetailView opportunity={job} assessment={assessment} standalone copilotEnabled={copilotEnabled}
+          profileSkills={profileSkills}
+          tracking={application ? { application } : undefined}
           saveControl={status || canSave
             ? <StandaloneOpportunitySave key={id} id={id} title={job.title} status={status} saveAction={canSave ? saveOpportunity : undefined} />
             : job.is_active && trackerItems === null

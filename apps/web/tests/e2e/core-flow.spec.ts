@@ -1,13 +1,13 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Locator, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { randomUUID } from "node:crypto";
 const password = "Local-E2E-Fixture-Only-2026";
 
-async function submit(page: Page, name: string) {
+async function submit(page: Page, name: string, scope: Locator | Page = page) {
   const pathname = new URL(page.url()).pathname;
   const response = page.waitForResponse((result) => result.request().method() === "POST"
     && new URL(result.url()).pathname === pathname);
-  await page.getByRole("button", { name, exact: true }).click();
+  await scope.getByRole("button", { name, exact: true }).click();
   await (await response).finished();
 }
 
@@ -32,30 +32,61 @@ test("confirmed signup, profile, ranking, filters, save/apply/status/notes and r
   page.on("pageerror", (error) => runtimeErrors.push(error.message));
   page.on("response", (response) => { if (response.status() >= 500) serverFailures.push(new URL(response.url()).pathname); });
   await request.post("http://127.0.0.1:8300/__test", { data: { confirmEmail: true } });
+  await page.goto("/resumes");
+  await expect(page).toHaveURL(/\/sign-in/);
   const email = `core-${randomUUID()}@example.invalid`;
   await signUp(page, email);
   await expect(page.getByText(/Check your email to confirm/)).toBeVisible();
   const control = await (await request.get("http://127.0.0.1:8300/__test")).json();
   await page.goto(`/auth/callback?code=${encodeURIComponent(control.confirmationCode)}`);
   await onboard(page);
+  await page.screenshot({ path: info.outputPath("jobs.png"), style: "nextjs-portal { visibility: hidden }" });
   await page.goto("/profile");
+  await expect(page.locator('input[type="file"]')).toHaveCount(0);
+  if (info.project.name === "mobile") await page.getByRole("button", { name: "Menu", exact: true }).click();
+  await page.getByRole("link", { name: "Resumes", exact: true }).click();
+  await expect(page).toHaveURL(/\/resumes/);
+  await expect(page.getByRole("heading", { name: "No resumes yet", exact: true })).toBeVisible();
+  await page.screenshot({ path: info.outputPath("resumes-empty.png"), style: "nextjs-portal { visibility: hidden }" });
+  await page.getByRole("button", { name: "Add resume", exact: true }).click();
   const fixturePdf = await request.get("http://127.0.0.1:8302/__test/resume.pdf");
   await page.getByLabel("Select PDF", {exact:true}).setInputFiles({name:"fixture.pdf",mimeType:"application/pdf",buffer:await fixturePdf.body()});
   await page.getByRole("button", {name:"Upload PDF",exact:true}).click();
-  await expect(page.getByRole("heading", {name:"Confirmed uploaded PDF",exact:true})).toBeVisible();
+  await expect(page.getByText("resume.pdf", {exact:true})).toBeVisible();
   await page.reload();
-  await expect(page.getByRole("heading", {name:"Confirmed uploaded PDF",exact:true})).toBeVisible();
+  await expect(page.getByText("resume.pdf", {exact:true})).toBeVisible();
+  const originalResume = await (await page.request.get("/api/backend/workspace/resume")).json();
+  await expect(page.getByText("You have 1 resume saved.", { exact: true })).toBeVisible();
+  await page.screenshot({ path: info.outputPath("resumes-saved.png"), style: "nextjs-portal { visibility: hidden }" });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+  const resumeAxe = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();
+  expect(resumeAxe.violations).toEqual([]);
+  await page.getByLabel("Actions for resume.pdf", { exact: true }).click();
   await page.getByRole("button", {name:"View PDF",exact:true}).click();
   await expect(page.getByRole("link", {name:/Open ready PDF/})).toHaveAttribute("href", /^blob:/);
+  await page.getByRole("button", { name: "Replace resume", exact: true }).click();
+  await page.getByLabel("Select PDF", { exact: true }).setInputFiles({name:"replacement.pdf",mimeType:"application/pdf",buffer:await fixturePdf.body()});
+  await page.getByRole("button", { name: "Replace PDF", exact: true }).click();
+  await expect.poll(async () => (await (await page.request.get("/api/backend/workspace/resume")).json()).id).not.toBe(originalResume.id);
+  await page.reload();
+  await expect(page.getByText("resume.pdf", { exact: true })).toBeVisible();
+  const replacedResume = await (await page.request.get("/api/backend/workspace/resume")).json();
+  expect(replacedResume.id).not.toBe(originalResume.id);
+  await page.getByLabel("Actions for resume.pdf", { exact: true }).click();
   await page.getByRole("button", {name:"Remove PDF",exact:true}).click();
   await page.getByRole("button", {name:"Confirm remove PDF",exact:true}).click();
-  await expect(page.getByText("No PDF uploaded", {exact:true})).toBeVisible();
+  await expect(page.getByRole("heading", {name:"No resumes yet",exact:true})).toBeVisible();
+  await page.goto("/profile");
   await page.getByRole("button", { name: "Add project", exact: true }).click();
   await page.getByLabel("Project name (required)", {exact: true}).fill("Persistent solver project");
   await page.getByRole("button", {name: "Save", exact: true}).click();
   await expect(page.getByRole("heading", {name:"Persistent solver project",exact:true})).toBeVisible();
   await page.reload();
   await expect(page.getByRole("heading", {name:"Persistent solver project",exact:true})).toBeVisible();
+  await page.locator("main").evaluate(el => el.scrollTo(0, 0));
+  await expect(page.getByRole("heading", { name: "Your profile", exact: true })).toBeInViewport();
+  await page.screenshot({ path: info.outputPath("profile.png"), style: "nextjs-portal { visibility: hidden }" });
+  await page.getByText("Edit preferences", { exact: true }).click();
   await page.getByLabel("Study year", { exact: true }).selectOption("third");
   await page.getByLabel("Interests", { exact: true }).fill("python");
   await page.getByLabel("Remote preference", { exact: true }).selectOption("true");
@@ -72,6 +103,25 @@ test("confirmed signup, profile, ranking, filters, save/apply/status/notes and r
   const detail = page.getByRole("article").filter({
     has: page.getByRole("region", { name: "Opportunity information", exact: true }),
   });
+  await expect(detail.getByRole("link", { name: /Apply on official site/ })).toBeInViewport();
+  if (info.project.name === "desktop") {
+    const reader = await detail.getByRole("region", { name: "Opportunity information", exact: true }).boundingBox();
+    expect(reader?.height).toBeGreaterThan(480);
+    expect(reader?.y).toBeLessThan(160);
+  }
+  await page.screenshot({ path: info.outputPath("opportunity.png"), style: "nextjs-portal { visibility: hidden }" });
+  await detail.getByRole("heading", { name: "Responsibilities", exact: true }).scrollIntoViewIfNeeded();
+  await expect(detail.getByRole("heading", { name: "Responsibilities", exact: true })).toBeInViewport();
+  await page.screenshot({ path: info.outputPath("opportunity-body.png"), style: "nextjs-portal { visibility: hidden }" });
+  await detail.getByRole("region", { name: "Opportunity information", exact: true }).evaluate(el => el.scrollTo(0, 0));
+  await expect(detail.getByRole("link", { name: /Check the official listing/ })).toHaveCount(0);
+  const tailor = detail.getByRole("button", { name: "Tailor resume", exact: true });
+  await expect(detail.getByRole("button", { name: "Status · Not tracked", exact: true })).toBeInViewport();
+  await expect(tailor).toBeInViewport();
+  await tailor.focus();
+  await page.keyboard.press("Enter");
+  await expect(detail.getByRole("button", { name: "Request tailored draft", exact: true })).toBeVisible();
+  await page.keyboard.press("Enter");
   await expect(detail.getByRole("heading", { name: "Match Score", exact: true })).toBeVisible();
   await expect(detail.getByRole("heading", { name: "Eligibility", exact: true })).toBeVisible();
   const scoreBreakdown = detail.locator("details").filter({
@@ -87,7 +137,7 @@ test("confirmed signup, profile, ranking, filters, save/apply/status/notes and r
   const criteria = eligibilityDetails.getByRole("list", { name: "Eligibility criteria" });
   await expect(criteria.getByText("Opportunity does not specify a degree level", { exact: true })).toBeVisible();
   await expect(criteria.getByText("Remote opportunity; no location barrier", { exact: true })).toBeVisible();
-  await page.locator("summary:visible").filter({hasText:"Tailor resume for this job"}).click();
+  await tailor.click();
   await page.getByRole("button", {name:"Request tailored draft",exact:true}).click();
   await expect.poll(async () => page.locator("textarea").evaluateAll(nodes => nodes.some(node => node instanceof HTMLTextAreaElement && node.value.includes("Persistent solver project")))).toBeTruthy();
   const accept = page.getByRole("button", {name:"Accept item", exact:true});
@@ -101,12 +151,27 @@ test("confirmed signup, profile, ranking, filters, save/apply/status/notes and r
   await page.getByRole("button", {name:"Get download link",exact:true}).click();
   await expect(page.getByRole("link", {name:"Download approved resume",exact:true})).toHaveAttribute("href", /^blob:/);
   await detail.getByRole("button", { name: "Save Python Engineering Intern", exact: true }).click();
-  await expect(page.getByRole("combobox", { name: "Application status", exact: true })).toHaveValue("saved");
-  await page.goto("/applications?view=saved");
-  await expect(page.getByRole("heading", { name: "Python Engineering Intern" })).toBeVisible();
-  await page.getByRole("combobox", { name: "Application status", exact: true }).selectOption("applied");
-  await page.getByLabel("Notes", { exact: true }).fill("Fixture application note");
-  await submit(page, "Save progress");
+  const saved = detail.getByRole("button", { name: "Status · Saved", exact: true });
+  const notes = detail.getByRole("button", { name: "Notes", exact: true });
+  await saved.focus();
+  await page.keyboard.press("Enter");
+  await expect(detail.getByRole("combobox", { name: "Application status", exact: true })).toHaveValue("saved");
+  await notes.focus();
+  await page.keyboard.press("Space");
+  await detail.getByLabel("Notes", { exact: true }).fill("Fixture application note");
+  await saved.click();
+  await detail.getByRole("combobox", { name: "Application status", exact: true }).selectOption("applied");
+  await notes.click();
+  await expect(detail.getByLabel("Notes", { exact: true })).toHaveValue("Fixture application note");
+  await submit(page, "Save progress", detail);
+  await expect(detail.getByRole("button", { name: "Status · Applied", exact: true })).toBeVisible();
+  const fullDetails = await detail.getByRole("link", { name: "View full details" }).getAttribute("href");
+  expect(fullDetails).toBeTruthy();
+  await page.goto(fullDetails!);
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Status · Applied", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Edit notes", exact: true }).click();
+  await expect(page.getByLabel("Notes", { exact: true })).toHaveValue("Fixture application note");
   await page.goto("/applications?view=applied");
   for (const status of ["interview", "offer", "rejected"]) {
     await page.getByRole("combobox", { name: "Application status", exact: true }).selectOption(status);

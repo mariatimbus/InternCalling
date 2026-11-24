@@ -6,5 +6,5 @@ export function CollectionView<T extends { id: string }>({ state, renderEntry, o
   if (state.kind === "loading") return <p role="status" className="text-sm">Loading entries...</p>;
   if (state.kind === "error") return <div role="alert"><p className="text-sm">{state.message}</p><Button variant="secondary" onClick={onRetry}>Retry loading</Button></div>;
   if (!state.entries.length) return <p className="text-sm text-muted">{emptyMessage}</p>;
-  return <ul className="space-y-5">{state.entries.map(entry => <li key={entry.id} className="min-w-0 rounded-card border border-border p-4">{renderEntry(entry)}</li>)}</ul>;
+  return <ul data-profile-entries className="space-y-5">{state.entries.map(entry => <li key={entry.id} className="min-w-0 rounded-card border border-border p-4">{renderEntry(entry)}</li>)}</ul>;
 }

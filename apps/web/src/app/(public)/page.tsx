@@ -15,7 +15,7 @@ export default async function Home() {
       </section>
       <section aria-labelledby="opportunities-heading" className="pb-16 sm:pb-20">
         <div className="mb-7 flex flex-wrap items-end justify-between gap-3"><h2 id="opportunities-heading" className="section-title">Opportunities to explore</h2>{catalog.data && <Link href="/explore" className="text-sm text-accent">View all {catalog.data.total} opportunities</Link>}</div>
-        <div className="grid items-stretch gap-6 sm:grid-cols-2 lg:gap-8">
+        <div className="grid items-stretch gap-3">
           {catalog.data?.items.map((job) => <PublicOpportunityCard key={job.id} opportunity={job} />)}
         </div>
         {catalog.failed && <ErrorState title="Opportunities could not be loaded" description="Please try again shortly." />}
