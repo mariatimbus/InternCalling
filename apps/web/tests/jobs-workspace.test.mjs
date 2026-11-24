@@ -34,6 +34,7 @@ const detailUi = await load("../src/components/jobs/opportunity-details.tsx", {
 const assessmentApi = await load("../src/lib/api/opportunity-assessment.ts");
 const detailView = await load("../src/components/jobs/opportunity-detail-view.tsx", {
   "react/jsx-runtime": runtime, "next/link": { default: "Link" },
+  "@/lib/job-description": await load("../src/lib/job-description.ts"),
   "@/components/jobs/company-avatar": { CompanyAvatar: "CompanyAvatar" },
   "@/components/jobs/eligibility-badge": { EligibilityBadge: "EligibilityBadge" },
   "@/components/jobs/match-score": { MatchScore: "MatchScore" },
@@ -581,6 +582,7 @@ test("compact cards retain long metadata, meaningful eligibility and top-row act
     "react/jsx-runtime": runtime, "@/components/ui/badge": { Badge: "Badge" }, "@/components/ui/icon": { Icon: "Icon" },
     "./company-mark": { CompanyMark: "CompanyMark" }, "./company-avatar": { CompanyAvatar: "CompanyAvatar" },
     "./eligibility-badge": { EligibilityBadge: "EligibilityBadge" }, "./match-score": { MatchScore: "MatchScore" },
+    "@/lib/job-description": await load("../src/lib/job-description.ts"),
   });
   const location = "Berlin, Frankfurt am Main, Munich, London, and Zürich";
   const job = { company: "QuantCo", initials: "QU", companyLogoUrl: "/company-logos/example.png", skills: [],
