@@ -15,7 +15,14 @@ from ..core.errors import APIError
 from ..eligibility import evaluate as evaluate_eligibility
 from ..matching import AIScorer, OllamaEmbedder, score_match
 from ..matching.engine import to_opportunity_input
-from ..models import Opportunity, OpportunityDegreeLevel, OpportunityType, Profile, User
+from ..models import (
+    Opportunity,
+    OpportunityDegreeLevel,
+    OpportunityType,
+    Profile,
+    ProfileEntry,
+    User,
+)
 from ..schemas import OpportunityResponse, PaginatedOpportunityResponse
 from ..schemas.eligibility import EligibilityResult, StudentInput
 from ..schemas.matching import MatchingOpportunity, MatchingProfile, MatchResult
@@ -177,15 +184,35 @@ def _to_student_input(profile: Profile) -> StudentInput:
     )
 
 
-def _to_matching_profile(user: User) -> MatchingProfile:
+def _profile_evidence(db: Session, user: User) -> tuple[list[str], list[str]]:
+    """Technologies and role titles the student saved in projects and experience."""
+    skills, roles = [], []
+    entries = db.scalars(
+        select(ProfileEntry).where(
+            ProfileEntry.user_id == user.id, ProfileEntry.section.in_(("projects", "experience"))
+        )
+    )
+    for entry in entries:
+        values = entry.values if isinstance(entry.values, dict) else {}
+        technologies = values.get("technologies")
+        if isinstance(technologies, list):
+            skills += [t for t in technologies if isinstance(t, str) and t.strip()]
+        if isinstance(role := values.get("role"), str) and role.strip():
+            roles.append(role)
+    return skills, roles
+
+
+def _to_matching_profile(user: User, db: Session) -> MatchingProfile:
     profile = user.profile
+    project_skills, roles = _profile_evidence(db, user)
     return MatchingProfile(
         study_year=_study_year(profile),
         degree_level=profile.degree_level,
         graduation_year=profile.graduation_year,
         location=profile.location,
         field_of_study=profile.field_of_study,
-        skills=[skill.name for skill in user.skills],
+        skills=list(dict.fromkeys([skill.name for skill in user.skills] + project_skills)),
+        roles=roles,
         interests=profile.interests or [],
         preferred_tech_domains=profile.preferred_tech_domains or [],
         preferred_locations=profile.preferred_locations or [],
@@ -201,6 +228,7 @@ def _to_matching_opportunity(opportunity: Opportunity) -> MatchingOpportunity:
         degree_level=opportunity.degree_level,
         study_year=opportunity.study_year,
         skills=[skill.name for skill in opportunity.skills],
+        posted_at=opportunity.posted_at,
     )
 
 
@@ -235,7 +263,7 @@ def recommended_opportunities(
         search=search,
     ).where(or_(Opportunity.deadline.is_(None), Opportunity.deadline >= datetime.now(UTC)))
     stmt = stmt.options(selectinload(Opportunity.skills))
-    profile = _to_matching_profile(user)
+    profile = _to_matching_profile(user, db)
     student = _to_student_input(user.profile)
     ranked = []
     for opportunity in db.scalars(stmt):
@@ -254,13 +282,8 @@ def recommended_opportunities(
                 eligibility=evaluate_eligibility(student, to_opportunity_input(inputs)),
             )
         )
-    ranked.sort(
-        key=lambda item: (
-            item.match.eligibility != "eligible",
-            -item.match.score,
-            str(item.opportunity.id),
-        )
-    )
+    # Eligibility already weighs on the score; a stronger match ranks higher.
+    ranked.sort(key=lambda item: (-item.match.score, str(item.opportunity.id)))
     start = (page - 1) * page_size
     return RecommendationPage(
         items=ranked[start : start + page_size], total=len(ranked), page=page, page_size=page_size
@@ -296,7 +319,7 @@ def get_opportunity_match(
     """Explainable match score (A10 core + optional A11/A12 AI component)."""
     opportunity = _get_opportunity_or_404(db, opportunity_id)
     return score_match(
-        _to_matching_profile(user),
+        _to_matching_profile(user, db),
         _to_matching_opportunity(opportunity),
         ai=ai,
     )
