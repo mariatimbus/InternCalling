@@ -6,7 +6,7 @@ the pipeline (normalize/validate); here we only require identity, provenance
 and honest absence: a field the source did not provide stays ``None``.
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -28,6 +28,8 @@ class RawOpportunity(BaseModel):
     deadline_raw: str | None = None
     degree_level_raw: str | None = None
     study_year_raw: str | None = None
+    # When the source says the posting was published; never our own first-seen time.
+    posted_at: datetime | None = None
     fetched_at: datetime = Field(default_factory=_utcnow)
 
     @field_validator(
@@ -45,6 +47,14 @@ class RawOpportunity(BaseModel):
         if isinstance(value, str) and not value.strip():
             return None
         return value
+
+    @field_validator("posted_at")
+    @classmethod
+    def _plausible_publication(cls, value: datetime | None) -> datetime | None:
+        # Unknown beats wrong: naive or future timestamps are dropped, not guessed.
+        if value is None or value.tzinfo is None or value > _utcnow() + timedelta(days=1):
+            return None
+        return value.astimezone(UTC)
 
     @model_validator(mode="after")
     def _has_identity(self) -> "RawOpportunity":
