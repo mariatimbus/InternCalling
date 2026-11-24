@@ -28,6 +28,7 @@ def assess(session, observations=(), *, fetched=1, failed=0, now=NOW, dry_run=Fa
 
 
 def seed_row(db_factory, **kwargs):
+    kwargs = {"title": "Software Engineering Intern", "location": "Berlin, Germany", **kwargs}
     row = make_opportunity(source=SOURCE, source_id="known-job", **kwargs)
     with db_factory() as session:
         session.add(row)
@@ -47,6 +48,17 @@ def test_three_healthy_missing_days_inactivate_but_never_delete(db_factory):
             assert stored.is_active == (day < 2)
         assert result.totals().inactivated == 1
         assert session.get(Opportunity, row.id).inactive_reason == "source_missing"
+
+
+def test_live_row_the_scope_now_rejects_is_hidden_even_when_unseen(db_factory):
+    row = seed_row(db_factory, title="Werkstudent (m/w/d) Customer Service")
+    with db_factory() as session:
+        assert assess(session, dry_run=True).totals().inactivated == 1
+        assert session.get(Opportunity, row.id).is_active is True  # preview only
+        assert assess(session).totals().inactivated == 1
+        stored = session.get(Opportunity, row.id)
+        assert stored.is_active is False
+        assert stored.inactive_reason is None  # like a withdrawal: can be republished
 
 
 def test_observation_resets_misses_without_automatic_reactivation(db_factory):
