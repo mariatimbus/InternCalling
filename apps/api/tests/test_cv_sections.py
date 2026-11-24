@@ -67,8 +67,8 @@ def test_projects_split_stack_and_short_titles():
 def test_awards_certificates_and_languages():
     found = by_section()
     assert found["honours"] == [
-        {"title": "Dean's List", "receivedDate": "2023"},
-        {"title": "2nd Place – National Olympiad", "receivedDate": "2022"},
+        {"title": "Dean's List", "receivedDate": "2023", "description": ""},
+        {"title": "2nd Place – National Olympiad", "receivedDate": "2022", "description": ""},
     ]
     assert found["certificates"] == [
         {
@@ -94,3 +94,68 @@ def test_repeated_text_layer_is_proposed_once_and_keys_are_unique():
 def test_incomplete_entries_are_not_guessed():
     text = "Experience\nIntern at Acme\nCertifications\nAWS Cloud Practitioner (2024)\n"
     assert propose(text) == []  # no dates for the job, no issuer for the certificate
+
+
+# Synthetic CV with the layout that used to split projects in two: a subtitle line under
+# each title, one date at the end of the title line, an ALL-CAPS heading the parser does
+# not know, two languages on one line and a detail line under an award.
+LAYOUT = """
+TECHNICAL SKILLS
+Programming: C, C++, Python
+Hardware: Arduino Uno, Servo Motor Control
+Concepts: Power Iteration, Image
+Processing, Computer Vision
+Tools: Git, AutoCAD
+PROJECTS
+Campus Rover | Hardware & Embedded Programming Jun 2026
+University Project – Computer Systems Architecture
+• Built a rover on an Arduino Uno with servo steering written in C++.
+• Added obstacle detection and automatic stop.
+Plant Watering Alarm | GitHub Repository May 2026
+Python – Computer Vision & Linear Algebra
+• Detected dry soil from webcam frames with Image Processing and Power Iteration.
+Bridge Model | AutoCAD May 2026
+University Project – Computer-Aided Design
+• Drew 2D plans and a 3D model.
+RESEARCH INTERESTS
+Embedded Systems, Circuit Design, PCB Development.
+ADDITIONAL LEARNING
+Intro to Robotics Certificate In Progress
+Object-Oriented Programming in C++ – Microsoft In Progress
+HONORS & AWARDS
+Second Place – National Robotics Contest Mar 2025
+Spring Edition | Robotics League | Finals
+LANGUAGES
+Romanian: Native English: C2
+"""
+
+
+def test_project_subtitles_single_dates_and_unknown_headings():
+    found = {}
+    for candidate in propose(LAYOUT):
+        found.setdefault(candidate["section"], []).append(candidate["values"])
+    rover, alarm, bridge = found["projects"]  # exactly three: no title-only duplicates
+    assert rover["name"] == "Campus Rover" and rover["role"] == "Hardware & Embedded Programming"
+    assert (rover["startDate"], rover["endDate"]) == ("2026-06", "2026-06")
+    assert rover["description"].startswith("University Project – Computer Systems Architecture\n")
+    assert "obstacle detection" in rover["description"]
+    assert set(rover["technologies"]) == {"Arduino Uno", "C++"}
+    assert alarm["role"] == ""  # "GitHub Repository" is a link, not a role
+    # The subtitle names Python and Computer Vision; the bullet names the other two.
+    assert set(alarm["technologies"]) == {
+        "Python",
+        "Computer Vision",
+        "Image Processing",
+        "Power Iteration",
+    }
+    assert (bridge["role"], bridge["technologies"]) == ("", ["AutoCAD"])
+    assert found["certificates"] == [
+        {"name": "Object-Oriented Programming in C++", "organization": "Microsoft", "issueDate": ""}
+    ]
+    [award] = found["honours"]
+    assert award["receivedDate"] == "2025-03"
+    assert award["description"] == "Spring Edition | Robotics League | Finals"
+    assert found["languages"] == [
+        {"name": "Romanian", "cefr": "", "native": True},
+        {"name": "English", "cefr": "C2", "native": False},
+    ]
