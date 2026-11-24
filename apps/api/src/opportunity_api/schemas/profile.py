@@ -2,7 +2,6 @@
 
 from datetime import datetime
 from typing import Annotated
-from urllib.parse import urlparse
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
@@ -30,22 +29,6 @@ def _validate_graduation_year(value: int | None) -> int | None:
     return value
 
 
-def _validate_social_url(value: str | None, host: str) -> str | None:
-    if value is None:
-        return None
-    url = urlparse(value)
-    if (
-        url.scheme != "https"
-        or url.hostname not in {host, f"www.{host}"}
-        or not url.path.strip("/")
-        or url.username
-        or url.password
-        or url.port
-    ):
-        raise ValueError(f"Enter a valid https://{host}/ profile URL")
-    return value
-
-
 class ProfileResponse(BaseModel):
     """Full profile representation returned by the API."""
 
@@ -63,8 +46,6 @@ class ProfileResponse(BaseModel):
     bio: str | None
     location: str | None
     resume_url: str | None
-    linkedin_url: str | None = None
-    github_url: str | None = None
     degree_level: str | None
     field_of_study: str | None
     university: str | None
@@ -86,8 +67,6 @@ class ProfileUpsert(BaseModel):
     bio: str | None = None
     location: str | None = Field(default=None, max_length=255)
     resume_url: str | None = Field(default=None, max_length=512)
-    linkedin_url: str | None = Field(default=None, max_length=512)
-    github_url: str | None = Field(default=None, max_length=512)
     degree_level: str | None = None
     field_of_study: str | None = Field(default=None, max_length=255)
     university: str | None = Field(default=None, max_length=255)
@@ -95,10 +74,6 @@ class ProfileUpsert(BaseModel):
 
     _v_degree = field_validator("degree_level")(_validate_degree_level)
     _v_year = field_validator("graduation_year")(_validate_graduation_year)
-    _v_linkedin = field_validator("linkedin_url")(
-        lambda value: _validate_social_url(value, "linkedin.com")
-    )
-    _v_github = field_validator("github_url")(lambda value: _validate_social_url(value, "github.com"))
 
 
 class ProfilePatch(BaseModel):
@@ -114,8 +89,6 @@ class ProfilePatch(BaseModel):
     bio: str | None = None
     location: str | None = Field(default=None, max_length=255)
     resume_url: str | None = Field(default=None, max_length=512)
-    linkedin_url: str | None = Field(default=None, max_length=512)
-    github_url: str | None = Field(default=None, max_length=512)
     degree_level: str | None = None
     field_of_study: str | None = Field(default=None, max_length=255)
     university: str | None = Field(default=None, max_length=255)
@@ -123,7 +96,3 @@ class ProfilePatch(BaseModel):
 
     _v_degree = field_validator("degree_level")(_validate_degree_level)
     _v_year = field_validator("graduation_year")(_validate_graduation_year)
-    _v_linkedin = field_validator("linkedin_url")(
-        lambda value: _validate_social_url(value, "linkedin.com")
-    )
-    _v_github = field_validator("github_url")(lambda value: _validate_social_url(value, "github.com"))

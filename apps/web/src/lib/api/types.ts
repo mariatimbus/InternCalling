@@ -8,7 +8,6 @@ export type Profile = {
   university: string | null; field_of_study: string | null;
   graduation_year: number | null; location: string | null;
   headline: string | null; bio: string | null; resume_url: string | null;
-  linkedin_url?: string | null; github_url?: string | null;
   created_at: string; updated_at: string;
 };
 export type Skill = { id: string; name: string };
@@ -39,7 +38,6 @@ export function isProfile(value: unknown): value is Profile {
   return typeof p.id === "string" && typeof p.user_id === "string"
     && (p.degree_level === null || p.degree_level === "bachelor" || p.degree_level === "master")
     && ["headline", "bio", "resume_url", "university", "field_of_study", "location"].every((key) => p[key] === null || typeof p[key] === "string")
-    && ["linkedin_url", "github_url"].every((key) => p[key] === undefined || p[key] === null || typeof p[key] === "string")
     && ["created_at", "updated_at"].every((key) => typeof p[key] === "string" && Number.isFinite(Date.parse(p[key] as string)))
     && (p.graduation_year === null || (Number.isInteger(p.graduation_year) && Number(p.graduation_year) >= 1900 && Number(p.graduation_year) <= 2100));
 }

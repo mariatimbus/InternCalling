@@ -15,6 +15,7 @@ export default async function ProfilePage() {
       <p className="reading-text mt-3">Your experience, studies and skills, in one place.</p>
     </div>
     <ProfileHub initialProfile={profile} initialSkills={isSkillList(selected) ? selected : null} insightsEnabled={profileInsightsEnabled()}
+      socialLinks={user.socialLinks}
       contactEmail={user?.email.includes("@") ? user.email : undefined}
       preferences={<PreferencesForm profile={profile} />} />
   </div>;
