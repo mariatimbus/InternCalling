@@ -12,6 +12,7 @@ from sqlalchemy import select
 from opportunity_api.models import Opportunity
 
 from .database import checked_url, explicit_database_url, ingestion_session
+from .freshness import expire_past_deadlines
 from .persistence import OpportunityStore
 from .prefetch import prefetch
 from .registry import build_registry
@@ -97,6 +98,10 @@ def main(argv: list[str] | None = None) -> int:
                 report = IngestionRunner(
                     store, dry_run=args.dry_run, track_freshness=args.freshness
                 ).run(prefetch(adapters))
+                if args.apply and args.freshness:
+                    expired = expire_past_deadlines(session)
+                    session.commit()
+                    print(f"Hid {expired} expired postings.", file=sys.stderr)
                 print(
                     f"Ingested {len(adapters)} sources in {time.monotonic() - started:.0f}s.",
                     file=sys.stderr,

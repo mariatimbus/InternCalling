@@ -175,3 +175,23 @@ def test_failed_freshness_transaction_does_not_report_or_keep_inactivation(db_fa
         assert result.source(SOURCE).inactivated == 0
         assert result.source(SOURCE).source_failures == 1
         assert result.failed_sources == [SOURCE]
+
+
+def test_expired_postings_from_any_source_are_hidden(db_factory):
+    from opportunity_api.ingestion.freshness import expire_past_deadlines
+
+    past, future = NOW - timedelta(days=1), NOW + timedelta(days=1)
+    curated = make_opportunity(source="seed_supplemental", deadline=past)
+    open_ = make_opportunity(source="seed_supplemental", deadline=future)
+    undated = make_opportunity(source="greenhouse.fixture", deadline=None)
+    with db_factory() as session:
+        session.add_all([curated, open_, undated])
+        session.commit()
+        assert expire_past_deadlines(session, NOW) == 1
+        session.commit()
+        session.expire_all()
+        assert session.get(Opportunity, curated.id).inactive_reason == "deadline_expired"
+        assert session.get(Opportunity, curated.id).is_active is False
+        assert session.get(Opportunity, open_.id).is_active is True
+        assert session.get(Opportunity, undated.id).is_active is True
+        assert expire_past_deadlines(session, NOW) == 0  # idempotent

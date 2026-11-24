@@ -33,7 +33,7 @@ const text=tree=>JSON.stringify(tree),button=(tree,label)=>nodes(tree).find(n=>n
 async function component(service){const values=[],refs=[],effects=[];let index=0,refIndex=0;const react={useId:()=>"tailor",useRef(current){const slot=refIndex++;return refs[slot]??={current};},useEffect(effect){effects.push(effect);},useState(initial){const slot=index++;if(!(slot in values))values[slot]=typeof initial==="function"?initial():initial;return[values[slot],next=>{values[slot]=typeof next==="function"?next(values[slot]):next;}];}};class Fast extends ResumeTailoringController{constructor(jobId,service,preview){super(jobId,service,preview,0);}}const opportunities=await load("../src/lib/opportunities.ts");const {ResumeTailoringFlow}=await load("../src/components/profile/resume-tailoring-flow.tsx",{react,"react/jsx-runtime":runtime,"@/lib/resume-tailoring-controller":{...controller,ResumeTailoringController:Fast},"@/lib/resume-tailoring":model,"@/lib/opportunities":opportunities,"@/components/ui/button":{Button:"Button"},"@/components/ui/drawer":{Drawer:"Drawer"},"@/components/ui/input":{Input:"Input"},"@/components/ui/select":{Select:"Select"},"@/components/ui/field":{fieldControl:""}});const render=()=>{index=0;refIndex=0;return ResumeTailoringFlow({jobId:"sample-job",service,preview:true});};render();const cleanup=effects[0]();return{render,cleanup};}
 test("component exposes side-by-side text-only sources, editing, selection, approval and fixed sample disclaimer",async()=>{const service=preview.createTailoringPreviewService({delayMs:0}),f=await component(service);await tick();button(f.render(),"Request tailored draft").props.onClick();for(let i=0;i<30&&!nodes(f.render()).some(n=>n.type==="textarea");i++)await tick();let tree=f.render();assert.match(text(tree),/Source information/);assert.match(text(tree),/Proposed wording/);assert.match(text(tree),/Not supported by the source/);const textarea=nodes(tree).find(n=>n.type==="textarea");textarea.props.onChange({target:{value:"<script>User text, not HTML</script>"}});tree=f.render();assert.match(text(tree),/User-provided wording/);assert.equal(nodes(tree).some(n=>n.props.dangerouslySetInnerHTML),false);for(let i=0;i<4;i++){const accept=nodes(f.render()).filter(n=>n.type==="Button"&&n.props.children==="Accept item")[i];accept.props.onClick();}button(f.render(),"Save tailored draft").props.onClick();assert.equal(button(f.render(),"Save tailored draft").props.disabled,true);await tick();button(f.render(),"Approve this revision").props.onClick();await tick();assert.match(text(f.render()),/not an export of your edited draft/);button(f.render(),"Discard local draft").props.onClick();assert.equal(nodes(f.render()).find(n=>n.type==="Drawer").props.open,true);const modal=nodes(f.render()).find(n=>n.type==="Drawer");modal.props.onClose();assert.equal(nodes(f.render()).find(n=>n.type==="Drawer").props.open,false);f.cleanup();service.dispose();});
 test("unconnected flow stays safe; real entry lazily mounts live tailoring; preview notice persists",async()=>{const f=await component();assert.match(text(f.render()),/Tailoring is not available yet/);assert.equal(button(f.render(),"Request tailored draft"),undefined);f.cleanup();const {TailoringEntryPoint}=await load("../src/components/jobs/tailoring-entry-point.tsx",{react:{useMemo:f=>f(),useState:()=>[true,()=>{}]},"react/jsx-runtime":runtime,"@/lib/profile-services":{createProfileServices:()=>({tailoring:"live-service"})},"@/components/profile/resume-tailoring-flow":{ResumeTailoringFlow:"LiveFlow"}});const entry=TailoringEntryPoint({jobId:"job-id",title:"Role",organization:"Organization"});const flow=nodes(entry).find(n=>n.type==="LiveFlow");assert.equal(flow.props.jobId,"job-id");assert.equal(flow.props.service,"live-service");assert.equal(flow.props.preview,undefined);const {ResumeTailoringPreview}=await load("../src/components/dev/resume-tailoring-preview.tsx",{react:{useState(initial){return[typeof initial==="function"?initial():initial,()=>{}];}},"react/jsx-runtime":runtime,"@/components/ui/button":{Button:"Button"},"@/components/profile/resume-tailoring-flow":{ResumeTailoringFlow:"Flow"},"@/lib/resume-tailoring-preview-service":preview});const tree=ResumeTailoringPreview();assert.ok(nodes(tree).some(n=>n.type==="aside"&&n.props.children==="Demo mode — no AI generation or real account changes. The resume and job below use sample data."));assert.ok(nodes(tree).some(n=>n.type==="Flow"&&n.props.preview));});
-test("Jobs briefs keep source and detail links independent and place tailoring after the listing content", async () => {
+test("Jobs briefs keep source and detail links independent and place tailoring in the header controls", async () => {
   const badge = { Badge: "Badge" };
   const detailUi = await load("../src/components/jobs/opportunity-details.tsx", {
     "react/jsx-runtime": runtime, "@/components/ui/badge": badge,
@@ -46,6 +46,8 @@ test("Jobs briefs keep source and detail links independent and place tailoring a
     "@/components/jobs/eligibility-badge": { EligibilityBadge: "EligibilityBadge" }, "@/components/ui/badge": badge,
     "@/components/ui/drawer": { Drawer: "Drawer" }, "@/components/ui/button": { Button: "Button" },
     "@/lib/company-logo": await load("../src/lib/company-logo.ts"), "@/lib/match-reasons": await load("../src/lib/match-reasons.ts"), "@/components/ui/icon": { Icon: "Icon" }, "@/lib/opportunities": await load("../src/lib/opportunities.ts"),
+    "@/lib/profile-skills": await load("../src/lib/profile-skills.ts"),
+    "@/lib/opportunity-copilot": await load("../src/lib/opportunity-copilot.ts", { "./match-reasons": await load("../src/lib/match-reasons.ts") }),
     "@/components/jobs/tailoring-entry-point": { TailoringEntryPoint: "Entry" },
     "@/components/jobs/opportunity-details": detailUi,
     "@/lib/job-description": await load("../src/lib/job-description.ts"),
@@ -86,8 +88,10 @@ test("Jobs briefs keep source and detail links independent and place tailoring a
       assert.ok(position("Python") < position("View full details"));
       assert.ok(position("View full details") < position("About the opportunity"));
       assert.ok(position("Original description") < position("Match Score"));
-      assert.ok(content.findIndex((node) => node.type === "Entry") > position("Match Score"));
-      if (source) assert.ok(content.findIndex((node) => node.type === "Entry") < content.indexOf(source));
+      const controls = content.find((node) => node.type === "ApplicationControls");
+      assert.equal(controls.props.tailoring.type, "Entry");
+      assert.ok(content.indexOf(controls) < position("Match Score"));
+      if (source) assert.ok(content.indexOf(controls) < content.indexOf(source));
     }
   }
   const tree = RecommendedJobs({ items: [{ opportunity: { id: "sparse", title: "Sparse", opportunity_type: "internship" }, match: null, status: "saved" }] });
@@ -117,9 +121,11 @@ test("Jobs briefs keep source and detail links independent and place tailoring a
   }
   const lines = (value) => value.split(/\r?\n/).filter(Boolean);
   function renderedText(value) {
-    if (typeof value === "string") return value;
+    if (value == null || typeof value === "boolean") return "";
+    if (typeof value === "string" || typeof value === "number") return String(value);
     if (Array.isArray(value)) return value.map(renderedText).join("");
-    return renderedText(value.props.children);
+    if (value.props?.["aria-hidden"]) return "";
+    return renderedText(value.props?.children);
   }
   const amazonBrief = listingBrief(fixtureDescription, amazon);
   const descriptionNode = prose(amazonBrief);
@@ -135,5 +141,13 @@ test("Jobs briefs keep source and detail links independent and place tailoring a
   const sparse = prose(listingBrief("Details will follow.", amazon));
   assert.deepEqual(blocks(sparse), ["Details will follow."]);
   assert.equal(nodes(sparse).some((node) => node.type === "strong"), false);
+  const labelled = ["Responsibilities", "• Discovery: Ask users about the problem.", "• Data & Privacy: Protect user information.",
+    "• https://example.invalid/guide", "• Official source: " + other, "• Keep the original wording."].join("\n");
+  const formatted = prose(listingBrief(labelled, amazon));
+  assert.deepEqual(blocks(formatted), ["Responsibilities", "Discovery: Ask users about the problem.", "Data & Privacy: Protect user information.",
+    "https://example.invalid/guide", "Official source: " + other, "Keep the original wording."]);
+  assert.deepEqual(nodes(formatted).filter((node) => node.type === "strong").map((node) => node.props.children), ["Discovery:", "Data & Privacy:"]);
+  const responsibilities = nodes(formatted).find((node) => ["h3", "h4"].includes(node.type));
+  assert.ok(nodes(responsibilities).some((node) => node.type === "Icon" && node.props.name === "jobs"));
 });
 test("development route returns notFound in production and never imports real persistence",async()=>{const {default:Page}=await load("../src/app/dev/resume-tailoring/page.tsx",{"next/navigation":{notFound(){throw new Error("404");}},"@/components/dev/resume-tailoring-preview":{ResumeTailoringPreview:"Preview"},"react/jsx-runtime":runtime});const old=process.env.NODE_ENV;try{for(const mode of ["production","test"]){process.env.NODE_ENV=mode;assert.throws(()=>Page(),/404/);}process.env.NODE_ENV="development";assert.equal(Page().type,"Preview");}finally{if(old===undefined)delete process.env.NODE_ENV;else process.env.NODE_ENV=old;}for(const path of ["../src/lib/resume-tailoring-preview-service.ts","../src/components/dev/resume-tailoring-preview.tsx","../src/components/profile/resume-tailoring-flow.tsx"]){const code=await readFile(new URL(path,import.meta.url),"utf8");assert.doesNotMatch(code,/fetch\(|localStorage|IndexedDB|api\/v1|profile\/actions|skills-actions/);}});

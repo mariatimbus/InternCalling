@@ -68,7 +68,8 @@ test("skill category discovery modifies review only and Cancel leaves saved prof
 test("unconnected review stays unavailable; synthetic preview is gated and absent from real Profile",async()=>{
   const f=await component();assert.match(JSON.stringify(f.render()),/Not available yet/);assert.equal(button(f.render(),"Start review"),undefined);f.cleanup?.();
   const {default:Page}=await load("../src/app/dev/resume-review/page.tsx",{"next/navigation":{notFound(){throw new Error("404");}},"@/components/dev/resume-review-preview":{ResumeReviewPreview:"Preview"},"react/jsx-runtime":runtime});const old=process.env.NODE_ENV;try{for(const mode of ["production","test"]){process.env.NODE_ENV=mode;assert.throws(()=>Page(),/404/);}process.env.NODE_ENV="development";assert.equal(Page().type,"Preview");}finally{if(old===undefined)delete process.env.NODE_ENV;else process.env.NODE_ENV=old;}
-  const hub=await readFile(new URL("../src/components/profile/profile-hub.tsx",import.meta.url),"utf8");assert.doesNotMatch(hub,/preview-service|synthetic|Preview/);assert.match(hub,/service=\{services.review\}/);
+  const hub=await readFile(new URL("../src/components/profile/profile-hub.tsx",import.meta.url),"utf8");assert.doesNotMatch(hub,/preview-service|synthetic|Preview|ResumeReviewFlow|ResumePdfSection/);
+  const library=await readFile(new URL("../src/components/resumes/resume-library.tsx",import.meta.url),"utf8");assert.match(library,/service=\{services.review\}/);assert.doesNotMatch(library,/preview-service|synthetic|Preview/);
 });
 
 test("unextracted boolean/list/date facts remain null in confirmed collection snapshots",async()=>{

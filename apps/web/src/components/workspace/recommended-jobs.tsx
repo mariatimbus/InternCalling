@@ -1,8 +1,7 @@
 "use client";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import type { Application, Opportunity, Match, Eligibility } from "@/lib/api/types";
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import type { Application, Opportunity, Match, Eligibility, Skill } from "@/lib/api/types";
 import type { SaveResult } from "@/app/(workspace)/jobs/save-action";
-import { ApplicationControls } from "@/components/applications/application-controls";
 import { JobCard, type JobSummary } from "@/components/jobs/job-card";
 import { Badge } from "@/components/ui/badge";
 import { Drawer } from "@/components/ui/drawer";
@@ -104,13 +103,18 @@ export function StandaloneOpportunitySave({ id, title, status, saveAction }: {
 
 const subscribeHydration = () => () => {};
 
-export function RecommendedJobs({ items, applications = emptyApplications, label = "Recommended opportunities", saveAction, detailContext = "", loadAssessment }: {
+export function RecommendedJobs({ items, applications = emptyApplications, label = "Recommended opportunities", saveAction, detailContext = "", loadAssessment, loadCatalog, copilotEnabled = false, profileSkills = null, listFooter, children }: {
   items: RankedOpportunity[];
   applications?: Application[];
   label?: string;
   saveAction?: (id: string) => Promise<SaveResult>;
   detailContext?: string;
   loadAssessment: (id: string) => Promise<OpportunityAssessment>;
+  loadCatalog: (id: string) => Promise<Opportunity | null>;
+  copilotEnabled?: boolean;
+  profileSkills?: Skill[] | null;
+  listFooter?: ReactNode;
+  children?: ReactNode;
 }) {
   const hydrated = useSyncExternalStore(subscribeHydration, () => true, () => false);
   const [selected, setSelected] = useState(items[0]?.opportunity.id);
@@ -118,7 +122,39 @@ export function RecommendedJobs({ items, applications = emptyApplications, label
   const { stateFor, submit } = useOpportunitySave(saveAction, applications);
   const current = items.find((item) => item.opportunity.id === selected) ?? items[0];
   const currentId = current?.opportunity.id;
+  const summaryId = current && !("url" in current.opportunity) ? currentId : undefined;
+  const [catalog, setCatalog] = useState<{ id: string; opportunity: Opportunity | null }>();
+  const desktopPanel = useRef<HTMLDivElement>(null);
   const [resolved, setResolved] = useState<{ id: string; value: OpportunityAssessment }>();
+  useEffect(() => {
+    const panel = desktopPanel.current;
+    const workspace = panel?.closest("main");
+    if (!panel || !workspace) return;
+    const fitPanel = () => {
+      const top = panel.getBoundingClientRect().top;
+      const bottom = workspace.getBoundingClientRect().bottom;
+      panel.style.height = Math.max(176, Math.floor(bottom - top - 12)) + "px";
+    };
+    const observer = new ResizeObserver(fitPanel);
+    observer.observe(workspace);
+    workspace.addEventListener("scroll", fitPanel, { passive: true });
+    fitPanel();
+    return () => {
+      observer.disconnect();
+      workspace.removeEventListener("scroll", fitPanel);
+    };
+  }, []);
+  useEffect(() => {
+    if (!summaryId || !loadCatalog) return;
+    let active = true;
+    loadCatalog(summaryId).then(
+      (opportunity) => {
+        if (active) setCatalog({ id: summaryId, opportunity: opportunity?.id === summaryId ? opportunity : null });
+      },
+      () => { if (active) setCatalog({ id: summaryId, opportunity: null }); },
+    );
+    return () => { active = false; };
+  }, [summaryId, loadCatalog]);
   useEffect(() => {
     if (!currentId) return;
     let active = true;
@@ -137,13 +173,18 @@ export function RecommendedJobs({ items, applications = emptyApplications, label
   }
   const assessment = resolved?.id === current.opportunity.id ? resolved.value : null;
   const application = applications.find((item) => item.opportunity_id === current.opportunity.id);
-  const detail = <OpportunityDetailView opportunity={current.opportunity} status={current.status}
+  const selectedCatalog = summaryId && catalog?.id === summaryId ? catalog : undefined;
+  const detail = <OpportunityDetailView opportunity={selectedCatalog?.opportunity ?? current.opportunity}
+    catalogStatus={summaryId ? selectedCatalog ? selectedCatalog.opportunity ? "loaded" : "failed" : "loading" : undefined}
+    status={current.status} copilotEnabled={copilotEnabled}
+    profileSkills={profileSkills}
     companyLogoUrl={current.companyLogoUrl} detailContext={detailContext} assessment={assessment} saveControl={saveControl(current)}
-    applicationControls={<ApplicationControls key={`${current.opportunity.id}:${application?.updated_at ?? "new"}`}
-      opportunityId={current.opportunity.id} application={application} showSave={!saveAction} />} />;
+    tracking={{ application: application ?? null, showSave: !saveAction }} />;
   return <>
     <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
       <div className="min-w-0 space-y-3" aria-label={label}>
+        {children}
+        <h2 className="sr-only">{label}</h2>
         {items.map((item) => <JobCard
           key={item.opportunity.id}
           job={summary(item)}
@@ -156,8 +197,9 @@ export function RecommendedJobs({ items, applications = emptyApplications, label
           onSelect={() => { setSelected(item.opportunity.id); setOpen(true); }}
           action={saveControl(item)}
         />)}
+        {listFooter}
       </div>
-      <div className="sticky top-6 hidden max-h-[calc(100dvh-10rem)] flex-col overflow-hidden rounded-panel bg-surface/60 xl:flex" aria-label="Selected opportunity">
+      <div ref={desktopPanel} className="sticky top-6 hidden h-[calc(100dvh-10rem)] flex-col overflow-hidden rounded-panel border border-line bg-surface xl:flex" aria-label="Selected opportunity">
         {detail}
       </div>
     </div>

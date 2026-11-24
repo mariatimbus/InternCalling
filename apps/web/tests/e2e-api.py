@@ -51,7 +51,25 @@ def serve(database_url: URL) -> None:
                     Opportunity(
                         id=UUID(int=index),
                         title=title,
-                        description="Synthetic integration fixture.",
+                        description=(
+                            "Synthetic integration fixture.\n"
+                            "About the role\n"
+                            "Join a small engineering team to build accessible tools for students. "
+                            "Collaborate with designers and engineers throughout delivery.\n"
+                            "Responsibilities\n"
+                            "• Development: Build clear interfaces and maintain existing features.\n"
+                            "• Testing: Check edge cases and document reproducible issues.\n"
+                            "• Collaboration: Explain decisions and review changes with the team.\n"
+                            "• Accessibility: Support keyboard use and readable content.\n"
+                            "• Quality: Validate API responses and preserve user input on errors.\n"
+                            "Qualifications\n"
+                            "• Currently enrolled in a relevant degree programme.\n"
+                            "• Comfortable reading documentation and asking clear questions.\n"
+                            "• Interested in practical software engineering and user experience.\n"
+                            "Benefits\n"
+                            "• Regular feedback from the engineering team.\n"
+                            "• Time to learn through practical work.\n"
+                        ),
                         organization="E2E Fixture",
                         opportunity_type=OpportunityType.internship,
                         location="Remote",

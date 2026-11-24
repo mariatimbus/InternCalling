@@ -1,5 +1,9 @@
 import type { ApiClient } from "./client";
-import type { Eligibility, Match } from "./types";
+import type { Eligibility, Match, Opportunity } from "./types";
+
+export function readCatalogOpportunity(api: ApiClient, id: string) {
+  return api.request<Opportunity>("/api/v1/opportunities/" + encodeURIComponent(id), { authentication: "none" });
+}
 
 export type OpportunityAssessment = {
   match: Match | null;

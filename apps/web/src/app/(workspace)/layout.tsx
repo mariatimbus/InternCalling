@@ -8,9 +8,10 @@ import type { NavigationItem } from "@/components/navigation/sidebar";
 
 const navigation: NavigationItem[] = [
   { href: "/jobs", label: "Jobs", icon: "jobs" },
-  { href: "/profile", label: "Resume / Profile", icon: "profile" },
+  { href: "/profile", label: "Profile", icon: "profile" },
+  { href: "/resumes", label: "Resumes", icon: "resume" },
   { href: "/applications", label: "Applications", icon: "applications" },
-  { href: "/settings", label: "Account / Settings", icon: "settings" },
+  { href: "/settings", label: "Settings", icon: "settings" },
 ];
 const reviewItem: NavigationItem = { href: "/review", label: "Review", icon: "check" };
 export const dynamic = "force-dynamic";

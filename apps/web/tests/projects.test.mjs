@@ -41,8 +41,9 @@ test("preview CRUD preserves IDs/order, checks conflicts and retains records aft
 const jsx = (type, props) => ({ type, props: props ?? {} });
 const runtime = { jsx, jsxs: jsx };
 function nodes(tree) { return !tree || typeof tree !== "object" ? [] : [tree, ...[tree.props?.children].flat(Infinity).flatMap(nodes)]; }
+function text(tree) { return Array.isArray(tree) ? tree.map(text).join("") : tree && typeof tree === "object" ? text(tree.props?.children) : typeof tree === "string" ? tree : ""; }
 const find = (tree, type) => nodes(tree).find(n => n.type === type);
-const button = (tree, label) => nodes(tree).find(n => n.type === "Button" && [n.props.children].flat()[0] === label);
+const button = (tree, label) => nodes(tree).find(n => n.type === "Button" && (n.props["aria-label"] ?? text(n)).startsWith(label));
 async function fixture(service) {
   const values = [], refs = [], effects = []; let cursor = 0, refCursor = 0;
   const react = {
@@ -111,4 +112,44 @@ test("load errors retry, conflicts retain drafts and production preview returns 
   const previous = process.env.NODE_ENV;
   try { process.env.NODE_ENV = "production"; assert.throws(() => Page(), /404/); process.env.NODE_ENV = "development"; assert.equal(Page().type, "Preview"); }
   finally { if (previous === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = previous; }
+});
+
+test("project periods preserve date precision and unknown endpoints", () => {
+  assert.equal(model.projectPeriod({ startDate: "2026-10", endDate: "", ongoing: true }), "Oct 2026 – Present");
+  assert.equal(model.projectPeriod({ startDate: "2025", endDate: "2026", ongoing: false }), "2025 – 2026");
+  assert.equal(model.projectPeriod({ startDate: "2026-10", endDate: "", ongoing: false }), "Started Oct 2026");
+  assert.equal(model.projectPeriod({ startDate: "", endDate: "2026-02", ongoing: false }), "Ended Feb 2026");
+  assert.equal(model.projectPeriod({ startDate: "", endDate: "", ongoing: true }), "Ongoing");
+  assert.equal(model.projectPeriod({ startDate: "", endDate: "", ongoing: false }), "Dates not provided");
+});
+
+test("GitHub field persists through create, reload and edit and renders a safe Code link", async () => {
+  const service = createProjectsPreviewService(), f = await fixture(service);
+  button(f.render(), "Add project").props.onClick(); f.fill();
+  const github = nodes(f.render()).find(n => n.type === "Input" && n.props.name === "repositoryUrl");
+  assert.match(github.props.label, /GitHub/);
+  assert.equal(github.props.type, "url");
+  const url = "https://github.com/example-student/portfolio";
+  github.props.onChange({ target: { value: url } }); await f.submit();
+  const reloaded = await fixture(service), row = reloaded.state().entries[0];
+  assert.equal(row.repositoryUrl, url);
+  const anchor = nodes(reloaded.row(row)).find(n => n.type === "a" && n.props.href === url);
+  assert.ok(anchor); assert.equal(anchor.props.rel, "noopener noreferrer");
+  assert.ok(text(reloaded.row(row)).includes("Code:"));
+  button(reloaded.row(row), "Edit").props.onClick();
+  assert.equal(nodes(reloaded.render()).find(n => n.type === "Input" && n.props.name === "repositoryUrl").props.value, url);
+});
+
+test("project cards have a pencil edit control and reveal long descriptions without changing saved text", async () => {
+  const service = createProjectsPreviewService(), f = await fixture(service);
+  const description = "Build accessible tools for students.\n".repeat(12) + "The final source sentence.";
+  const row = { ...valid, id: "synthetic-project", revision: 1, position: 0, description, ongoing: true, endDate: "" };
+  let card = f.row(row);
+  assert.equal(find(card, "h3").props.children, row.name);
+  assert.ok(find(button(card, "Edit"), "svg"));
+  assert.ok(!text(card).includes("The final source sentence."));
+  const more = button(card, "Show more"); assert.equal(more.props["aria-expanded"], false); more.props.onClick();
+  card = f.row(row); assert.ok(text(card).includes(description));
+  button(card, "Show less").props.onClick(); assert.ok(!text(f.row(row)).includes("The final source sentence."));
+  assert.ok(description.endsWith("The final source sentence."));
 });
