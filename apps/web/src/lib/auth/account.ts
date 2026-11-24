@@ -8,6 +8,11 @@ import { getApiBaseUrl, getPublicAuthConfig } from "./server-config";
 import { createServerSupabaseClient } from "./supabase-server";
 import { isAuthNetworkError } from "./config";
 
+/** Only the server key can set app_metadata, so this flag is not self-granted; the API checks it again. */
+function isReviewer(metadata: Record<string, unknown> | undefined) {
+  return Array.isArray(metadata?.roles) && metadata.roles.includes("reviewer");
+}
+
 /** Request-scoped verification against Supabase, never against unverified cookie user data. */
 export const getVerifiedAuth = cache(async () => {
   try {
@@ -17,7 +22,7 @@ export const getVerifiedAuth = cache(async () => {
     const { data, error } = await client.auth.getUser();
     if (isAuthNetworkError(error)) return { kind: "unavailable" as const };
     if (!data.user || error) return { kind: "guest" as const };
-    return { kind: "signed-in" as const, config, client, user: { id: data.user.id, email: data.user.email ?? "Your account" } };
+    return { kind: "signed-in" as const, config, client, user: { id: data.user.id, email: data.user.email ?? "Your account", reviewer: isReviewer(data.user.app_metadata) } };
   } catch { return { kind: "unavailable" as const }; }
 });
 

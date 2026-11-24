@@ -57,6 +57,7 @@ class NormalizedOpportunity(BaseModel):
     is_active: Literal[False] = False
     _requires_review: bool = PrivateAttr(default=False)
     _review_notices: tuple[Notice, ...] = PrivateAttr(default=())
+    _review_reason: str | None = PrivateAttr(default=None)
 
     @field_validator("title", "organization", "location", mode="before")
     @classmethod
@@ -108,6 +109,20 @@ class NormalizedOpportunity(BaseModel):
 
 def _row_values(record: NormalizedOpportunity) -> dict[str, object]:
     return record.model_dump(exclude={"source_id", "source", "is_active"})
+
+
+def _review_target(row: Opportunity, record: NormalizedOpportunity, *, changed: bool):
+    """Review status and reason an upsert leaves on ``row``.
+
+    A reviewer's decision stands while the posting is unchanged; a changed posting that
+    still needs review waits again. A posting the rules now accept leaves the queue.
+    """
+    status = row.review_status
+    if record._requires_review:
+        if status in ("approved", "rejected") and not changed:
+            return status, row.review_reason
+        return "pending", record._review_reason
+    return (None, None) if status == "pending" else (status, row.review_reason)
 
 
 @dataclass(frozen=True)
@@ -282,6 +297,8 @@ class OpportunityStore:
                     source=record.source,
                     source_id=storage_id(record),
                     is_active=self.publish and not record._requires_review,
+                    review_status="pending" if record._requires_review else None,
+                    review_reason=record._review_reason if record._requires_review else None,
                     **_row_values(record),
                 )
                 self.session.add(row)
@@ -316,7 +333,10 @@ class OpportunityStore:
         """True when an upsert would write nothing (the common case on a rerun)."""
         if any(not _same(getattr(row, k), v) for k, v in _row_values(record).items()):
             return False
-        if (record._requires_review and row.is_active) or self._republishable(row, record):
+        if (row.review_status, row.review_reason) != _review_target(row, record, changed=False):
+            return False
+        held = record._requires_review and row.review_status != "approved"
+        if (held and row.is_active) or self._republishable(row, record):
             return False
         return bool(explicit_id(row)) or not record.source_id
 
@@ -330,9 +350,16 @@ class OpportunityStore:
             if not same:
                 setattr(row, field_name, value)
                 changed = True
+        status, reason = _review_target(row, record, changed=changed)
         # Publication approval applies to the reviewed values, not arbitrary later changes.
-        if (changed or record._requires_review) and row.is_active:
+        held = record._requires_review and status != "approved"
+        if (changed or held) and row.is_active:
             row.is_active = False
+            changed = True
+        if (row.review_status, row.review_reason) != (status, reason):
+            if status == "pending":
+                row.reviewed_at = None
+            row.review_status, row.review_reason = status, reason
             changed = True
         if self._republishable(row, record):
             row.is_active, row.inactive_reason = True, None
@@ -347,8 +374,8 @@ class OpportunityStore:
             return False
         self._identities()  # the run's snapshot answers this without another query
         row = self._by_source[source].get(source_id)
-        if row is None or not row.is_active:
-            return False
+        if row is None or not row.is_active or row.review_status == "approved":
+            return False  # a reviewer's approval outranks later rule changes
         self._begin_write()
         with self.session.begin_nested():
             row.is_active = False
@@ -358,7 +385,9 @@ class OpportunityStore:
 
     def _republishable(self, row: Opportunity, record: NormalizedOpportunity) -> bool:
         """Auto-publish a seen, unambiguous posting; never revive an expired one."""
-        if not self.publish or record._requires_review or row.is_active:
+        if not self.publish or row.is_active or row.review_status == "rejected":
+            return False
+        if record._requires_review and row.review_status != "approved":
             return False
         expired = row.deadline is not None and utc(row.deadline) < datetime.now(UTC)
         return row.inactive_reason in (None, "source_missing") and not expired

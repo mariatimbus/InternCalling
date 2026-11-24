@@ -122,6 +122,7 @@ class IngestionRunner:
             stage = "raw"
             reviewed = False
             notices: list[Notice] = []
+            review_reasons: list[str] = []
 
             def mark_review():
                 nonlocal reviewed
@@ -191,6 +192,7 @@ class IngestionRunner:
                 source.accepted += 1
                 if decision.requires_review:
                     mark_review()
+                    review_reasons.append(decision.reason)
                     report.issue(name, identity, stage, decision.code, decision.reason, "review")
                 add_notices(prepared, notices, identity)
                 if self.normalizer is not default_normalize:
@@ -222,12 +224,16 @@ class IngestionRunner:
                     continue
                 if final_scope.requires_review:
                     mark_review()
+                    review_reasons.append(final_scope.reason)
                     if not decision.requires_review or decision.reason != final_scope.reason:
                         report.issue(
                             name, identity, stage, final_scope.code, final_scope.reason, "review"
                         )
                 normalized._requires_review = reviewed
                 normalized._review_notices = tuple(notices)
+                review_reasons += [notice.message for notice in notices if notice.review]
+                # Shown to the reviewer; the scope and notice texts are fixed, never source data.
+                normalized._review_reason = "; ".join(dict.fromkeys(review_reasons))[:500] or None
                 stage = "dedupe"
                 match = seen.find(normalized)
                 if match is not None:

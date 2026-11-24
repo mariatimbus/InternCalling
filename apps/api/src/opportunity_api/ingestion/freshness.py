@@ -98,6 +98,7 @@ class FreshnessTracker:
             if (
                 row.is_active
                 and not reason
+                and row.review_status != "approved"  # a reviewer's call outranks the rules
                 and not assess_scope(
                     row.title, row.description, row.location, european_source=european_source
                 ).accepted
