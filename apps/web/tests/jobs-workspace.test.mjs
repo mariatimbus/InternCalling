@@ -63,6 +63,7 @@ async function fixture(request) {
     "@/components/ui/empty-state": { EmptyState: "Empty" }, "@/components/ui/error-state": { ErrorState: "Error" },
     "./save-action": action,
     "./assessment-action": { loadOpportunityAssessment() {} },
+    "./saved-search-actions": { savedSearchAction() {} }, "@/components/jobs/saved-searches": { SavedSearches: "SavedSearches" },
     "@/lib/jobs-url": jobsUrl,
   });
   return { calls, invalidated, save: action.saveOpportunity, visit: async (query = {}) => nodes(await page({ searchParams: Promise.resolve(query) })) };

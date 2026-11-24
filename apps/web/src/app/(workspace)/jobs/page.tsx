@@ -9,6 +9,9 @@ import { ErrorState } from "@/components/ui/error-state";
 import { jobsParams, readJobsQuery, type JobsQuery, type JobsView } from "@/lib/jobs-url";
 import { saveOpportunity } from "./save-action";
 import { loadOpportunityAssessment } from "./assessment-action";
+import { savedSearchAction } from "./saved-search-actions";
+import { SavedSearches } from "@/components/jobs/saved-searches";
+import type { SavedSearch } from "@/lib/saved-searches";
 
 const views = {
   recommended: { label: "Recommended", empty: "No opportunities found", help: "Try another search or come back later for new opportunities.", error: "Recommended opportunities could not be loaded." },
@@ -36,10 +39,13 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
   params.set("page", String(page));
   params.set("page_size", "12");
   if (search.trim()) params.set("search", search.trim());
-  const [tracker, catalog] = await Promise.allSettled([
+  const [tracker, catalog, savedSearches] = await Promise.allSettled([
     api.request<{ items: Application[]; total: number }>("/api/v1/applications"),
     view === "recommended" ? api.request<RecommendationPage>("/api/v1/opportunities/recommended?" + params) : null,
+    view === "recommended" ? api.request<{ items: SavedSearch[] }>("/api/v1/saved-searches") : null,
   ]);
+  // Saved searches are a convenience: if they fail to load, Jobs still works.
+  const saved = savedSearches.status === "fulfilled" ? savedSearches.value?.items ?? [] : [];
 
   let items: RankedOpportunity[] = [];
   const result = catalog.status === "fulfilled" ? catalog.value : null;
@@ -67,6 +73,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
     </div>
     {view === "recommended" && <div className="mt-6">
       <JobsSearch search={search} applied={{ location, degree_level: degree, study_year: year }} navigationKey={href(view)} />
+      <SavedSearches saved={saved} current={{ search, location, degree, year }} action={savedSearchAction} />
     </div>}
     <nav aria-label="Job lists" className={`segmented-track mb-5 ${view === "recommended" ? "" : "mt-6"}`}>
       {(Object.keys(views) as JobsView[]).map((target) => <Link key={target} href={href(target)} prefetch={false}
