@@ -1,6 +1,7 @@
 """Explicit employer allowlist; identifiers are data, never arbitrary fetch URLs."""
 
 import json
+from functools import cache
 from pathlib import Path
 from typing import Literal
 
@@ -26,6 +27,10 @@ class Employer(BaseModel):
     provider: Literal["greenhouse", "lever", "smartrecruiters", "ashby", "arbeitnow"]
     identifier: str = Field(pattern=r"^[A-Za-z0-9_-]{1,40}$")
     careers_url: HttpUrl
+    # The company's own website, for its logo; never fetched by ingestion.
+    domain: str | None = Field(
+        default=None, min_length=4, max_length=100, pattern=r"^[a-z0-9-]+(?:\.[a-z0-9-]+)+$"
+    )
     region: Literal["global", "eu"] = "global"
     enabled: bool = False
 
@@ -52,6 +57,12 @@ def load_employers(path: Path = REGISTRY) -> list[Employer]:
     if len(names) != len(set(names)):
         raise ValueError("duplicate employer source")
     return employers
+
+
+@cache
+def company_domains() -> dict[str, str]:
+    """Source name ("greenhouse.stripe") -> company website domain ("stripe.com")."""
+    return {e.source_name: e.domain for e in load_employers() if e.domain}
 
 
 def employer_registry(
