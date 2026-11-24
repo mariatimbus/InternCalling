@@ -5,6 +5,8 @@ gated it, the per-component breakdown, and the reasons behind each
 component. All of it deterministic — no AI, no embeddings (that is A11/A12).
 """
 
+from datetime import datetime
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from opportunity_api.models.opportunity import OpportunityDegreeLevel
@@ -19,6 +21,7 @@ class ComponentScores(BaseModel):
     field_fit: int = 0
     interests: int = 0
     location: int = 0
+    recency: int = 0
     ai: int = 0
 
 
@@ -46,6 +49,8 @@ class MatchingProfile(BaseModel):
     preferred_tech_domains: list[str] = Field(default_factory=list)
     preferred_locations: list[str] = Field(default_factory=list)
     remote_preferred: bool | None = None
+    # Role titles from the student's experience and projects ("Frontend Developer").
+    roles: list[str] = Field(default_factory=list)
 
 
 class MatchingOpportunity(BaseModel):
@@ -59,3 +64,4 @@ class MatchingOpportunity(BaseModel):
     degree_level: OpportunityDegreeLevel | None = None
     study_year: list[int] | None = None
     skills: list[str] = Field(default_factory=list)
+    posted_at: datetime | None = None

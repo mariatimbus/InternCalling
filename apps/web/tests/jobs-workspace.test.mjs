@@ -32,18 +32,19 @@ const detailUi = await load("../src/components/jobs/opportunity-details.tsx", {
   "react/jsx-runtime": runtime, "@/components/ui/badge": { Badge: "Badge" },
 });
 const assessmentApi = await load("../src/lib/api/opportunity-assessment.ts");
-const copilotModel = await load("../src/lib/opportunity-copilot.ts");
+const copilotModel = await load("../src/lib/opportunity-copilot.ts", { "./match-reasons": await load("../src/lib/match-reasons.ts") });
 const featureFlags = await load("../src/lib/feature-flags.ts");
 const profileSkillsApi = await load("../src/lib/profile-skills.ts");
 const detailView = await load("../src/components/jobs/opportunity-detail-view.tsx", {
   "react/jsx-runtime": runtime, "next/link": { default: "Link" },
+  "@/lib/job-description": await load("../src/lib/job-description.ts"),
   "@/components/jobs/company-avatar": { CompanyAvatar: "CompanyAvatar" },
   "@/components/jobs/eligibility-badge": { EligibilityBadge: "EligibilityBadge" },
   "@/components/jobs/match-score": { MatchScore: "MatchScore" },
   "@/components/jobs/tailoring-entry-point": { TailoringEntryPoint: "TailoringEntryPoint" },
   "@/components/applications/application-controls": { ApplicationControls: "ApplicationControls" },
   "@/components/ui/badge": { Badge: "Badge" }, "@/components/ui/icon": { Icon: "Icon" },
-  "@/lib/opportunities": { opportunityTypeLabel: (type) => type },
+  "@/lib/company-logo": await load("../src/lib/company-logo.ts"), "@/lib/match-reasons": await load("../src/lib/match-reasons.ts"), "@/lib/opportunities": { opportunityTypeLabel: (type) => type },
   "@/lib/profile-skills": profileSkillsApi,
   "@/lib/opportunity-copilot": copilotModel,
   "@/components/jobs/opportunity-details": detailUi,
@@ -70,6 +71,7 @@ async function fixture(request) {
     "./assessment-action": { loadOpportunityAssessment() {}, loadOpportunityCatalog() {} },
     "@/lib/feature-flags": featureFlags,
     "@/lib/profile-skills": profileSkillsApi,
+    "./saved-search-actions": { savedSearchAction() {} }, "@/components/jobs/saved-searches": { SavedSearches: "SavedSearches" },
     "@/lib/jobs-url": jobsUrl,
   });
   return { calls, invalidated, save: action.saveOpportunity, visit: async (query = {}) => nodes(await page({ searchParams: Promise.resolve(query) })) };
@@ -409,7 +411,7 @@ test("the card shows pending, blocks repeated clicks, and only displays the conf
       useRef: () => lock,
       useEffect: () => {},
     },
-    "react/jsx-runtime": runtime, "@/lib/opportunities": { opportunitySummary: () => ({}) },
+    "@/lib/company-logo": await load("../src/lib/company-logo.ts"), "@/lib/match-reasons": await load("../src/lib/match-reasons.ts"), "react/jsx-runtime": runtime, "@/lib/opportunities": { opportunitySummary: () => ({}) },
     "@/components/applications/application-controls": { ApplicationControls: "ApplicationControls" },
     "@/components/jobs/job-card": { JobCard: "JobCard" }, "@/components/jobs/match-score": { MatchScore: "MatchScore" },
     "@/components/jobs/eligibility-badge": { EligibilityBadge: "EligibilityBadge" }, "@/components/ui/badge": { Badge: "Badge" },
@@ -475,7 +477,7 @@ test("Recommended preserves API ranking even when a later card has a higher scor
 test("cards omit unknown metadata and keep official links, selection and Save independent", async () => {
   const { RecommendedJobs } = await load("../src/components/workspace/recommended-jobs.tsx", {
     react: { useSyncExternalStore: (_subscribe, snapshot) => snapshot(), useState: (value) => [value, () => {}], useEffect: () => {}, useRef: (current) => ({ current }) },
-    "react/jsx-runtime": runtime, "@/lib/opportunities": {
+    "@/lib/company-logo": await load("../src/lib/company-logo.ts"), "@/lib/match-reasons": await load("../src/lib/match-reasons.ts"), "react/jsx-runtime": runtime, "@/lib/opportunities": {
       opportunitySummary: (job) => ({ title: job.title, company: "Fixture" }), opportunityTypeLabel: (type) => type,
     },
     "@/components/applications/application-controls": { ApplicationControls: "ApplicationControls" },
@@ -589,6 +591,7 @@ test("compact cards retain long metadata, meaningful eligibility and top-row act
     "react/jsx-runtime": runtime, "@/components/ui/badge": { Badge: "Badge" }, "@/components/ui/icon": { Icon: "Icon" },
     "./company-mark": { CompanyMark: "CompanyMark" }, "./company-avatar": { CompanyAvatar: "CompanyAvatar" },
     "./eligibility-badge": { EligibilityBadge: "EligibilityBadge" }, "./match-score": { MatchScore: "MatchScore" },
+    "@/lib/job-description": await load("../src/lib/job-description.ts"),
   });
   const location = "Berlin, Frankfurt am Main, Munich, London, and Zürich";
   const job = { company: "QuantCo", initials: "QU", companyLogoUrl: "/company-logos/example.png", skills: [],
@@ -735,6 +738,7 @@ test("a late catalog response never replaces the selected Saved or Applied listi
         }
       },
     },
+    "@/lib/company-logo": await load("../src/lib/company-logo.ts"), "@/lib/match-reasons": await load("../src/lib/match-reasons.ts"),
     "react/jsx-runtime": runtime, "@/lib/opportunities": { opportunitySummary: (job) => ({ id: job.id }) },
     "@/components/jobs/job-card": { JobCard: "JobCard" }, "@/components/ui/badge": { Badge: "Badge" },
     "@/components/ui/drawer": { Drawer: "Drawer" }, "@/components/ui/button": { Button: "Button" },
@@ -906,9 +910,10 @@ test("standalone detail preserves tracker status and withholds Save when tracker
   assert.ok(unavailable.some((node) => node.type === "a"));
 });
 
-test("Match Score uses the final backend value and separates reasons, points, and the cap", () => {
-  const positive = ["Skill overlap: Python", "Remote-friendly location"];
-  const cap = "Eligibility not fully confirmed; score capped";
+test("Match Score uses the final backend value and separates fit, gaps, points and the discount note", () => {
+  const positive = ["Matches 2 of 4 skills: python, sql", "Software role fits your background", "Remote-friendly"];
+  const gap = "Also asks for: docker, kafka";
+  const cap = "Some requirements are not stated in the posting";
   const aiUnavailable = "AI similarity unavailable; deterministic components only";
   const render = (match) => nodes(detailView.OpportunityDetailView({
     opportunity: { ...opportunity, skills: [] },
@@ -916,14 +921,15 @@ test("Match Score uses the final backend value and separates reasons, points, an
   }));
   const capped = render({
     score: 60, components: { skills: 30, field_fit: 25, interests: 20, location: 0, ai: 0 },
-    reasons: [...positive, cap, aiUnavailable, "Not eligible: A gate failed"],
+    reasons: [...positive, gap, cap, aiUnavailable, "Not eligible: A gate failed"],
   });
   const text = (tree, value) => tree.some((node) => node.props.children === value);
   assert.ok(text(capped, "60/100"));
   assert.ok(text(capped, "Not eligible"));
-  assert.ok(text(capped, "The maximum Match Score is 49/100 while eligibility is unconfirmed."));
+  assert.ok(text(capped, "To stand out"));
+  assert.ok(capped.some((node) => node.type === "p" && [node.props.children].flat().join("") === cap + ", so the score is slightly lower."));
   assert.ok(capped.some((node) => node.type === "summary" && node.props.children === "Score breakdown"));
-  assert.deepEqual(capped.filter((node) => node.type === "li").map((node) => node.props.children), positive);
+  assert.deepEqual(capped.filter((node) => node.type === "li").map((node) => node.props.children), [...positive, gap]);
   assert.deepEqual(capped.filter((node) => node.type === "dd").map((node) => node.props.children),
     ["30 points", "25 points", "20 points", "0 points"]);
   assert.ok(!text(capped, "AI similarity"));
@@ -932,7 +938,7 @@ test("Match Score uses the final backend value and separates reasons, points, an
   assert.ok(text(sparse, "0/100"));
   assert.ok(text(sparse, "No positive match reasons were provided for this opportunity."));
   assert.ok(text(sparse, "No component values were provided."));
-  assert.ok(!text(sparse, "The maximum Match Score is 49/100 while eligibility is unconfirmed."));
+  assert.ok(!text(sparse, "To stand out"));
 
   const evaluated = render({ score: 12, components: { skills: 12, ai: 0 },
     reasons: ["AI similarity: 0.00 (embeddings)"] });
@@ -1005,7 +1011,7 @@ test("switching cards scopes both Copilot surfaces and ignores the earlier in-fl
         }
       },
     },
-    "react/jsx-runtime": runtime, "@/lib/opportunities": { opportunitySummary: (job) => ({ id: job.id }) },
+    "@/lib/company-logo": await load("../src/lib/company-logo.ts"), "@/lib/match-reasons": await load("../src/lib/match-reasons.ts"), "react/jsx-runtime": runtime, "@/lib/opportunities": { opportunitySummary: (job) => ({ id: job.id }) },
     "@/components/applications/application-controls": { ApplicationControls: "ApplicationControls" },
     "@/components/jobs/job-card": { JobCard: "JobCard" }, "@/components/ui/badge": { Badge: "Badge" },
     "@/components/ui/drawer": { Drawer: "Drawer" }, "@/components/ui/button": { Button: "Button" },

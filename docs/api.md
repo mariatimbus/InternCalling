@@ -232,21 +232,35 @@ The profile currently carries `degree_level`, `graduation_year` and
 
 ### GET /api/v1/opportunities/{id}/match 🔒
 
-A10 explainable match score, gated by A9 eligibility (degree level, study
+A10 explainable match score (v2), gated by A9 eligibility (degree level, study
 year, location rules only — graduation cannot gate matching without a
-structured source). `not_eligible` always scores `0`;
-`possibly_eligible`/`unknown` caps the score at `49`; `eligible` is
-uncapped (max 100). The optional `ai` component (A11/A12, Ollama
-embeddings) is `0` when Ollama is not configured — the deterministic core
-is the product, AI is a bonus.
+structured source). Components (100 in total):
+
+- `skills` (40): share of the posting's skills the student has — structured skills
+  plus known technologies the text names; 3 to 8 of them count. Student skills
+  include technologies saved in Profile projects and experience; spellings are
+  normalised (`JS`, `ReactJS`, `k8s`).
+- `field_fit` (25): the title is in a domain of the student's field of study,
+  saved roles or preferred domains (12 when only the description is).
+- `location` (15): chosen city 15, remote 12 (15 if remote is preferred), same country 9.
+- `interests` (10): 5 per interest the posting mentions.
+- `recency` (10): posted within 7 days 10, 30 days 6, 90 days or unknown 3.
+
+`not_eligible` always scores `0`. `possibly_eligible` (nothing failed, some
+requirements not stated) is multiplied by 0.95 and `unknown` by 0.9 — most
+postings never state a degree or year, so missing data no longer buries a strong
+match. `/opportunities/recommended` sorts by score alone. The optional `ai`
+component (A11/A12, Ollama embeddings) is `0` when Ollama is not configured — the
+deterministic core is the product, AI is a bonus.
 
 ```json
 // 200
 {
-  "score": 54,
-  "eligibility": "eligible",
-  "components": { "skills": 12, "field_fit": 25, "interests": 10, "location": 7, "ai": 0 },
-  "reasons": ["Skill overlap: Python, SQL", "Field of study matches: computer science", "Remote-friendly location"]
+  "score": 57,
+  "eligibility": "possibly_eligible",
+  "components": { "skills": 20, "field_fit": 25, "interests": 0, "location": 12, "recency": 3, "ai": 0 },
+  "reasons": ["Matches 3 of 6 skills: python, react, typescript", "Also asks for: java, kotlin, docker",
+              "Software role fits your background", "Remote-friendly", "Some requirements are not stated in the posting"]
 }
 ```
 
@@ -323,6 +337,43 @@ Application shape (all endpoints):
 
 `status` ∈ `saved | applied | interview | offer | rejected`. `opportunity` is
 an embedded summary so the tracker UI renders without extra lookups.
+
+## Saved searches 🔒
+
+A student's saved Jobs searches (up to 10), scoped to the owner like Applications
+(another user's search is a `404`); Supabase RLS enforces the same rule.
+
+- `GET /api/v1/saved-searches` → `{ "items": [{ "id", "name", "search", "location", "degree_level", "study_year", "alert", "created_at" }] }`
+- `POST /api/v1/saved-searches` `{ name, search?, location?, degree_level?, study_year?, alert? }` → `201`.
+  At least one criterion is required (`422`); a duplicate name or an 11th search → `409`.
+- `PATCH /api/v1/saved-searches/{id}` `{ "alert": true|false }` → the search. Turning alerts on starts
+  the window now, so the backlog is never emailed.
+- `DELETE /api/v1/saved-searches/{id}` → `204`.
+
+With `alert` on, the daily `job-alerts` workflow (`python -m opportunity_api.alerts --send`) emails
+new internships matching the search, ranked by matching v2, with confirmed mismatches left out.
+
+## Review 🔒 (reviewers only)
+
+Ingested postings the scope rules cannot decide (unclear location, role level or
+STEM domain) are held with `review_status = "pending"` and never shown in Jobs.
+Only users whose Supabase `app_metadata.roles` contains `"reviewer"` may call
+these endpoints; anyone else gets `403 forbidden`. `app_metadata` is set with the
+server key only (`user_metadata`, which users can edit, is ignored).
+
+### GET /api/v1/review/opportunities
+
+Up to 100 pending postings, newest `posted_at` first, plus the full count:
+`{ "items": [{ "id", "title", "organization", "location", "url", "description",
+"source", "posted_at", "deadline", "review_reason" }], "total": 52 }`.
+
+### POST /api/v1/review/opportunities/{id}
+
+Body `{ "decision": "approve" | "reject" }`; `204` on success. `approve` publishes
+the posting (unless its deadline has passed); `reject` keeps it hidden. A posting
+that is not pending (already decided, or taken off the queue by ingestion) returns
+`409 conflict`. Later ingestion runs keep the decision while the posting's values
+stay the same; a changed posting that still needs review returns to the queue.
 
 ## Frozen upcoming contracts
 

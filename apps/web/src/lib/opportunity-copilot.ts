@@ -1,11 +1,13 @@
 import type { OpportunityAssessment } from "./api/opportunity-assessment";
 import type { Eligibility, Match, Skill } from "./api/types";
+import { discountNote, isFitReason, isGapReason } from "./match-reasons";
 
 const scoreComponents = [
   ["skills", "Skills"],
-  ["field_fit", "Field of study"],
+  ["field_fit", "Role fit"],
   ["interests", "Interests"],
   ["location", "Location"],
+  ["recency", "Recently posted"],
   ["ai", "AI similarity"],
 ] as const;
 const aiEvaluation = /^AI similarity: (?:0\.\d{2}|1\.00) \(embeddings\)$/;
@@ -16,16 +18,13 @@ function explainMatch(match: Match) {
   const aiEvaluated = aiPoints > 0 || reasons.some((reason) => aiEvaluation.test(reason));
   return {
     score: match.score,
-    positiveReasons: reasons.filter((reason) =>
-      /^(?:Skill overlap|Field keywords found|Matches interests): \S/.test(reason)
-      || reason === "Remote-friendly location"
-      || reason === "Location matches the student's preference"
-      || (aiPoints > 0 && aiEvaluation.test(reason))),
+    positiveReasons: reasons.filter((reason) => isFitReason(reason) || (aiPoints > 0 && aiEvaluation.test(reason))),
+    gaps: reasons.filter(isGapReason),
     components: scoreComponents.flatMap(([key, label]) => {
       const points = match.components?.[key];
       return Number.isFinite(points) && (key !== "ai" || aiEvaluated) ? [{ label, points }] : [];
     }),
-    capped: reasons.includes("Eligibility not fully confirmed; score capped"),
+    note: discountNote(reasons),
   };
 }
 

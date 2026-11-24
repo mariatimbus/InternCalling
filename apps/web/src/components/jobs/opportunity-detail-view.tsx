@@ -10,11 +10,13 @@ import { Icon, type IconName } from "@/components/ui/icon";
 import { opportunityTypeLabel } from "@/lib/opportunities";
 import { isSkillList } from "@/lib/profile-skills";
 import { prepareOpportunityCopilot, type OpportunityCopilotData } from "@/lib/opportunity-copilot";
+import { companyLogoUrl as logoFor } from "@/lib/company-logo";
+import { structureDescription } from "@/lib/job-description";
 import { degreeLabels, safeJobSource, studyYears } from "@/components/jobs/opportunity-details";
 
 type DetailHeadingLevel = "h3" | "h4" | "h5";
 
-function matchExplanation({ score, positiveReasons, components, capped }: NonNullable<OpportunityCopilotData["match"]>, ReasonHeading: DetailHeadingLevel) {
+function matchExplanation({ score, positiveReasons, gaps, components, note }: NonNullable<OpportunityCopilotData["match"]>, ReasonHeading: DetailHeadingLevel) {
   return <>
     <p className="card-title text-2xl tabular-nums">{score + "/100"}</p>
     <p className="metadata-text mt-1">Measures how closely this opportunity fits your profile.</p>
@@ -24,6 +26,13 @@ function matchExplanation({ score, positiveReasons, components, capped }: NonNul
         {positiveReasons.map((reason) => <li key={reason}>{reason}</li>)}
       </ul>
       : <p className="metadata-text mt-2">No positive match reasons were provided for this opportunity.</p>}
+    {gaps.length > 0 && <>
+      <ReasonHeading className="card-title mt-4 text-sm">To stand out</ReasonHeading>
+      <ul className="reading-text mt-2 list-disc space-y-1 pl-5 text-sm [overflow-wrap:anywhere]">
+        {gaps.map((reason) => <li key={reason}>{reason}</li>)}
+      </ul>
+      <Link href="/profile#profile-skills-title" prefetch={false} className="mt-2 inline-flex min-h-10 items-center text-sm text-accent underline">Add the ones you already have</Link>
+    </>}
     <details className="mt-4 border-t border-line pt-2">
       <summary className="cursor-pointer rounded-sm py-2 text-sm font-semibold text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">Score breakdown</summary>
       {components.length > 0
@@ -35,7 +44,7 @@ function matchExplanation({ score, positiveReasons, components, capped }: NonNul
         </dl>
         : <p className="metadata-text">No component values were provided.</p>}
     </details>
-    {capped && <p className="metadata-text mt-2">The maximum Match Score is 49/100 while eligibility is unconfirmed.</p>}
+    {note && <p className="metadata-text mt-2">{note}, so the score is slightly lower.</p>}
   </>;
 }
 
@@ -88,50 +97,60 @@ export function opportunityDisplayDate(value: string | null | undefined) {
   if (Number.isFinite(date.getTime())) return date.toLocaleDateString("en-GB", { timeZone: "UTC" });
 }
 
-function briefDescription(listing: Opportunity, officialUrl: string | null) {
+function cleanDescription(listing: Opportunity, officialUrl: string | null) {
   const source = listing.description ?? "";
   const description = source.replace(/^[ \t]*Official source:[ \t]+(?:<(https?:\/\/[^\s<>]+)>|(https?:\/\/[^\s<>]+))[ \t]*(?:\r?\n|$)/gmi,
     (line, bracketed, bare) => officialUrl && safeJobSource(bracketed ?? bare) === officialUrl ? "" : line);
-  if (!description.trim()) return null;
+  return description.trim() ? description : null;
+}
 
-  // A7 supplies plain text. Only literal, short values from the structured listing are eligible.
+/** Bold the listing's own title and location once each; keep source notes quiet; never touch URLs. */
+function inlineText(text: string, phrases: string[], used: Set<string>): ReactNode {
+  if (/^Source last checked:[ \t]*\S/i.test(text)) return <span className="metadata-text">{text}</span>;
+  const blocked = [...text.matchAll(/\bhttps?:\/\/[^\s<>]+|^(?:Official source|Source last checked):.*/gi)];
+  const parts: { start: number; end: number }[] = [];
+  for (const phrase of phrases) {
+    if (used.has(phrase)) continue;
+    let start = text.indexOf(phrase);
+    while (start !== -1) {
+      const end = start + phrase.length;
+      const word = /[\p{L}\p{N}_]/u;
+      if (!word.test(text[start - 1] ?? "") && !word.test(text[end] ?? "")
+        && !blocked.some((span) => start < span.index + span[0].length && end > span.index)
+        && !parts.some((part) => start < part.end && end > part.start)) {
+        parts.push({ start, end });
+        used.add(phrase);
+        break;
+      }
+      start = text.indexOf(phrase, end);
+    }
+  }
+  if (parts.length === 0) return text;
+  let cursor = 0;
+  const content = parts.sort((a, b) => a.start - b.start).flatMap(({ start, end }) => {
+    const prefix = text.slice(cursor, start);
+    cursor = end;
+    return [prefix, <strong key={start} className="font-semibold text-foreground">{text.slice(start, end)}</strong>];
+  });
+  return [...content, text.slice(cursor)];
+}
+
+function descriptionBody(listing: Opportunity, text: string, Heading: "h3" | "h4") {
+  // Only literal, short values from the structured listing are eligible for emphasis.
   const phrases = [...new Set([listing.title, listing.location].flatMap((value) => {
     const phrase = value?.trim();
     return phrase && phrase.length >= 3 && phrase.length <= 48 && !/[\r\n]/.test(phrase) ? [phrase] : [];
   }))];
-  const parts: { start: number; end: number; kind: "note" | "strong" }[] = [];
-  const blocked = [...description.matchAll(/\bhttps?:\/\/[^\s<>]+|^[ \t]*(?:Official source|Source last checked):[^\r\n]*/gmi)];
-  for (const match of blocked) {
-    if (/^[ \t]*Source last checked:[ \t]*\S/i.test(match[0])) {
-      parts.push({ start: match.index, end: match.index + match[0].length, kind: "note" });
-    }
-  }
-  for (const phrase of phrases) {
-    let start = description.indexOf(phrase);
-    while (start !== -1) {
-      const end = start + phrase.length;
-      const word = /[\p{L}\p{N}_]/u;
-      if (!word.test(description[start - 1] ?? "") && !word.test(description[end] ?? "")
-        && !blocked.some((span) => start < span.index + span[0].length && end > span.index)
-        && !parts.some((part) => start < part.end && end > part.start)) {
-        parts.push({ start, end, kind: "strong" });
-        break;
-      }
-      start = description.indexOf(phrase, end);
-    }
-  }
-  if (parts.length === 0) return description;
-
-  let cursor = 0;
-  const content = parts.sort((a, b) => a.start - b.start).flatMap(({ start, end, kind }) => {
-    const prefix = description.slice(cursor, start);
-    const text = description.slice(start, end);
-    cursor = end;
-    return [prefix, kind === "note"
-      ? <span key={start} className="metadata-text">{text}</span>
-      : <strong key={start} className="font-semibold text-foreground">{text}</strong>];
-  });
-  return [...content, description.slice(cursor)];
+  const used = new Set<string>();
+  return <div className="reading-text mt-3 max-w-prose space-y-3 [overflow-wrap:anywhere]">
+    {structureDescription(text).map((block, index) => block.kind === "heading"
+      ? <Heading key={index} className="pt-2 text-sm font-semibold text-foreground">{block.text}</Heading>
+      : block.kind === "list"
+        ? <ul key={index} className="list-disc space-y-1.5 pl-5 marker:text-accent">
+          {block.items.map((item, i) => <li key={i}>{inlineText(item, phrases, used)}</li>)}
+        </ul>
+        : <p key={index}>{inlineText(block.text, phrases, used)}</p>)}
+  </div>;
 }
 
 function skillComparison(skills: OpportunityCopilotData["skills"], Heading: "h3" | "h4") {
@@ -217,7 +236,7 @@ export function OpportunityDetailView({ opportunity: job, assessment, status, co
     loaded: "No official link is available for this opportunity.",
     failed: "The official listing could not be loaded. Open full details to try again.",
   }[catalogStatus];
-  const description = listing && briefDescription(listing, officialUrl);
+  const description = listing && cleanDescription(listing, officialUrl);
   const facts: { label: string; icon: IconName; value?: string }[] = [
     { label: "Degree level", icon: "profile", value: listing?.degree_level ? degreeLabels[listing.degree_level] : undefined },
     { label: "Study year", icon: "applications", value: studyYears(listing?.study_year) },
@@ -231,7 +250,7 @@ export function OpportunityDetailView({ opportunity: job, assessment, status, co
       className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain p-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus sm:p-4">
       <header className="rounded-panel border border-accent/15 bg-primary/10 p-4 sm:p-5">
         <div className="flex items-center gap-3">
-          <CompanyAvatar companyName={company} initials={monogram} logoUrl={companyLogoUrl} />
+          <CompanyAvatar companyName={company} initials={monogram} logoUrl={companyLogoUrl ?? logoFor(listing?.company_domain)} />
           <p className="min-w-0 text-sm font-medium text-foreground/90 [overflow-wrap:anywhere]">{company || "Organization not specified"}</p>
         </div>
         <div className="mt-4 flex flex-wrap items-start gap-x-5 gap-y-3">
@@ -278,7 +297,7 @@ export function OpportunityDetailView({ opportunity: job, assessment, status, co
         </Link>}
       {description && <section className="border-t border-line pt-5">
         <SectionHeading className="card-title">About the opportunity</SectionHeading>
-        <p className="reading-text mt-3 max-w-prose whitespace-pre-wrap [overflow-wrap:anywhere]">{description}</p>
+        {listing && descriptionBody(listing, description, standalone ? "h3" : "h4")}
       </section>}
       {opportunityDecision(copilot, standalone, copilotEnabled)}
     </div>

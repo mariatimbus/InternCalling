@@ -86,3 +86,30 @@ test("checking a missing blank field explicitly clears it without inventing a bo
 });
 test("onboarding saves only complete new CV entries, never profile fields or skills",async()=>{const {c,service}=await fixture(),result=c.state.result;const changes=model.sectionChanges(result,"onboarding-1");assert.ok(changes);assert.deepEqual(changes.profile,{});assert.deepEqual(changes.skills,{add:[]});assert.ok(changes.collections.length>0&&changes.collections.every(change=>change.operation==="add"));for(const change of changes.collections){const candidate=result.proposed.collections.find(row=>row.key===change.proposalKey);assert.equal(model.alreadySaved(result,candidate),false);}
   const saved=await service.confirm(changes,{signal:new AbortController().signal});assert.ok(saved.snapshot);c.dispose();});
+const onboardingCv=await load("../src/lib/onboarding-cv.ts",{"./resume-review":model});
+test("onboarding lists new CV entries ticked, saves them as edited and only when ticked",async()=>{
+  const service=preview.createResumeReviewPreviewService({delayMs:0});const c=new ResumeReviewController(service,service.getSource(),undefined,0);await c.process();const result=c.state.result;
+  const entries=onboardingCv.onboardingEntries(result);
+  assert.ok(entries.length>0);assert.ok(entries.every(entry=>entry.include));
+  for(const entry of entries)assert.equal(model.alreadySaved(result,result.proposed.collections.find(row=>row.key===entry.key)),false);
+  assert.ok(entries.every(entry=>onboardingCv.entryLabel(entry).length>0));
+  // Untick everything: nothing to save, no errors.
+  assert.deepEqual(onboardingCv.onboardingChanges(result,entries.map(entry=>({...entry,include:false})),"r1"),{changes:null,errors:{}});
+  // Edit one entry: the edited value is what gets saved.
+  const [first,...rest]=entries;const field=onboardingCv.entryFields[first.section][0].key;
+  const edited=[{...first,values:{...first.values,[field]:"Edited by student"}},...rest];
+  const {changes,errors}=onboardingCv.onboardingChanges(result,edited,"r2");
+  assert.deepEqual(errors,{});assert.equal(changes.collections.length,entries.length);
+  assert.equal(changes.collections.find(row=>row.proposalKey===first.key).fields[field],"Edited by student");
+  // A required field emptied is reported against that entry, and nothing is built.
+  const broken=onboardingCv.onboardingChanges(result,[{...first,values:{...first.values,[field]:""}}],"r3");
+  assert.equal(broken.changes,null);assert.ok(Object.keys(broken.errors).some(key=>key.startsWith(first.key)));
+  c.dispose();
+});
+test("onboarding technologies are typed as text and saved as a list",async()=>{
+  const service=preview.createResumeReviewPreviewService({delayMs:0});const c=new ResumeReviewController(service,service.getSource(),undefined,0);await c.process();const result=c.state.result;
+  const project=onboardingCv.onboardingEntries(result).find(entry=>entry.section==="projects");
+  assert.ok(project,"the preview CV has a new project");{const {changes,errors}=onboardingCv.onboardingChanges(result,[{...project,values:{...project.values,technologies:"React,  Vue , "}}],"r4");
+    assert.deepEqual(errors,{});assert.deepEqual(changes.collections[0].fields.technologies,["React","Vue"]);}
+  c.dispose();
+});
