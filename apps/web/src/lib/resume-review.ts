@@ -66,6 +66,41 @@ export const providedReviewValue = (value: unknown): boolean => value !== undefi
 export function createReviewDraft(result: ParsingResult): ReviewDraft {
   return { profile: Object.fromEntries(editableProfileFields.map(key => [key,{apply:false,value:result.proposed.profile[key] ?? undefined}])) as ReviewDraft["profile"], skills: result.proposed.skills.map((name,index)=>({key:"skill-"+index,name,apply:false})), collections: result.proposed.collections.map(candidate=>({key:candidate.key,decision:"skip",targetId:"",fields:Object.fromEntries(Object.keys(reviewDefaults[candidate.section]).map(key=>[key,{apply:false,value:(candidate.values as ReviewValues)[key] ?? undefined}]))})) };
 }
+const entryIdentity: Record<ReviewSection, string[]> = { experience: ["role", "organization", "startDate"], projects: ["name"], certificates: ["name"], honours: ["title"], languages: ["name"], publications: ["title"] };
+const sameEntry = (section: ReviewSection, a: Record<string, unknown>, b: Record<string, unknown>) => entryIdentity[section].every(key => String(a[key] ?? "").trim().toLowerCase() === String(b[key] ?? "").trim().toLowerCase());
+/** A proposal the student already has in Profile is not offered again. */
+export const alreadySaved = (result: ParsingResult, candidate: ParsedCandidate): boolean =>
+  (result.snapshot.collections[candidate.section] as SavedReviewEntry[]).some(row => sameEntry(candidate.section, row.values as Record<string, unknown>, candidate.values as Record<string, unknown>));
+/**
+ * The CV's proposals, selected: profile facts that differ from Profile, every new skill and
+ * every complete section entry the student does not already have. The student only unticks
+ * what is wrong instead of ticking everything that is right.
+ */
+export function selectProposals(result: ParsingResult): ReviewDraft {
+  const draft = createReviewDraft(result);
+  for (const key of editableProfileFields) {
+    const choice = draft.profile[key];
+    choice.apply = typeof choice.value === "string" && !!choice.value.trim() && choice.value.trim() !== result.snapshot.profile[key].trim();
+  }
+  const saved = new Set(result.snapshot.skills.map(normalizeSkillName));
+  for (const row of draft.skills) row.apply = !saved.has(normalizeSkillName(row.name));
+  draft.collections = draft.collections.map(row => {
+    const candidate = result.proposed.collections.find(item => item.key === row.key);
+    if (!candidate || alreadySaved(result, candidate)) return row;
+    const chosen = { ...row, decision: "add" as const, fields: Object.fromEntries(Object.entries(row.fields).map(([key, field]) => [key, { ...field, apply: providedReviewValue(field.value) }])) };
+    // Keep only entries that would save as they are; incomplete ones stay for manual review.
+    return buildReviewChanges(result, { ...draft, profile: createReviewDraft(result).profile, skills: [], collections: [chosen] }, "check").changes ? chosen : row;
+  });
+  return draft;
+}
+/** Section entries to save with onboarding (no profile or skill changes); null when none. */
+export function sectionChanges(result: ParsingResult, requestId: string): ReviewChanges | null {
+  const selected = selectProposals(result), base = createReviewDraft(result);
+  const collections = selected.collections.filter(row => row.decision === "add");
+  if (!collections.length) return null;
+  return buildReviewChanges(result, { ...base, skills: [], collections }, requestId).changes ?? null;
+}
+
 /** Defaults are validator placeholders only, never persisted as extracted facts. */
 function validationValues(section: ReviewSection, values: Record<string,ReviewValue|null|undefined>): ReviewValues {
   return Object.fromEntries(Object.entries(reviewDefaults[section]).map(([key,sample])=>[key,values[key] ?? structuredClone(sample)]));
