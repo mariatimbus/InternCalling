@@ -3,8 +3,9 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, computed_field
 
+from opportunity_api.ingestion.sources.employers import company_domains
 from opportunity_api.models.opportunity import OpportunityDegreeLevel, OpportunityType
 
 from .skill import SkillResponse
@@ -30,6 +31,12 @@ class OpportunityResponse(BaseModel):
     degree_level: OpportunityDegreeLevel | None
     study_year: list[int] | None
     skills: list[SkillResponse]
+
+    @computed_field
+    @property
+    def company_domain(self) -> str | None:
+        """The employer's website domain (for its logo), when the source registry knows it."""
+        return company_domains().get(self.source.lower())
 
 
 class PaginatedOpportunityResponse(BaseModel):

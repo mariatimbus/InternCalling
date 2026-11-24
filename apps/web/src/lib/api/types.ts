@@ -14,14 +14,14 @@ export type Skill = { id: string; name: string };
 export type Opportunity = {
   id: string; title: string; description: string | null; organization: string | null;
   location: string | null; url: string; deadline: string | null; posted_at: string | null;
-  opportunity_type: string; is_active: boolean; skills: Skill[];
+  opportunity_type: string; is_active: boolean; skills: Skill[]; company_domain?: string | null;
   degree_level?: "bachelor" | "master" | "both" | null; study_year?: number[] | null;
 };
 export type OpportunityPage = { items: Opportunity[]; page: number; page_size: number; total: number };
 export type Match = {
   score: number;
   eligibility: "eligible" | "possibly_eligible" | "not_eligible" | "unknown";
-  components: { skills: number; field_fit: number; interests: number; location: number; ai: number };
+  components: { skills: number; field_fit: number; interests: number; location: number; recency?: number; ai: number };
   reasons: string[];
 };
 export type Application = {

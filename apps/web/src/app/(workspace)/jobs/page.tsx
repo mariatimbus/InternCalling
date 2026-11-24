@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { jobsParams, readJobsQuery, type JobsQuery, type JobsView } from "@/lib/jobs-url";
 import { saveOpportunity } from "./save-action";
+import { loadOpportunityAssessment } from "./assessment-action";
 
 const views = {
   recommended: { label: "Recommended", empty: "No opportunities found", help: "Try another search or come back later for new opportunities.", error: "Recommended opportunities could not be loaded." },
@@ -85,7 +86,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
         {result && <p className="metadata-text">Ranked across all matching opportunities.</p>}
       </div>
       {items.length ? <RecommendedJobs key={href(view)} items={items}
-        detailContext={urlParams(view, page).toString()} label={copy.label + " opportunities"}
+        detailContext={urlParams(view, page).toString()} label={copy.label + " opportunities"} loadAssessment={loadOpportunityAssessment}
         saveAction={view === "recommended" ? saveOpportunity : undefined}
         applications={tracker.status === "fulfilled" ? tracker.value.items : []} />
         : <EmptyState title={copy.empty} description={copy.help} />}
