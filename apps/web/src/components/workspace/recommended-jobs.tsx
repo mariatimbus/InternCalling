@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import type { Application, Opportunity, Match, Eligibility, Skill } from "@/lib/api/types";
 import type { SaveResult } from "@/app/(workspace)/jobs/save-action";
 import { JobCard, type JobSummary } from "@/components/jobs/job-card";
@@ -103,7 +103,7 @@ export function StandaloneOpportunitySave({ id, title, status, saveAction }: {
 
 const subscribeHydration = () => () => {};
 
-export function RecommendedJobs({ items, applications = emptyApplications, label = "Recommended opportunities", saveAction, detailContext = "", loadAssessment, loadCatalog, copilotEnabled = false, profileSkills = null }: {
+export function RecommendedJobs({ items, applications = emptyApplications, label = "Recommended opportunities", saveAction, detailContext = "", loadAssessment, loadCatalog, copilotEnabled = false, profileSkills = null, listFooter, children }: {
   items: RankedOpportunity[];
   applications?: Application[];
   label?: string;
@@ -113,6 +113,8 @@ export function RecommendedJobs({ items, applications = emptyApplications, label
   loadCatalog: (id: string) => Promise<Opportunity | null>;
   copilotEnabled?: boolean;
   profileSkills?: Skill[] | null;
+  listFooter?: ReactNode;
+  children?: ReactNode;
 }) {
   const hydrated = useSyncExternalStore(subscribeHydration, () => true, () => false);
   const [selected, setSelected] = useState(items[0]?.opportunity.id);
@@ -181,6 +183,8 @@ export function RecommendedJobs({ items, applications = emptyApplications, label
   return <>
     <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
       <div className="min-w-0 space-y-3" aria-label={label}>
+        {children}
+        <h2 className="sr-only">{label}</h2>
         {items.map((item) => <JobCard
           key={item.opportunity.id}
           job={summary(item)}
@@ -193,8 +197,9 @@ export function RecommendedJobs({ items, applications = emptyApplications, label
           onSelect={() => { setSelected(item.opportunity.id); setOpen(true); }}
           action={saveControl(item)}
         />)}
+        {listFooter}
       </div>
-      <div ref={desktopPanel} className="sticky top-6 hidden h-[calc(100dvh-10rem)] flex-col overflow-hidden rounded-panel bg-surface/60 xl:flex" aria-label="Selected opportunity">
+      <div ref={desktopPanel} className="sticky top-6 hidden h-[calc(100dvh-10rem)] flex-col overflow-hidden rounded-panel border border-line bg-surface xl:flex" aria-label="Selected opportunity">
         {detail}
       </div>
     </div>

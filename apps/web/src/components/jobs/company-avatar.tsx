@@ -12,10 +12,10 @@ const localLogo = /^\/company-logos\/(?:[a-z0-9_-]+\/)*[a-z0-9_.-]+\.(?:avif|gif
 
 function CompanyLogo({ src, initials, size }: { src: string; initials: string; size: AvatarSize }) {
   const [failed, setFailed] = useState(false);
-  const pixels = size === "sm" ? 40 : 48;
+  const pixels = size === "sm" ? 48 : 64;
   if (failed) return <CompanyMark initials={initials} size={size} />;
 
-  return <span aria-hidden="true" className={`inline-flex shrink-0 items-center justify-center overflow-hidden rounded-control bg-accent/10 p-1.5 ${size === "sm" ? "size-10" : "size-12"}`}>
+  return <span aria-hidden="true" className={`inline-flex shrink-0 items-center justify-center overflow-hidden rounded-lg bg-logo-surface p-1 ${size === "sm" ? "size-12" : "size-16"}`}>
     <Image src={src} alt="" width={pixels} height={pixels} sizes={`${pixels}px`} unoptimized className="size-full object-contain"
       onError={() => setFailed(true)} />
   </span>;

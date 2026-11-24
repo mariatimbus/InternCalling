@@ -12,7 +12,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ fil
   if (!domain) return missing();
   let upstream: Response;
   try {
-    upstream = await fetch(`${ICONS}?domain=${encodeURIComponent(domain)}&sz=128`, { signal: AbortSignal.timeout(5000), cache: "no-store" });
+    const options = { signal: AbortSignal.timeout(5000), cache: "no-store" as const };
+    upstream = await fetch(`${ICONS}?domain=${encodeURIComponent(domain)}&sz=128`, options);
+    if (upstream.status === 404 && !domain.startsWith("www.")) {
+      upstream = await fetch(`${ICONS}?domain=www.${encodeURIComponent(domain)}&sz=128`, options);
+    }
   } catch { return missing(); }
   const type = (upstream.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
   // No SVG: served from this origin it could carry script.

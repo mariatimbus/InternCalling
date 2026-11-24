@@ -135,19 +135,36 @@ function inlineText(text: string, phrases: string[], used: Set<string>): ReactNo
   return [...content, text.slice(cursor)];
 }
 
+function bulletText(text: string, phrases: string[], used: Set<string>): ReactNode {
+  const label = /^[\p{L}\p{N}][\p{L}\p{N} \t/&’'()+-]{0,59}:(?=\s+\S)/u.exec(text)?.[0];
+  if (!label || /^(?:Official source|Source last checked):/i.test(text)) return inlineText(text, phrases, used);
+  return <><strong className="font-bold text-foreground">{label}</strong>{inlineText(text.slice(label.length), phrases, used)}</>;
+}
+
+function descriptionHeadingIcon(title: string): IconName {
+  if (/responsibilit|duties|what you(?:['’]ll| will) do/i.test(title)) return "jobs";
+  if (/qualif|require|skill|preferred/i.test(title)) return "check";
+  if (/benefit|perk|offer/i.test(title)) return "wallet";
+  if (/about|company|team/i.test(title)) return "globe";
+  return "applications";
+}
+
 function descriptionBody(listing: Opportunity, text: string, Heading: "h3" | "h4") {
-  // Only literal, short values from the structured listing are eligible for emphasis.
+  // Keep title/location emphasis alongside the listing's own short bullet labels.
   const phrases = [...new Set([listing.title, listing.location].flatMap((value) => {
     const phrase = value?.trim();
     return phrase && phrase.length >= 3 && phrase.length <= 48 && !/[\r\n]/.test(phrase) ? [phrase] : [];
   }))];
   const used = new Set<string>();
-  return <div className="reading-text mt-3 max-w-prose space-y-3 [overflow-wrap:anywhere]">
+  return <div className="reading-text mt-4 max-w-prose space-y-4 leading-7 [overflow-wrap:anywhere]">
     {structureDescription(text).map((block, index) => block.kind === "heading"
-      ? <Heading key={index} className="pt-2 text-sm font-semibold text-foreground">{block.text}</Heading>
+      ? <Heading key={index} className="mt-7 flex items-center gap-3 border-t border-line pt-6 text-lg font-bold text-foreground">
+          <span aria-hidden="true" className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-accent"><Icon name={descriptionHeadingIcon(block.text)} className="size-5" /></span>
+          <span className="min-w-0 [overflow-wrap:anywhere]">{block.text}</span>
+        </Heading>
       : block.kind === "list"
-        ? <ul key={index} className="list-disc space-y-1.5 pl-5 marker:text-accent">
-          {block.items.map((item, i) => <li key={i}>{inlineText(item, phrases, used)}</li>)}
+        ? <ul key={index} className="list-disc space-y-2 pl-5 marker:text-accent">
+          {block.items.map((item, i) => <li key={i}>{bulletText(item, phrases, used)}</li>)}
         </ul>
         : <p key={index}>{inlineText(block.text, phrases, used)}</p>)}
   </div>;
@@ -180,7 +197,7 @@ function opportunityDecision(copilot: OpportunityCopilotData, standalone: boolea
   const DetailHeading = copilotEnabled && !standalone ? "h5" : AssessmentHeading === "h2" ? "h3" : "h4";
   const ActionHeading = standalone ? "h3" : "h4";
   const assessmentCards = <div className="grid items-start gap-4 @sm:grid-cols-2">
-    <section className="min-w-0 rounded-card border border-line bg-card p-4">
+    <section className="min-w-0 border-t border-line pt-5">
       <AssessmentHeading className="card-title">Match Score</AssessmentHeading>
       <div className="mt-3" aria-live="polite">
         {copilot.loading ? <p className="metadata-text">Loading match score…</p>
@@ -191,7 +208,7 @@ function opportunityDecision(copilot: OpportunityCopilotData, standalone: boolea
             </>}
       </div>
     </section>
-    <section className="min-w-0 rounded-card border border-line bg-card p-4">
+    <section className="min-w-0 border-t border-line pt-5">
       <AssessmentHeading className="card-title">Eligibility</AssessmentHeading>
       <div className="mt-3" aria-live="polite">
         {copilot.loading ? <p className="metadata-text">Loading eligibility…</p>
@@ -200,7 +217,7 @@ function opportunityDecision(copilot: OpportunityCopilotData, standalone: boolea
       </div>
     </section>
   </div>;
-  return copilotEnabled ? <section aria-label="Opportunity Copilot" className="space-y-4 rounded-panel border border-accent/20 bg-primary/10 p-3 sm:p-4">
+  return copilotEnabled ? <section aria-label="Opportunity Copilot" className="space-y-6">
         <SectionHeading className="section-title">Opportunity Copilot</SectionHeading>
         {assessmentCards}
         {skillComparison(copilot.skills, ActionHeading)}
@@ -248,14 +265,22 @@ export function OpportunityDetailView({ opportunity: job, assessment, status, co
   return <article className="@container flex min-h-0 min-w-0 flex-1 flex-col">
     <div role="region" aria-label="Opportunity information" tabIndex={0}
       className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain p-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus sm:p-4">
-      <header className="rounded-panel border border-accent/15 bg-primary/10 p-4 sm:p-5">
+      <header className="border-b border-line pb-6">
+        {(tracking || listing) && <div className="mb-4">
+          <ApplicationControls key={`${job.id}:${tracking?.application?.updated_at ?? "new"}`}
+            opportunityId={job.id} application={tracking?.application} showSave={tracking?.showSave}
+            inline allowTracking={!!tracking}
+            tailoring={listing ? <TailoringEntryPoint jobId={job.id} title={job.title} organization={job.organization ?? ""} embedded /> : undefined} />
+        </div>}
+        <div className="grid items-start gap-5 @lg:grid-cols-[minmax(0,1fr)_11rem]">
+        <div className="min-w-0">
         <div className="flex items-center gap-3">
           <CompanyAvatar companyName={company} initials={monogram} logoUrl={companyLogoUrl ?? logoFor(listing?.company_domain)} />
           <p className="min-w-0 text-sm font-medium text-foreground/90 [overflow-wrap:anywhere]">{company || "Organization not specified"}</p>
         </div>
         <div className="mt-4 flex flex-wrap items-start gap-x-5 gap-y-3">
           <div className="min-w-0 flex-[1_1_15rem]">
-            <Heading className={standalone ? "page-title" : "section-title @sm:text-3xl"}>{job.title}</Heading>
+            <Heading className={standalone ? "text-2xl font-semibold leading-tight tracking-tight text-foreground @lg:text-3xl" : "section-title"}>{job.title}</Heading>
             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
               <span>{opportunityTypeLabel(job.opportunity_type)}</span>
               {listing?.location && <span className="inline-flex min-w-0 items-start gap-1.5 [overflow-wrap:anywhere]">
@@ -264,30 +289,40 @@ export function OpportunityDetailView({ opportunity: job, assessment, status, co
             </div>
           </div>
         </div>
-        {(tracking || listing) && <div className="mt-3">
-          <ApplicationControls key={`${job.id}:${tracking?.application?.updated_at ?? "new"}`}
-            opportunityId={job.id} application={tracking?.application} showSave={tracking?.showSave}
-            inline allowTracking={!!tracking}
-            tailoring={listing ? <TailoringEntryPoint jobId={job.id} title={job.title} organization={job.organization ?? ""} embedded /> : undefined} />
-        </div>}
+        </div>
+        <section aria-label="Match overview" className="rounded-xl border border-accent/25 bg-primary/10 p-4">
+          <p className="metadata-text font-semibold">Profile match</p>
+          <div className="mt-2" aria-live="polite">
+            <div className="flex flex-wrap items-center justify-between gap-3 @lg:block">
+            {copilot.match ?
+              <p className="text-4xl font-bold tracking-tight tabular-nums text-foreground">{copilot.match.score}<span className="ml-1 text-base font-normal text-muted">/100</span></p>
+              : <p className="metadata-text">{copilot.loading ? "Loading match score…" : "Match score unavailable"}</p>}
+            {copilot.eligibility && <p className="text-sm font-medium text-foreground @lg:mt-3">{eligibilityVerdicts[copilot.eligibility.status]}</p>}
+            </div>
+            {copilot.match && <p className="metadata-text mt-2">Based on your profile</p>}
+          </div>
+        </section>
+        </div>
         <div className="mt-3 flex flex-wrap gap-2">
           {listing?.is_active === false && <Badge>Closed on InternCalling</Badge>}
           {listing?.is_active === true && <Badge>Active on InternCalling</Badge>}
           {!listing && status && !saveControl && <Badge className="capitalize">{status}</Badge>}
         </div>
-      </header>
-      {knownFacts.length > 0 && <section className="space-y-3">
+      {knownFacts.length > 0 && <section className="mt-5 space-y-3 border-t border-line pt-5">
         <SectionHeading className="card-title">At a glance</SectionHeading>
-        <dl className="grid gap-3 @xs:grid-cols-2">
-          {knownFacts.map(({ label, icon, value }) => <div key={label} className="flex min-w-0 items-start gap-2.5">
-            <Icon name={icon} className="mt-0.5 size-4 text-accent" />
-            <div className="min-w-0">
-              <dt className="metadata-text">{label}</dt>
-              <dd className="text-sm text-foreground [overflow-wrap:anywhere]">{icon === "calendar" ? <time dateTime={value}>{value}</time> : value}</dd>
-            </div>
+        <dl className="grid gap-x-6 gap-y-4 @xs:grid-cols-2 @3xl:grid-cols-4">
+          {knownFacts.map(({ label, icon, value }) => <div key={label} className="min-w-0">
+            <dt className="metadata-text">{label}</dt>
+            <dd className="mt-1 flex min-w-0 items-start gap-2 text-sm text-foreground [overflow-wrap:anywhere]">
+              <Icon name={icon} className="mt-0.5 size-4 text-accent" />
+              <span>{icon === "calendar" ? <time dateTime={value}>{opportunityDisplayDate(value)}</time> : value}</span>
+            </dd>
           </div>)}
         </dl>
       </section>}
+      </header>
+      <div className={standalone ? "grid items-start gap-8 @4xl:grid-cols-[minmax(0,1fr)_19rem]" : "space-y-6"}>
+      <div className="min-w-0 space-y-6">
       {!!listedSkills?.length && <ul aria-label="Skills" className="flex flex-wrap gap-2">
         {listedSkills.map((skill) => <li key={skill.id} className="max-w-full [overflow-wrap:anywhere]"><Badge className="!text-foreground">{skill.name}</Badge></li>)}
       </ul>}
@@ -295,11 +330,15 @@ export function OpportunityDetailView({ opportunity: job, assessment, status, co
           prefetch={false} className="inline-flex min-h-11 items-center rounded-full border border-border px-4 py-2 text-sm font-medium text-accent hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">
           View full details
         </Link>}
-      {description && <section className="border-t border-line pt-5">
-        <SectionHeading className="card-title">About the opportunity</SectionHeading>
+      {description && <section>
+        <SectionHeading className="section-title">About the opportunity</SectionHeading>
         {listing && descriptionBody(listing, description, standalone ? "h3" : "h4")}
       </section>}
+      </div>
+      <aside aria-label="Your fit for this opportunity" className={standalone ? "@container min-w-0 @4xl:sticky @4xl:top-0 @4xl:border-l @4xl:border-line @4xl:pl-6" : "@container min-w-0 border-t border-line pt-6"}>
       {opportunityDecision(copilot, standalone, copilotEnabled)}
+      </aside>
+      </div>
     </div>
     {(officialUrl || saveControl || sourceNotice) && <footer aria-label="Opportunity actions" className="flex shrink-0 flex-wrap items-center gap-2 border-t border-line bg-surface p-3">
       {officialUrl && <a href={officialUrl} target="_blank" rel="noopener noreferrer"

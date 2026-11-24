@@ -62,10 +62,11 @@ test("confirmed profile/skill writes feed fresh Jobs requests and the real score
     const opportunityHelpers = await load("../src/lib/opportunities.ts");
     const { default: JobsPage } = await load("../src/app/(workspace)/jobs/page.tsx", {
       "react/jsx-runtime": runtime, "next/link": "Link", "@/lib/auth/account": { requireCompletedAccount: account },
-      "@/components/workspace/recommended-jobs": { RecommendedJobs: "RecommendedJobs" },
+      "@/components/workspace/recommended-feed": { RecommendedFeed: "RecommendedJobs" },
       "@/components/jobs/jobs-search": { JobsSearch: "JobsSearch" }, "@/components/ui/button": { Button: "Button" },
       "@/components/ui/empty-state": { EmptyState: "EmptyState" }, "@/components/ui/error-state": { ErrorState: "ErrorState" },
       "./save-action": { saveOpportunity() {} },
+      "./load-more-action": { loadMoreRecommended() {} },
       "./saved-search-actions": { savedSearchAction() {} }, "@/components/jobs/saved-searches": { SavedSearches: "SavedSearches" },
       "./assessment-action": { loadOpportunityAssessment() {}, loadOpportunityCatalog() {} },
       "@/lib/feature-flags": { opportunityCopilotEnabled: () => false },

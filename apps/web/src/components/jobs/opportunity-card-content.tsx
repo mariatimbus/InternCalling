@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Icon } from "@/components/ui/icon";
-import { CompanyMark } from "./company-mark";
 import { CompanyAvatar } from "./company-avatar";
 import { EligibilityBadge } from "./eligibility-badge";
 import { MatchScore } from "./match-score";
@@ -10,12 +9,12 @@ import { descriptionSnippet } from "@/lib/job-description";
 
 export type CardDensity = "comfortable" | "compact";
 
-/** Shared soft card frame. Compact density is intended for the split-view list. */
+/** Shared opportunity row. Compact density is intended for the split-view list. */
 export function opportunityCardClasses(selected = false, density: CardDensity = "comfortable") {
   if (density === "compact") {
-    return `group relative flex min-w-0 flex-col gap-2 rounded-card border border-s-4 px-3 py-3 motion-safe:transition-colors sm:px-4 ${selected ? "border-line border-s-accent bg-primary/20" : "border-line border-s-transparent bg-card hover:bg-elevated"}`;
+    return `group relative flex min-w-0 flex-col gap-3 rounded-card border p-4 motion-safe:transition-colors ${selected ? "border-primary bg-primary/5" : "border-line bg-card hover:border-border"}`;
   }
-  return `group relative flex h-full flex-col rounded-card border p-6 motion-safe:transition-colors motion-safe:duration-200 sm:p-8 ${selected ? "border-accent/40 bg-primary/15" : "border-transparent bg-card hover:border-accent/25 hover:bg-elevated"}`;
+  return `group relative flex h-full min-w-0 flex-col rounded-card border p-4 motion-safe:transition-colors sm:p-5 ${selected ? "border-primary bg-primary/5" : "border-line bg-card hover:border-border"}`;
 }
 
 /** Shared information hierarchy; callers provide a native link or button as the heading. */
@@ -60,30 +59,26 @@ export function OpportunityCardContent({ job, heading, action, density = "comfor
   </>;
   return (
     <>
-      <div className="mb-6 flex items-center justify-between gap-3">
-        <Badge variant="accent">{job.category ?? "Internship"}</Badge>
+      <div className="flex items-start gap-4">
+        <CompanyAvatar companyName={job.company} initials={job.initials} logoUrl={job.companyLogoUrl} />
+        <div className="min-w-0 flex-1">
+          <div className="mb-2 flex flex-wrap items-center gap-2"><Badge variant="accent">{job.category ?? "Internship"}</Badge>{job.postedLabel && <span className="metadata-text">{job.postedLabel}</span>}</div>
+          {heading}
+          <p className="mt-1 text-sm font-medium text-muted">{job.company}</p>
+        </div>
         {action}
       </div>
-      <div className="flex items-start gap-4">
-        <CompanyMark initials={job.initials} />
-        <div className="min-w-0 flex-1">
-          <p className="mb-1 text-xs text-muted">{job.company}</p>
-          {heading}
-          <div className="mt-3 space-y-2 text-xs text-muted">
-            <p className="flex items-start gap-2"><Icon name="location" className="size-3.5" />{job.location}</p>
-            {job.duration && <p className="flex items-center gap-2"><Icon name="calendar" className="size-3.5" />{job.duration}</p>}
-          </div>
-        </div>
+      <div className="mt-4 flex flex-wrap gap-x-7 gap-y-2 border-t border-line pt-3 text-sm text-muted">
+        <p className="flex min-w-0 items-start gap-2"><Icon name="location" className="mt-0.5 size-4" /><span className="min-w-0 [overflow-wrap:anywhere]">{job.location}</span></p>
+        {job.duration && <p className="flex items-center gap-2"><Icon name="calendar" className="size-4" />{job.duration}</p>}
+        {job.compensation && <p className="flex items-start gap-2"><Icon name="wallet" className="size-4" />{job.compensation}</p>}
+        {job.workMode && <p className="flex items-center gap-2"><Icon name="clock" className="size-4" />{job.workMode}</p>}
+        {(job.deadlineText || job.deadlineLabel) && <p className="flex items-start gap-2"><Icon name="calendar" className="mt-0.5 size-4" />{job.deadlineText ?? job.deadlineLabel}</p>}
       </div>
-      {descriptionSnippet(job.description) && <p className="reading-text mt-6 line-clamp-3">{descriptionSnippet(job.description)}</p>}
-      <div className="mt-6 space-y-2.5 text-xs text-muted">
-        {job.compensation && <p className="flex items-start gap-2"><Icon name="wallet" className="size-3.5" />{job.compensation}</p>}
-        {job.workMode && <p className="flex items-center gap-2"><Icon name="clock" className="size-3.5" />{job.workMode}</p>}
-        {(job.deadlineText || job.deadlineLabel) && <p className="flex items-start gap-2 leading-relaxed"><Icon name="calendar" className="mt-0.5 size-3.5" />{job.deadlineText ?? job.deadlineLabel}</p>}
-      </div>
-      <div className="mt-5 flex flex-wrap gap-2">{job.skills.slice(0, 3).map((skill) => <Badge key={skill}>{skill}</Badge>)}{applied && <Badge variant="accent">Applied</Badge>}</div>
-      {showMatch && job.matchReason && <p className="mt-5 flex items-start gap-1.5 text-sm text-foreground"><Icon name="check" className="mt-0.5 size-4 shrink-0 text-accent" />{job.matchReason}</p>}
-      {showMatch && <div className="mt-auto flex flex-wrap items-center justify-between gap-3 pt-6"><EligibilityBadge status={job.eligibility} /><MatchScore score={job.matchScore} size="sm" /></div>}
+      {descriptionSnippet(job.description) && <p className="reading-text mt-3 line-clamp-2">{descriptionSnippet(job.description)}</p>}
+      {(job.skills.length > 0 || applied) && <div className="mt-3 flex flex-wrap gap-1.5">{job.skills.slice(0, 5).map((skill) => <Badge key={skill}>{skill}</Badge>)}{applied && <Badge variant="accent">Applied</Badge>}</div>}
+      {showMatch && job.matchReason && <p className="mt-3 flex items-start gap-1.5 text-sm text-foreground"><Icon name="check" className="mt-0.5 size-4 shrink-0 text-accent" />{job.matchReason}</p>}
+      {showMatch && <div className="mt-auto flex flex-wrap items-center justify-between gap-3 pt-4"><EligibilityBadge status={job.eligibility} /><MatchScore score={job.matchScore} size="sm" /></div>}
     </>
   );
 }

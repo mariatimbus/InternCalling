@@ -13,15 +13,16 @@ export type AppShellProps = { children: ReactNode; navigation: readonly Navigati
 /** Shared product frame. Authentication and product data belong to the calling route layout. */
 export function AppShell({ children, navigation, notice, account }: AppShellProps) {
   const pathname = usePathname();
-  const active = navigation.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
+  const active = navigation.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`)
+    || (item.href === "/jobs" && pathname.startsWith("/opportunities/")));
   const [navigationOpen, setNavigationOpen] = useState(false);
   return (
-    <div className="flex h-dvh min-h-0 flex-col overflow-hidden lg:flex-row lg:gap-3 lg:p-3 xl:gap-5 xl:p-5">
-      <aside className="hidden w-52 shrink-0 rounded-panel border border-line bg-surface/80 px-4 py-6 lg:block xl:w-56">
+    <div className="flex h-dvh min-h-0 flex-col overflow-hidden lg:flex-row">
+      <aside className="hidden w-56 shrink-0 border-r border-line bg-surface px-4 py-7 lg:block xl:w-60">
         <Sidebar items={navigation} activePath={pathname} account={account} />
       </aside>
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <header className="relative z-20 flex min-h-16 shrink-0 flex-wrap items-center justify-between gap-2 px-4 py-2 lg:min-h-14 lg:px-7">
+        <header className="relative z-20 flex min-h-16 shrink-0 flex-wrap items-center justify-between gap-2 border-b border-line bg-surface px-4 py-2 lg:px-8">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <Button variant="ghost" className="lg:hidden" aria-expanded={navigationOpen} aria-controls="workspace-navigation" onClick={() => setNavigationOpen(true)}><Icon name="menu" /><span className="sr-only">Menu</span></Button>
             <span className="lg:hidden"><BrandLogo /></span>

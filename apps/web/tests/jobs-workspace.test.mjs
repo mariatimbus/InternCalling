@@ -61,13 +61,17 @@ async function fixture(request) {
     "next/cache": { revalidatePath: (path) => invalidated.push(path) },
     "@/lib/auth/account": account, "@/lib/api/client": { ApiError },
   });
+  const continuation = await load(jobs + "load-more-action.ts", {
+    "@/lib/auth/account": account, "@/lib/jobs-url": jobsUrl,
+  });
   const { default: page } = await load(jobs + "page.tsx", {
     "react/jsx-runtime": runtime, "next/link": { default: "Link" }, "@/lib/auth/account": account,
-    "@/components/workspace/recommended-jobs": { RecommendedJobs: "JobsList" },
+    "@/components/workspace/recommended-feed": { RecommendedFeed: "JobsList" },
     "@/components/jobs/jobs-search": { JobsSearch: "JobsSearch" },
     "@/components/ui/button": { Button: "Button" },
     "@/components/ui/empty-state": { EmptyState: "Empty" }, "@/components/ui/error-state": { ErrorState: "Error" },
     "./save-action": action,
+    "./load-more-action": continuation,
     "./saved-search-actions": { savedSearchAction() {} }, "@/components/jobs/saved-searches": { SavedSearches: "SavedSearches" },
     "./assessment-action": { loadOpportunityAssessment() {}, loadOpportunityCatalog() {} },
     "@/lib/feature-flags": featureFlags,
@@ -274,8 +278,13 @@ test("Jobs links preserve q/page across views and Recommended ignores legacy typ
   assert.equal(list(recommended).items[0].match.score, 42);
   assert.ok(app.calls.every(([path]) => !path.endsWith("/match")), "ranking arrives from the global endpoint without per-page scoring calls");
   assert.equal(list(recommended).items[0].status, "rejected");
-  assert.deepEqual(queryOf(tab(recommended, "Next page").props.href), { view: "recommended", q: search, page: "3", ...filters });
-  assert.deepEqual(queryOf(tab(recommended, "Previous page").props.href), { view: "recommended", q: search, page: "1", ...filters });
+  assert.ok(!tab(recommended, "Next page"));
+  assert.ok(!tab(recommended, "Previous page"));
+  assert.deepEqual(list(recommended).pagination, { page: 2, pageSize: 12, total: 36 });
+  await list(recommended).loadMore(3);
+  assert.deepEqual(queryOf(app.calls.filter(([path]) => path.includes("opportunities/recommended?")).at(-1)[0]), {
+    opportunity_type: "internship", is_active: "true", page: "3", page_size: "12", search: "C++ & Python", ...filters,
+  });
   const discovery = recommended.find((node) => node.type === "JobsSearch").props;
   assert.deepEqual(discovery.applied, filters);
   assert.equal(discovery.search, search);
@@ -497,7 +506,10 @@ test("cards omit unknown metadata and keep official links, selection and Save in
   ];
   const context = "view=applied&q=robotics&location=Berlin&degree_level=master&study_year=1&page=2";
   const logoFixture = "/company-logos/example.png";
-  const trackedTree = nodes(RecommendedJobs({ items: [{ ...listings[2], companyLogoUrl: logoFixture }], detailContext: context }));
+  const trackedTree = nodes(RecommendedJobs({ items: [{ ...listings[2], companyLogoUrl: logoFixture }], detailContext: context,
+    children: jsx("h1", { children: "Search this catalog" }) }));
+  assert.ok(trackedTree.findIndex(node => node.type === "h1") >= 0);
+  assert.ok(trackedTree.findIndex(node => node.type === "h1") < trackedTree.findIndex(node => node.type === "JobCard"));
   assert.equal(trackedTree.find((node) => node.type === "JobCard").props.job.companyLogoUrl, logoFixture);
   const briefs = trackedTree.filter((node) => node.type === detailView.OpportunityDetailView);
   assert.equal(briefs.length, 2, "desktop panel and mobile drawer share the same brief");
@@ -567,22 +579,22 @@ test("company avatars keep a fixed frame, reject unsupported URLs and recover wh
   assert.equal(supplied.type, "Image");
   assert.equal(supplied.props.src, first);
   assert.equal(supplied.props.alt, "");
-  assert.equal(supplied.props.width, 40);
+  assert.equal(supplied.props.width, 48);
   assert.match(supplied.props.className, /object-contain/);
-  assert.match(frame.props.className, /\bsize-10\b/);
+  assert.match(frame.props.className, /\bsize-12\b/);
   supplied.props.onError();
   const failed = mount({ companyName: "Example", initials: "EX", logoUrl: first, size: "sm" });
   assert.equal(failed.props.children, "EX");
-  assert.match(failed.props.className, /\bsize-10\b/);
+  assert.match(failed.props.className, /\bsize-12\b/);
   assert.equal(mount({ companyName: "Example", initials: "EX", logoUrl: second, size: "sm" }).props.children.props.src, second);
   assert.equal(mount({ companyName: "Example Two", initials: "EX", logoUrl: first, size: "sm" }).props.children.props.src, first);
   supplied.props.onError();
-  assert.equal(mount({ companyName: "Example", initials: "EX", logoUrl: second }).props.children.props.width, 48);
+  assert.equal(mount({ companyName: "Example", initials: "EX", logoUrl: second }).props.children.props.width, 64);
   for (const logoUrl of [undefined, "//example.invalid/logo.png", "https://example.invalid/company-logos/ex.png",
     "/company-logos/../logo.png", "/company-logos/ex.png?redirect=1", "data:image/png;base64,eA=="]) {
     const fallback = mount({ logoUrl });
     assert.equal(fallback.props.children, "–");
-    assert.match(fallback.props.className, /\bsize-12\b/);
+    assert.match(fallback.props.className, /\bsize-16\b/);
   }
 });
 
@@ -605,13 +617,15 @@ test("compact cards retain long metadata, meaningful eligibility and top-row act
   assert.equal(compact.find((node) => node.type === "MatchScore").props.score, 84);
   assert.ok(compact.findIndex((node) => node.type === "TrackerBadge") < compact.findIndex((node) => node.type === "EligibilityBadge"));
   assert.match(compact.find((node) => node.props.children === job.description).props.className, /line-clamp-2/);
-  assert.match(opportunityCardClasses(true, "compact"), /border-s-4.*border-s-accent/);
-  assert.match(opportunityCardClasses(false, "compact"), /border-s-4.*border-s-transparent/);
+  assert.match(opportunityCardClasses(true, "compact"), /border-primary/);
+  assert.match(opportunityCardClasses(false, "compact"), /border-line/);
   assert.doesNotMatch(opportunityCardClasses(false, "compact"), /\b(?:h-full|min-h-)\b/);
   const sparse = nodes(OpportunityCardContent({ job: { ...job, eligibility: "unknown", matchScore: null, description: undefined }, density: "compact" }));
   assert.equal(sparse.find((node) => node.type === "MatchScore").props.score, null);
   assert.ok(!sparse.some((node) => node.type === "EligibilityBadge"));
-  assert.ok(nodes(OpportunityCardContent({ job })).some((node) => node.type === "CompanyMark"));
+  const comfortable = nodes(OpportunityCardContent({ job }));
+  assert.deepEqual(comfortable.find((node) => node.type === "CompanyAvatar")?.props,
+    { companyName: job.company, initials: "QU", logoUrl: job.companyLogoUrl });
 });
 
 async function detailPage(requireCompletedAccount) {
@@ -689,6 +703,19 @@ test("the footer is the only official link with Copilot on or off, including ful
   assert.equal(official(full).length, 1);
   assert.equal(official(full)[0].props.children[0], "Apply on official site");
   assert.equal(queryOf(tab(full, "Back to Jobs").props.href).view, "saved");
+});
+
+test("the detail overview preserves a zero match and distinguishes unavailable from loading", () => {
+  const overview = (assessment) => {
+    const tree = nodes(detailView.OpportunityDetailView({ opportunity: { ...opportunity, skills: [] }, assessment, standalone: true }));
+    return nodes(tree.find((node) => node.props["aria-label"] === "Match overview"));
+  };
+  const zero = overview({ match: { score: 0, reasons: [] }, eligibility: null });
+  assert.equal(zero.find((node) => node.props.className?.includes("text-4xl")).props.children[0], 0);
+  const missing = overview({ match: null, eligibility: null });
+  assert.ok(missing.some((node) => node.props.children === "Match score unavailable"));
+  assert.ok(!missing.some((node) => node.props.className?.includes("text-4xl")));
+  assert.ok(overview(null).some((node) => node.props.children === "Loading match score…"));
 });
 
 test("a failed request leaves the other Copilot evaluation available", async () => {
@@ -823,8 +850,9 @@ test("the flag gates profile skills reads across Recommended, Saved and Applied"
     const tree = await page();
     assert.equal(tree.some((node) => node.props["aria-label"] === "Opportunity Copilot"), enabled);
     assert.equal(tree.some((node) => node.props["aria-label"] === "Skills matched"), enabled);
+    const explanation = nodes(tree.find((node) => node.props["aria-label"] === "Your fit for this opportunity"));
     for (const label of ["Why this fits", "What to check", "Matches 1 of 3 skills: Python", "Possibly eligible"]) {
-      assert.equal(tree.filter((node) => node.props.children === label).length, 1);
+      assert.equal(explanation.filter((node) => node.props.children === label).length, 1);
     }
   }
   const endpoint = "/api/v1/opportunities/" + id;

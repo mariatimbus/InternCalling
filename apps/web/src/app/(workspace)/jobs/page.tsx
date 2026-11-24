@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { requireCompletedAccount } from "@/lib/auth/account";
 import type { Application, RecommendationPage } from "@/lib/api/types";
-import { RecommendedJobs, type RankedOpportunity } from "@/components/workspace/recommended-jobs";
+import type { RankedOpportunity } from "@/components/workspace/recommended-jobs";
+import { RecommendedFeed } from "@/components/workspace/recommended-feed";
 import { JobsSearch } from "@/components/jobs/jobs-search";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
-import { jobsParams, readJobsQuery, type JobsQuery, type JobsView } from "@/lib/jobs-url";
+import { jobsParams, readJobsQuery, recommendationParams, type JobsQuery, type JobsView } from "@/lib/jobs-url";
 import { saveOpportunity } from "./save-action";
 import { loadOpportunityAssessment, loadOpportunityCatalog } from "./assessment-action";
 import { opportunityCopilotEnabled } from "@/lib/feature-flags";
@@ -14,6 +15,7 @@ import { readProfileSkills } from "@/lib/profile-skills";
 import { savedSearchAction } from "./saved-search-actions";
 import { SavedSearches } from "@/components/jobs/saved-searches";
 import type { SavedSearch } from "@/lib/saved-searches";
+import { loadMoreRecommended } from "./load-more-action";
 
 const views = {
   recommended: { label: "Recommended", empty: "No opportunities found", help: "Try another search or come back later for new opportunities.", error: "Recommended opportunities could not be loaded." },
@@ -25,7 +27,7 @@ export const metadata = { title: "Jobs | InternCalling" };
 export default async function JobsPage({ searchParams }: { searchParams: Promise<JobsQuery> }) {
   const { api } = await requireCompletedAccount();
   const state = readJobsQuery(await searchParams);
-  const { view, search, location, degree, year, page, filters } = state;
+  const { view, search, location, degree, year, page } = state;
   const copilotEnabled = opportunityCopilotEnabled();
 
   function urlParams(target: JobsView, next: number) {
@@ -36,12 +38,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
     return "/jobs?" + urlParams(target, next);
   }
 
-  const params = new URLSearchParams(filters);
-  params.set("opportunity_type", "internship");
-  params.set("is_active", "true");
-  params.set("page", String(page));
-  params.set("page_size", "12");
-  if (search.trim()) params.set("search", search.trim());
+  const params = recommendationParams(state);
   const [tracker, catalog, profileSkills, savedSearches] = await Promise.allSettled([
     api.request<{ items: Application[]; total: number }>("/api/v1/applications"),
     view === "recommended" ? api.request<RecommendationPage>("/api/v1/opportunities/recommended?" + params) : null,
@@ -67,7 +64,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
     }
   }
   const copy = views[view];
-  return <div className="mx-auto max-w-7xl px-5 py-7 sm:px-8">
+  const listHeader = <>
     <div className="flex flex-wrap items-end justify-between gap-5">
       <div>
         <h1 className="page-title">Find your next step.</h1>
@@ -86,27 +83,25 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
         {views[target].label}
       </Link>)}
     </nav>
-    {failed ? <ErrorState title={copy.error} action={<form action="/jobs">
-      {Array.from(urlParams(view, page), ([name, value]) => <input key={name} type="hidden" name={name} value={value} />)}
-      <Button type="submit">Try again</Button>
-    </form>} /> : <>
-      <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+      {!failed && <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <p className="text-sm font-semibold tabular-nums text-foreground">
           {result?.total ?? items.length} {(result?.total ?? items.length) === 1 ? "opportunity" : "opportunities"}
         </p>
         {result && <p className="metadata-text">Ranked across all matching opportunities.</p>}
-      </div>
-      {items.length ? <RecommendedJobs key={href(view)} items={items} copilotEnabled={copilotEnabled}
+      </div>}
+  </>;
+  return <div className="mx-auto max-w-7xl px-5 py-7 sm:px-8">
+    {failed ? <>{listHeader}<ErrorState title={copy.error} action={<form action="/jobs">
+      {Array.from(urlParams(view, page), ([name, value]) => <input key={name} type="hidden" name={name} value={value} />)}
+      <Button type="submit">Try again</Button>
+    </form>} /></> : items.length ? <RecommendedFeed key={href(view)} items={items} copilotEnabled={copilotEnabled}
+        pagination={result ? { page: result.page ?? page, pageSize: result.page_size, total: result.total } : undefined}
+        loadMore={view === "recommended" ? loadMoreRecommended.bind(null, Object.fromEntries(urlParams(view, page))) : undefined}
         profileSkills={profileSkills.status === "fulfilled" ? profileSkills.value : null}
         detailContext={urlParams(view, page).toString()} label={copy.label + " opportunities"}
         loadAssessment={loadOpportunityAssessment} loadCatalog={loadOpportunityCatalog}
         saveAction={view === "recommended" ? saveOpportunity : undefined}
-        applications={tracker.status === "fulfilled" ? tracker.value.items : []} />
-        : <EmptyState title={copy.empty} description={copy.help} />}
-      {result && <nav aria-label="Results pages" className="mt-7 flex justify-between text-sm text-accent">
-        {page > 1 ? <Link href={href("recommended", page - 1)}>Previous page</Link> : <span />}
-        {page * result.page_size < result.total && <Link href={href("recommended", page + 1)}>Next page</Link>}
-      </nav>}
-    </>}
+        applications={tracker.status === "fulfilled" ? tracker.value.items : []}>{listHeader}</RecommendedFeed>
+        : <>{listHeader}<EmptyState title={copy.empty} description={copy.help} /></>}
   </div>;
 }

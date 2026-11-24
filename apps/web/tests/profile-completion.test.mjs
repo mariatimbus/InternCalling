@@ -67,7 +67,7 @@ function hooks() {
 function nodes(tree) { return !tree || typeof tree !== "object" ? [] : [tree, ...[tree.props?.children].flat(Infinity).flatMap(nodes)]; }
 const find = (tree, predicate) => nodes(tree).find(predicate);
 
-async function fixture({ profile = empty, skills = [], save = {}, mutate = {}, refreshed = {}, insightsEnabled = false } = {}) {
+async function fixture({ profile = empty, skills = [], save = {}, mutate = {}, refreshed = {}, insightsEnabled = false, contactEmail } = {}) {
   const hubHooks = hooks(), editorHooks = hooks(), skillsHooks = hooks();
   const { ProfileEditor } = await load("../src/components/profile/profile-editor.tsx", {
     react: editorHooks.react, "react/jsx-runtime": runtime, "@/lib/profile-edit": editing,
@@ -95,7 +95,7 @@ async function fixture({ profile = empty, skills = [], save = {}, mutate = {}, r
     "./profile-completion": { ProfileCompletion: "Completion" },
     "./profile-editor": { ProfileEditor }, "./profile-skills": { ProfileSkills }, "./resume-editor": { ResumeEditor: "ResumeEditor" }, "./resume-pdf-section": { ResumePdfSection: "ResumePdfSection" }, "./experience-section": { ExperienceSection: "ExperienceSection" }, "./projects-section": { ProjectsSection: "ProjectsSection" }, "./certificates-section": { CertificatesSection: "CertificatesSection" }, "./honours-section": { HonoursSection: "HonoursSection" }, "./languages-section": { LanguagesSection: "LanguagesSection" }, "./publications-section": { PublicationsSection: "PublicationsSection" }, "./profile-collection-sections": { ProfileCollectionSections: "CollectionSections" },
   });
-  const hub = () => hubHooks.render(ProfileHub, { initialProfile: profile, initialSkills: skills, insightsEnabled });
+  const hub = () => hubHooks.render(ProfileHub, { initialProfile: profile, initialSkills: skills, insightsEnabled, contactEmail });
   const editor = () => editorHooks.render(ProfileEditor, find(hub(), n => n.type === ProfileEditor).props);
   const skillsView = () => skillsHooks.render(ProfileSkills, find(hub(), n => n.type === ProfileSkills).props);
   const completion = () => { const props = find(hub(), n => n.type === "Completion").props; return calculate(props.profile, props.skills); };
@@ -114,6 +114,21 @@ test("typing and Cancel leave completion unchanged; only a confirmed profile sav
   find(f.editor(), n => n.type === "Input" && n.props.name === "headline").props.onChange({ target: { value: "Unsaved" } });
   await find(f.editor(), n => n.type === "form").props.onSubmit({ preventDefault() {} });
   assert.equal(f.completion().percentage, 13);
+});
+
+test("the document profile separates education and opens the existing editor without losing saved details", async () => {
+  const f = await fixture({ profile: full, skills: savedSkills, contactEmail: "student@example.invalid" });
+  const saved = f.editor();
+  assert.ok(find(saved, n => n.props.id === "profile-education"));
+  assert.ok(find(saved, n => n.props.children === "Fixture University"));
+  assert.ok(find(saved, n => n.props.children === "student@example.invalid"));
+  find(saved, n => n.type === "Button" && n.props.children === "Edit education").props.onClick();
+  const university = find(f.editor(), n => n.type === "Input" && n.props.name === "university");
+  assert.equal(university.props.value, "Fixture University");
+  university.props.onChange({ target: { value: "Unsaved university" } });
+  find(f.editor(), n => n.type === "Button" && n.props.children === "Cancel").props.onClick();
+  assert.ok(find(f.editor(), n => n.props.children === "Fixture University"));
+  assert.equal(f.completion().percentage, 100);
 });
 
 test("failed profile saves preserve entered values and cannot increase completion", async () => {
@@ -224,12 +239,14 @@ test("six reusable collection cards report unconnected data without fake entries
   }
 });
 
-test("expanded hub keeps the actual editor, Skills and Resume alongside the separate collections", async () => {
+test("Profile keeps its editors and collections without PDF upload or parsing", async () => {
   const f = await fixture();
   const tree = f.hub();
   assert.ok(find(tree, n => typeof n.type === "function" && n.type.name === "ProfileEditor"));
   assert.ok(find(tree, n => typeof n.type === "function" && n.type.name === "ProfileSkills"));
-  assert.equal(find(tree, n => n.type === "ResumePdfSection").props.profileLayout, true);
+  assert.equal(find(tree, n => n.type === "ResumePdfSection"), undefined);
+  assert.equal(find(tree, n => n.type === "ReviewFlow"), undefined);
+  assert.equal(find(tree, n => n.props.href === "#profile-resume"), undefined);
   assert.equal(find(tree, n => n.type === "ResumeEditor"), undefined);
   assert.equal(nodes(tree).filter(n => n.type === "Completion").length, 1);
   assert.ok(find(tree, n => n.type === "CertificatesSection"));

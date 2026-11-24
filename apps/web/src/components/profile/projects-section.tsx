@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
-import { emptyProject, projectDraft, validateProject, ProjectConflict, type Project, type ProjectDraft, type ProjectsService } from "@/lib/projects";
+import { emptyProject, projectDraft, projectPeriod, validateProject, ProjectConflict, type Project, type ProjectDraft, type ProjectsService } from "@/lib/projects";
 import { CollectionView, type CollectionState } from "./collection-view";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ export function ProjectsSection({ service }: { service?: ProjectsService }) {
   const [draft, setDraft] = useState<ProjectDraft>(emptyProject);
   const [editing, setEditing] = useState(false), [entry, setEntry] = useState<Project | null>(null);
   const [deleting, setDeleting] = useState<Project | null>(null);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [errors, setErrors] = useState<Partial<Record<keyof ProjectDraft, string>>>({});
   const [error, setError] = useState(""), [success, setSuccess] = useState(""), [pending, setPending] = useState(false);
   const busy = useRef(false), form = useRef<HTMLFormElement>(null), heading = useRef<HTMLHeadingElement>(null), confirmation = useRef<HTMLDivElement>(null);
@@ -59,21 +60,43 @@ export function ProjectsSection({ service }: { service?: ProjectsService }) {
     } catch (cause) { setError(cause instanceof ProjectConflict ? "This project changed elsewhere. Cancel deletion and reload before retrying." : "Projects could not be deleted. The entry is still shown. Retry or cancel."); }
     finally { busy.current = false; setPending(false); }
   }
-  const input = (key: "name" | "role" | "startDate" | "endDate" | "repositoryUrl" | "demoUrl", label: string) => <Input label={label} name={key} value={draft[key]} required={key === "name"} disabled={pending || key === "endDate" && draft.ongoing} maxLength={key.includes("Date") ? 7 : key.endsWith("Url") ? 512 : 255} placeholder={key.includes("Date") ? "YYYY or YYYY-MM" : undefined} error={errors[key]} onChange={event => change(key, event.target.value)} />;
+  const input = (key: "name" | "role" | "startDate" | "endDate" | "repositoryUrl" | "demoUrl", label: string) => <Input label={label} name={key} type={key.endsWith("Url") ? "url" : "text"} value={draft[key]} required={key === "name"} disabled={pending || key === "endDate" && draft.ongoing} maxLength={key.includes("Date") ? 7 : key.endsWith("Url") ? 512 : 255} placeholder={key.includes("Date") ? "YYYY or YYYY-MM" : key === "repositoryUrl" ? "https://github.com/username/repository" : undefined} error={errors[key]} onChange={event => change(key, event.target.value)} />;
   return <section className="mt-8 rounded-panel bg-card p-6 sm:p-9" aria-labelledby={id + "-title"} aria-busy={pending}>
-    <div className="flex flex-wrap items-center justify-between gap-3"><h2 ref={heading} tabIndex={-1} id={id + "-title"} className="section-title">Projects</h2>{!editing && <Button disabled={pending || !!deleting || !!service && state.kind !== "ready"} onClick={() => begin(null)}>{service ? "Add project" : "Draft project"}</Button>}</div>
-    <div className="mt-4"><CollectionView state={state} emptyMessage="No projects yet." onRetry={() => { void reload(); }} renderEntry={row => <article className="space-y-3 break-words"><h3 className="card-title">{row.name}</h3>{row.role && <p className="text-sm">{row.role}</p>}<p className="text-xs text-muted">{row.startDate || "Start date not provided"} to {row.ongoing ? "Present" : row.endDate || "End date not provided"}</p><p className="whitespace-pre-wrap text-sm leading-6">{row.description}</p><div className="flex flex-wrap gap-2">{row.technologies.map(name => <span key={name} className="rounded-full bg-surface px-3 py-2 text-xs">{name}</span>)}</div><div className="flex flex-wrap gap-4">{(["repositoryUrl", "demoUrl"] as const).map(key => {
-      const url = safeResumeUrl(row[key]);
-      return url ? <a key={key} href={url} target="_blank" rel="noopener noreferrer" className="rounded-control py-2 text-sm text-accent underline">{key === "repositoryUrl" ? "Repository" : "Live demo"}<span className="sr-only"> (opens in a new tab)</span></a> : row[key] ? <p key={key} className="text-xs text-muted">An invalid saved link is hidden. Edit this project to correct it.</p> : null;
-    })}</div><div className="flex flex-wrap gap-2"><Button variant="secondary" disabled={pending || editing || !!deleting} onClick={() => begin(row)}>Edit<span className="sr-only"> {row.name}</span></Button><Button variant="ghost" disabled={pending || editing || !!deleting} onClick={() => { setDeleting(row); setError(""); setSuccess(""); }}>Delete<span className="sr-only"> {row.name}</span></Button></div></article>} /></div>
+    <div className="flex flex-wrap items-center justify-between gap-3"><h2 ref={heading} tabIndex={-1} id={id + "-title"} className="section-title">Projects</h2>{!editing && <Button variant="ghost" size="sm" className="min-w-11 px-2" aria-label={service ? "Add project" : "Draft project"} disabled={pending || !!deleting || !!service && state.kind !== "ready"} onClick={() => begin(null)}>
+      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" className="size-5"><path d="M12 5v14 M5 12h14" /></svg>
+    </Button>}</div>
+    <div className="mt-4 [&>ul]:space-y-3"><CollectionView state={state} emptyMessage="No projects yet." onRetry={() => { void reload(); }} renderEntry={row => {
+      const characters = Array.from(row.description);
+      const long = characters.length > 280;
+      const description = long && !expanded[row.id] ? characters.slice(0, 280).join("") + "…" : row.description;
+      return <article className="min-w-0 rounded-lg border border-line bg-surface p-4 [overflow-wrap:anywhere] sm:p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0"><h3 className="card-title">{row.name}</h3><p className="metadata-text mt-1">{projectPeriod(row)}</p></div>
+          <Button variant="ghost" size="sm" className="shrink-0 px-2" aria-label={`Edit ${row.name}`} disabled={pending || editing || !!deleting} onClick={() => begin(row)}>
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="size-5"><path d="m15 5 4 4 M4 20l4-1 12-12a2.8 2.8 0 0 0-4-4L4 15z" /></svg>
+          </Button>
+        </div>
+        {row.role && <p className="mt-3 text-sm font-medium text-foreground">{row.role}</p>}
+        {row.description && <div className="mt-3"><p id={`${id}-${row.id}-description`} className="max-w-prose whitespace-pre-wrap text-sm leading-6">{description}</p>
+          {long && <Button variant="ghost" size="sm" className="mt-1 px-0 text-accent" aria-label={`${expanded[row.id] ? "Show less" : "Show more"} about ${row.name}`} aria-expanded={!!expanded[row.id]} aria-controls={`${id}-${row.id}-description`} onClick={() => setExpanded(current => ({ ...current, [row.id]: !current[row.id] }))}>{expanded[row.id] ? "Show less" : "Show more"}</Button>}
+        </div>}
+        {row.technologies.length > 0 && <ul aria-label={`Technologies used in ${row.name}`} className="mt-3 flex flex-wrap gap-1.5">{row.technologies.map(name => <li key={name} className="rounded-md bg-elevated px-2 py-1 text-xs text-muted">{name}</li>)}</ul>}
+        <div className="mt-3 flex flex-wrap items-start gap-x-5 gap-y-1">{(["repositoryUrl", "demoUrl"] as const).map(key => {
+          const url = safeResumeUrl(row[key]);
+          return url ? <p key={key} className="min-w-0 text-sm leading-6"><span className="font-medium">{key === "repositoryUrl" ? "Code:" : "Demo:"} </span><a href={url} target="_blank" rel="noopener noreferrer" className="rounded-sm text-accent underline underline-offset-4 [overflow-wrap:anywhere]">{url}<span className="sr-only"> (opens in a new tab)</span></a></p> : row[key] ? <p key={key} className="text-xs text-muted">An invalid saved link is hidden. Edit this project to correct it.</p> : null;
+        })}</div>
+        <div className="mt-2 flex justify-end"><Button variant="ghost" size="sm" className="text-xs" disabled={pending || editing || !!deleting} onClick={() => { setDeleting(row); setError(""); setSuccess(""); }}>Delete<span className="sr-only"> {row.name}</span></Button></div>
+      </article>;
+    }} /></div>
     {editing && <div onKeyDown={event => { if (event.key === "Escape") cancel(); }}><form id={id + "-form"} ref={form} noValidate onSubmit={save} className="mt-6 space-y-4" onKeyDown={event => { if (event.key === "Escape") cancel(); }}>
       {!service && <p role="status" className="text-sm text-muted">Draft only - saving is unavailable.</p>}
+      <h3 className="card-title">{entry ? "Edit project" : "Add project"}</h3>
       {input("name", "Project name (required)")}{input("role", "Role (optional)")}
       <p className="text-xs leading-6 text-muted">Dates accept YYYY or YYYY-MM. No day is assumed. Required fields are labelled.</p>
       <div className="grid gap-4 sm:grid-cols-2">{input("startDate", "Start date (optional)")}{input("endDate", draft.ongoing ? "End date (not applicable)" : "End date (optional)")}</div>
       <label className="flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" name="ongoing" checked={draft.ongoing} disabled={pending} onChange={event => { const checked = event.target.checked; setDraft(current => ({ ...current, ongoing: checked, endDate: checked ? "" : current.endDate })); setErrors(current => ({ ...current, endDate: undefined })); }} />Ongoing</label>
       <Field id={id + "-description"} label="Description (optional)" error={errors.description}><textarea id={id + "-description"} name="description" rows={4} value={draft.description} disabled={pending} maxLength={5000} aria-invalid={!!errors.description} aria-describedby={errors.description ? id + "-description-error" : undefined} className={fieldControl + " resize-y py-3"} onChange={event => change("description", event.target.value)} /></Field>
-      {input("repositoryUrl", "Repository URL (optional)")}{input("demoUrl", "Live-demo URL (optional)")}
+      {input("repositoryUrl", "GitHub / repository URL (optional)")}{input("demoUrl", "Live-demo URL (optional)")}
       </form>
       <fieldset className="my-5 min-w-0" disabled={pending}><legend className="text-sm">Technologies / skills</legend><ul aria-label="Project technologies" className="mt-3 flex flex-wrap gap-2">{draft.technologies.map(name => <li key={name}><SkillChip skill={{ name }} disabled={pending} onRemove={() => change("technologies", draft.technologies.filter(value => value !== name))} /></li>)}</ul>
       {errors.technologies && <p role="alert" className="text-sm">{errors.technologies}</p>}

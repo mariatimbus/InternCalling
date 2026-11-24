@@ -121,9 +121,11 @@ test("Jobs briefs keep source and detail links independent and place tailoring i
   }
   const lines = (value) => value.split(/\r?\n/).filter(Boolean);
   function renderedText(value) {
-    if (typeof value === "string") return value;
+    if (value == null || typeof value === "boolean") return "";
+    if (typeof value === "string" || typeof value === "number") return String(value);
     if (Array.isArray(value)) return value.map(renderedText).join("");
-    return renderedText(value.props.children);
+    if (value.props?.["aria-hidden"]) return "";
+    return renderedText(value.props?.children);
   }
   const amazonBrief = listingBrief(fixtureDescription, amazon);
   const descriptionNode = prose(amazonBrief);
@@ -139,5 +141,13 @@ test("Jobs briefs keep source and detail links independent and place tailoring i
   const sparse = prose(listingBrief("Details will follow.", amazon));
   assert.deepEqual(blocks(sparse), ["Details will follow."]);
   assert.equal(nodes(sparse).some((node) => node.type === "strong"), false);
+  const labelled = ["Responsibilities", "• Discovery: Ask users about the problem.", "• Data & Privacy: Protect user information.",
+    "• https://example.invalid/guide", "• Official source: " + other, "• Keep the original wording."].join("\n");
+  const formatted = prose(listingBrief(labelled, amazon));
+  assert.deepEqual(blocks(formatted), ["Responsibilities", "Discovery: Ask users about the problem.", "Data & Privacy: Protect user information.",
+    "https://example.invalid/guide", "Official source: " + other, "Keep the original wording."]);
+  assert.deepEqual(nodes(formatted).filter((node) => node.type === "strong").map((node) => node.props.children), ["Discovery:", "Data & Privacy:"]);
+  const responsibilities = nodes(formatted).find((node) => ["h3", "h4"].includes(node.type));
+  assert.ok(nodes(responsibilities).some((node) => node.type === "Icon" && node.props.name === "jobs"));
 });
 test("development route returns notFound in production and never imports real persistence",async()=>{const {default:Page}=await load("../src/app/dev/resume-tailoring/page.tsx",{"next/navigation":{notFound(){throw new Error("404");}},"@/components/dev/resume-tailoring-preview":{ResumeTailoringPreview:"Preview"},"react/jsx-runtime":runtime});const old=process.env.NODE_ENV;try{for(const mode of ["production","test"]){process.env.NODE_ENV=mode;assert.throws(()=>Page(),/404/);}process.env.NODE_ENV="development";assert.equal(Page().type,"Preview");}finally{if(old===undefined)delete process.env.NODE_ENV;else process.env.NODE_ENV=old;}for(const path of ["../src/lib/resume-tailoring-preview-service.ts","../src/components/dev/resume-tailoring-preview.tsx","../src/components/profile/resume-tailoring-flow.tsx"]){const code=await readFile(new URL(path,import.meta.url),"utf8");assert.doesNotMatch(code,/fetch\(|localStorage|IndexedDB|api\/v1|profile\/actions|skills-actions/);}});

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useImperativeHandle, useRef, useState, type FormEvent, type Ref } from "react";
+import { useCallback, useEffect, useImperativeHandle, useRef, useState, type FormEvent, type Ref } from "react";
 import type { Profile } from "@/lib/api/types";
 import { changedProfileFields, profileDraft, validateProfileDraft, type ProfileField, type ProfileFieldErrors } from "@/lib/profile-edit";
 import { saveProfile } from "@/app/(workspace)/profile/actions";
@@ -13,9 +13,9 @@ import { ErrorState } from "@/components/ui/error-state";
 const labels: Record<ProfileField, string> = { headline: "Headline", bio: "Bio", degree_level: "Degree level", university: "University", field_of_study: "Field of study", graduation_year: "Graduation year", location: "Location" };
 
 export type ProfileEditorHandle = { edit: (field: ProfileField) => void };
-export function ProfileEditor({ initialProfile, persistedProfile, onConfirmed, onUnavailable, ref, compactDesktop = false }: {
+export function ProfileEditor({ initialProfile, persistedProfile, onConfirmed, onUnavailable, ref, contactEmail }: {
   initialProfile: Profile; persistedProfile?: Profile; onConfirmed?: (profile: Profile) => void; onUnavailable?: () => void;
-  ref?: Ref<ProfileEditorHandle>; compactDesktop?: boolean;
+  ref?: Ref<ProfileEditorHandle>; contactEmail?: string;
 }) {
   const [profile, setProfile] = useState(initialProfile);
   const current = persistedProfile ?? profile;
@@ -30,11 +30,12 @@ export function ProfileEditor({ initialProfile, persistedProfile, onConfirmed, o
   const form = useRef<HTMLFormElement>(null);
   const focusField = useRef<ProfileField>("headline");
   useEffect(() => { if (editing) form.current?.querySelector<HTMLElement>('[name="' + focusField.current + '"]')?.focus(); }, [editing]);
-  useImperativeHandle(ref, () => ({ edit(field) {
+  const beginEdit = useCallback((field: ProfileField) => {
     focusField.current = field;
     if (editing) form.current?.querySelector<HTMLElement>('[name="' + field + '"]')?.focus();
     else { setProfile(current); setDraft(profileDraft(current)); setSuccess(""); setEditing(true); }
-  } }), [editing, current]);
+  }, [editing, current]);
+  useImperativeHandle(ref, () => ({ edit: beginEdit }), [beginEdit]);
 
   function update(key: ProfileField, value: string) { setDraft((current) => ({ ...current, [key]: value })); setFields((current) => ({ ...current, [key]: undefined })); }
   function close() { setDraft(profileDraft(current)); setEditing(false); setError(""); setFields({}); sectionTitle.current?.focus(); }
@@ -61,8 +62,9 @@ export function ProfileEditor({ initialProfile, persistedProfile, onConfirmed, o
   }
   const input = (key: Exclude<ProfileField, "bio" | "degree_level">) => <Input label={labels[key]} name={key} value={draft[key]} type={key === "graduation_year" ? "number" : "text"} min={key === "graduation_year" ? 1900 : undefined} max={key === "graduation_year" ? 2100 : undefined} step={key === "graduation_year" ? 1 : undefined} maxLength={key === "graduation_year" ? undefined : 255} disabled={saving} error={fields[key]} onChange={(event) => update(key, event.target.value)} />;
 
-  return <section data-profile-compact={compactDesktop ? "editor" : undefined} className={`mt-8 rounded-panel bg-card p-6 sm:p-9 ${compactDesktop ? "xl:mt-5 xl:p-4" : ""}`} aria-labelledby="profile-details-title">
-    <div className="flex flex-wrap items-center justify-between gap-4"><h2 ref={sectionTitle} id="profile-details-title" tabIndex={-1} className="section-title">Profile details</h2>{!editing && <Button onClick={() => { focusField.current = "headline"; setProfile(current); setDraft(profileDraft(current)); setSuccess(""); setEditing(true); }}>Edit profile</Button>}</div>
+  return <>
+    <section id="profile-overview" className="py-7" aria-labelledby="profile-details-title">
+    <div className="flex flex-wrap items-center justify-between gap-4"><h2 ref={sectionTitle} id="profile-details-title" tabIndex={-1} className="section-title">Profile details</h2>{!editing && <Button variant="ghost" size="sm" onClick={() => beginEdit("headline")}>Edit profile</Button>}</div>
     {success && <p role="status" className="mt-5 text-sm leading-6">{success}</p>}
     {editing ? <form ref={form} onSubmit={submit} noValidate aria-busy={saving} className="mt-6 space-y-6">
       <p className="text-sm leading-6 text-muted">Leave a field blank to clear it. Clearing study or location details may require onboarding again before opening Jobs.</p>
@@ -78,12 +80,27 @@ export function ProfileEditor({ initialProfile, persistedProfile, onConfirmed, o
       {error && <ErrorState variant="danger" title="Profile could not be saved" description={error} />}
       {saving && <p role="status" className="text-sm text-muted">Saving your profile…</p>}
       <div className="flex flex-wrap gap-3"><Button type="submit" disabled={saving}>{saving ? "Saving…" : "Save"}</Button><Button variant="secondary" disabled={saving} onClick={close}>Cancel</Button></div>
-    </form> : <dl className={`mt-6 grid gap-6 sm:grid-cols-2 ${compactDesktop ? "xl:mt-4 xl:grid-cols-3 xl:gap-3" : ""}`}>
-      {(Object.keys(labels) as ProfileField[]).map((key) => <div key={key} className={key === "bio"
-        ? `min-w-0 sm:col-span-2 ${compactDesktop ? "xl:col-span-3" : ""}` : "min-w-0"}>
-        <dt className="metadata-text">{labels[key]}</dt>
-        <dd className={`mt-2 whitespace-pre-wrap break-words text-sm leading-6 ${compactDesktop ? "xl:mt-1" : ""}`}>{display(key)}</dd>
-      </div>)}
-    </dl>}
-  </section>;
+    </form> : <div className="mt-5 space-y-4">
+      <p className="text-xl font-semibold text-foreground [overflow-wrap:anywhere]">{current.headline?.trim() || "Add a headline to introduce yourself."}</p>
+      {current.bio?.trim() && <p className="reading-text max-w-prose whitespace-pre-wrap [overflow-wrap:anywhere]">{current.bio}</p>}
+      <div className="flex flex-wrap gap-2 text-sm text-muted">
+        {current.location?.trim() && <span className="inline-flex max-w-full items-center gap-2 rounded-full bg-elevated px-3 py-1.5 [overflow-wrap:anywhere]"><span className="font-medium">Location</span>{current.location}</span>}
+        {contactEmail && <span className="inline-flex max-w-full flex-wrap items-center gap-x-2 rounded-full bg-elevated px-3 py-1.5 [overflow-wrap:anywhere]"><span className="font-medium">Email</span><span>{contactEmail}</span></span>}
+      </div>
+    </div>}
+    </section>
+    <section id="profile-education" aria-labelledby="profile-education-title" className="border-t border-line py-7">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 id="profile-education-title" className="section-title">Education</h2>
+        <Button variant="ghost" size="sm" disabled={saving} onClick={() => beginEdit("university")}>Edit education</Button>
+      </div>
+      <div className="mt-5 flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0 flex-[1_1_14rem]">
+          <h3 className="card-title [overflow-wrap:anywhere]">{current.university?.trim() || "University not provided"}</h3>
+          <p className="reading-text mt-1 [overflow-wrap:anywhere]">{[current.degree_level ? display("degree_level") : "", current.field_of_study?.trim()].filter(Boolean).join(" · ") || "Add your degree and field of study."}</p>
+        </div>
+        <p className="metadata-text">Graduation year <span className="ml-2 font-medium text-foreground">{display("graduation_year")}</span></p>
+      </div>
+    </section>
+  </>;
 }

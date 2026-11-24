@@ -19,6 +19,16 @@ export function jobsParams({ view, search, page, filters }: ReturnType<typeof re
   return new URLSearchParams({ view, q: search, page: String(page), ...Object.fromEntries(filters) });
 }
 
+export function recommendationParams(state: ReturnType<typeof readJobsQuery>, page = state.page) {
+  const params = new URLSearchParams(state.filters);
+  params.set("opportunity_type", "internship");
+  params.set("is_active", "true");
+  params.set("page", String(page));
+  params.set("page_size", "12");
+  if (state.search.trim()) params.set("search", state.search.trim());
+  return params;
+}
+
 export function detailReturnParams(query: JobsQuery) {
   if (query.view !== "recommended" && query.view !== "saved" && query.view !== "applied") return new URLSearchParams();
   return jobsParams(readJobsQuery(query));

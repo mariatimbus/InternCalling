@@ -45,7 +45,7 @@ export default async function OpportunityPage({ params, searchParams }: {
   const status = application?.status;
   const canSave = job?.is_active === true && trackerItems !== null && !status;
 
-  return <div className={`mx-auto w-full max-w-4xl px-5 py-4 sm:px-8 ${job ? "flex h-full min-h-64 flex-col gap-3" : "space-y-5"}`}>
+  return <div className={`mx-auto w-full max-w-7xl px-5 py-4 sm:px-8 ${job ? "flex h-full min-h-64 flex-col gap-3" : "space-y-5"}`}>
     <Link href={jobsHref} className="inline-flex min-h-11 shrink-0 items-center self-start rounded-control text-sm text-accent underline underline-offset-4">
       Back to Jobs
     </Link>
@@ -55,7 +55,7 @@ export default async function OpportunityPage({ params, searchParams }: {
         {Array.from(context, ([name, value]) => <input key={name} name={name} type="hidden" value={value} />)}
         <Button type="submit">Try again</Button>
       </form>} />
-      : job ? <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-panel border border-line bg-card">
+      : job ? <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <OpportunityDetailView opportunity={job} assessment={assessment} standalone copilotEnabled={copilotEnabled}
           profileSkills={profileSkills}
           tracking={application ? { application } : undefined}
