@@ -1,20 +1,16 @@
 "use client";
-import { useRef, useState, useTransition, useSyncExternalStore } from "react";
-import Link from "next/link";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { Application, Opportunity, Match, Eligibility } from "@/lib/api/types";
 import type { SaveResult } from "@/app/(workspace)/jobs/save-action";
 import { ApplicationControls } from "@/components/applications/application-controls";
 import { JobCard, type JobSummary } from "@/components/jobs/job-card";
-import { MatchScore } from "@/components/jobs/match-score";
-import { CompanyAvatar } from "@/components/jobs/company-avatar";
-import { EligibilityBadge } from "@/components/jobs/eligibility-badge";
 import { Badge } from "@/components/ui/badge";
 import { Drawer } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
-import { Icon, type IconName } from "@/components/ui/icon";
-import { opportunitySummary, opportunityTypeLabel } from "@/lib/opportunities";
-import { TailoringEntryPoint } from "@/components/jobs/tailoring-entry-point";
+import { opportunitySummary } from "@/lib/opportunities";
 import { degreeLabels, safeJobSource, studyYears } from "@/components/jobs/opportunity-details";
+import { OpportunityDetailView, opportunityDisplayDate } from "@/components/jobs/opportunity-detail-view";
+import type { OpportunityAssessment } from "@/lib/api/opportunity-assessment";
 
 export type RankedOpportunity = {
   opportunity: Opportunity | Application["opportunity"];
@@ -28,19 +24,12 @@ function summary({ opportunity: job, match, companyLogoUrl }: RankedOpportunity)
   return { ...card, initials: job.organization?.trim() ? card.initials : "–", companyLogoUrl,
     matchScore: match?.score ?? null, eligibility: match?.eligibility ?? "unknown" };
 }
-function cardDate(value: string | null | undefined) {
-  if (!value) return;
-  const timestamp = /^\d{4}-\d{2}-\d{2}T[\d:.]+$/.test(value) ? value + "Z" : value;
-  const date = new Date(timestamp);
-  if (Number.isFinite(date.getTime())) return date.toLocaleDateString("en-GB", { timeZone: "UTC" });
-}
-
 function cardMetadata(job: RankedOpportunity["opportunity"]) {
-  const deadline = { label: "Deadline", value: cardDate(job.deadline) };
+  const deadline = { label: "Deadline", value: opportunityDisplayDate(job.deadline) };
   const fields = [deadline];
   if ("url" in job) {
     fields.push(
-      { label: "Posted", value: cardDate(job.posted_at) },
+      { label: "Posted", value: opportunityDisplayDate(job.posted_at) },
       { label: "Degree level", value: job.degree_level ? degreeLabels[job.degree_level] : undefined },
       { label: "Study year", value: studyYears(job.study_year) },
     );
@@ -48,181 +37,107 @@ function cardMetadata(job: RankedOpportunity["opportunity"]) {
   return fields.filter((field): field is { label: string; value: string } => Boolean(field.value));
 }
 
-function briefDescription(listing: Opportunity, officialUrl: string | null) {
-  const source = listing.description ?? "";
-  const description = source.replace(/^[ \t]*Official source:[ \t]+(?:<(https?:\/\/[^\s<>]+)>|(https?:\/\/[^\s<>]+))[ \t]*(?:\r?\n|$)/gmi,
-    (line, bracketed, bare) => officialUrl && safeJobSource(bracketed ?? bare) === officialUrl ? "" : line);
-  if (!description.trim()) return null;
+type SaveAction = (id: string) => Promise<SaveResult>;
+type SaveState = SaveResult | "pending";
+const emptyApplications: Application[] = [];
 
-  // A7 supplies plain text. Only literal, short values from the structured listing are eligible.
-  const phrases = [...new Set([listing.title, listing.location].flatMap((value) => {
-    const phrase = value?.trim();
-    return phrase && phrase.length >= 3 && phrase.length <= 48 && !/[\r\n]/.test(phrase) ? [phrase] : [];
-  }))];
-  const parts: { start: number; end: number; kind: "note" | "strong" }[] = [];
-  const blocked = [...description.matchAll(/\bhttps?:\/\/[^\s<>]+|^[ \t]*(?:Official source|Source last checked):[^\r\n]*/gmi)];
-  for (const match of blocked) {
-    if (/^[ \t]*Source last checked:[ \t]*\S/i.test(match[0])) {
-      parts.push({ start: match.index, end: match.index + match[0].length, kind: "note" });
+function useOpportunitySave(saveAction?: SaveAction, applications?: Application[]) {
+  const [states, setStates] = useState<Record<string, { result: SaveState; applications?: Application[] }>>({});
+  const saving = useRef(new Set<string>());
+
+  function stateFor(id: string) {
+    const state = states[id];
+    if (!state || (state.result !== "pending" && "status" in state.result && state.applications !== applications)) return;
+    return state.result;
+  }
+
+  async function submit(id: string) {
+    if (!saveAction || saving.current.has(id)) return;
+    saving.current.add(id);
+    const remember = (result: SaveState) => setStates((current) => ({ ...current, [id]: { result, applications } }));
+    remember("pending");
+    try {
+      remember(await saveAction(id));
+    } catch {
+      remember({ error: "We could not confirm the save. Try again." });
+    } finally {
+      saving.current.delete(id);
     }
   }
-  for (const phrase of phrases) {
-    let start = description.indexOf(phrase);
-    while (start !== -1) {
-      const end = start + phrase.length;
-      const word = /[\p{L}\p{N}_]/u;
-      if (!word.test(description[start - 1] ?? "") && !word.test(description[end] ?? "")
-        && !blocked.some((span) => start < span.index + span[0].length && end > span.index)
-        && !parts.some((part) => start < part.end && end > part.start)) {
-        parts.push({ start, end, kind: "strong" });
-        break;
-      }
-      start = description.indexOf(phrase, end);
-    }
-  }
-  if (parts.length === 0) return description;
 
-  let cursor = 0;
-  const content = parts.sort((a, b) => a.start - b.start).flatMap(({ start, end, kind }) => {
-    const prefix = description.slice(cursor, start);
-    const text = description.slice(start, end);
-    cursor = end;
-    return [prefix, kind === "note"
-      ? <span key={start} className="metadata-text">{text}</span>
-      : <strong key={start} className="font-semibold text-foreground">{text}</strong>];
-  });
-  return [...content, description.slice(cursor)];
+  return { stateFor, submit };
 }
 
-function Brief({ item, detailContext, application }: { item: RankedOpportunity; detailContext: string; application?: Application }) {
-  const { opportunity: job, match } = item;
-  const listing = "url" in job ? job : null;
-  const company = job.organization?.trim();
-  const monogram = company ? Array.from(company)[0].toUpperCase() : "–";
-  const officialUrl = safeJobSource(listing?.url);
-  const description = listing && briefDescription(listing, officialUrl);
-  const facts: { label: string; icon: IconName; value?: string }[] = [
-    { label: "Degree level", icon: "profile", value: listing?.degree_level ? degreeLabels[listing.degree_level] : undefined },
-    { label: "Study year", icon: "applications", value: studyYears(listing?.study_year) },
-    { label: "Application deadline", icon: "calendar", value: job.deadline?.match(/^\d{4}-\d{2}-\d{2}(?=T|$)/)?.[0] },
-    { label: "Published", icon: "clock", value: cardDate(listing?.posted_at) },
-  ];
-  const knownFacts = facts.filter(({ value }) => value);
-  return <article className="@container min-w-0 space-y-6 p-2 sm:p-4">
-    <header className="rounded-panel border border-accent/15 bg-primary/10 p-4 sm:p-5">
-      <div className="flex items-center gap-3">
-        <CompanyAvatar companyName={company} initials={monogram} logoUrl={item.companyLogoUrl} />
-        <p className="min-w-0 text-sm font-medium text-foreground/90 [overflow-wrap:anywhere]">{company || "Organization not specified"}</p>
-      </div>
-      <div className="mt-4 flex flex-wrap items-start gap-x-5 gap-y-3">
-        <div className="min-w-0 flex-[1_1_15rem]">
-          <h2 className="section-title @sm:text-3xl">{job.title}</h2>
-          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
-            <span>{opportunityTypeLabel(job.opportunity_type)}</span>
-            {listing?.location && <span className="inline-flex min-w-0 items-start gap-1.5 [overflow-wrap:anywhere]">
-              <Icon name="location" className="size-4" />{listing.location}
-            </span>}
-          </div>
-        </div>
-        {listing && <MatchScore score={match?.score ?? null} />}
-      </div>
-      <div className="mt-3 flex flex-wrap gap-2">
-        {listing && <EligibilityBadge status={match?.eligibility ?? "unknown"} />}
-        {listing?.is_active === false && <Badge>Closed on InternCalling</Badge>}
-        {!listing && item.status && <Badge className="capitalize">{item.status}</Badge>}
-      </div>
-    </header>
-    {knownFacts.length > 0 && <section className="space-y-3">
-      <h3 className="card-title">At a glance</h3>
-      <dl className="grid gap-3 @xs:grid-cols-2">
-        {knownFacts.map(({ label, icon, value }) => <div key={label} className="flex min-w-0 items-start gap-2.5">
-          <Icon name={icon} className="mt-0.5 size-4 text-accent" />
-          <div className="min-w-0">
-            <dt className="metadata-text">{label}</dt>
-            <dd className="text-sm text-foreground [overflow-wrap:anywhere]">{value}</dd>
-          </div>
-        </div>)}
-      </dl>
-    </section>}
-    {listing && listing.skills.length > 0 && <ul aria-label="Skills" className="flex flex-wrap gap-2">
-      {listing.skills.map((skill) => <li key={skill.id} className="max-w-full [overflow-wrap:anywhere]"><Badge className="!text-foreground">{skill.name}</Badge></li>)}
-    </ul>}
-    <div className="flex flex-wrap items-center gap-3">
-      {officialUrl && <a href={officialUrl} target="_blank" rel="noopener noreferrer"
-        className="inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">
-        View official listing <Icon name="external-link" className="size-4" /><span className="sr-only"> (opens in a new tab)</span>
-      </a>}
-      <Link href={"/opportunities/" + encodeURIComponent(job.id) + (detailContext ? "?" + detailContext : "")}
-        prefetch={false} className="inline-flex min-h-11 items-center rounded-full border border-border px-4 py-2 text-sm font-medium text-accent hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">
-        View full details
-      </Link>
-    </div>
-    <ApplicationControls key={`${job.id}:${application?.updated_at ?? "new"}`} opportunityId={job.id} application={application} />
-    {description && <section className="border-t border-line pt-5">
-      <h3 className="card-title">About the opportunity</h3>
-      <p className="reading-text mt-3 max-w-prose whitespace-pre-wrap [overflow-wrap:anywhere]">{description}</p>
-    </section>}
-    {listing && <section>
-      <h3 className="card-title">Your match</h3>
-      {match ? <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-foreground/90 [overflow-wrap:anywhere]">{match.reasons.map((reason, index) => <li key={index}>{reason}</li>)}</ul>
-        : <p className="mt-3 text-sm leading-6 text-muted">Your match is currently unavailable. You can still review the opportunity.</p>}
-    </section>}
-    {match && <section><h3 className="card-title">Score breakdown</h3><p className="metadata-text mt-2">Profile relevance, not an acceptance probability.</p><dl className="mt-3 grid grid-cols-2 gap-3 text-sm">{Object.entries(match.components).map(([name, points]) => <div key={name}><dt className="text-muted">{name.replaceAll("_", " ")}</dt><dd>{points} points</dd></div>)}</dl></section>}
-    {item.eligibility && <section><h3 className="card-title">Eligibility requirements</h3><p className="metadata-text mt-2">Unknown requirements need confirmation from the official source.</p><ul className="mt-3 space-y-3 text-sm text-muted">{item.eligibility.reasons.map((rule) => <li key={rule.rule}><EligibilityBadge status={rule.status} /><p className="mt-1">{rule.reason}</p></li>)}</ul></section>}
-    {listing && <TailoringEntryPoint jobId={job.id} title={job.title} organization={job.organization ?? ""} />}
-  </article>;
-}
-
-function SaveControl({ item, saveAction }: {
-  item: RankedOpportunity;
-  saveAction?: (id: string) => Promise<SaveResult>;
+function SaveControl({ title, status, state, onSave }: {
+  title: string;
+  status?: Application["status"];
+  state?: SaveState;
+  onSave?: () => void;
 }) {
-  const [pending, startTransition] = useTransition();
-  const saving = useRef(false);
-  const [result, setResult] = useState<SaveResult>();
-  const status = item.status ?? (result && "status" in result ? result.status : undefined);
-  if (status) return <span role="status"><Badge className="capitalize">{status}</Badge></span>;
-  if (!saveAction) return null;
-  const save = saveAction;
+  const pending = state === "pending";
+  const result = pending ? undefined : state;
+  const tracked = status ?? (result && "status" in result ? result.status : undefined);
+  if (tracked) return <span role="status"><Badge className="capitalize">{tracked}</Badge></span>;
+  if (!onSave) return null;
   const error = result && "error" in result ? result.error : undefined;
 
-  function submit() {
-    if (saving.current) return;
-    saving.current = true;
-    setResult(undefined);
-    startTransition(async () => {
-      try {
-        setResult(await save(item.opportunity.id));
-      } catch {
-        setResult({ error: "We could not confirm the save. Try again." });
-      } finally {
-        saving.current = false;
-      }
-    });
-  }
-
   return <div className="relative z-10 flex flex-col items-end gap-1 text-right">
-    <Button variant="secondary" size="sm" disabled={pending} onClick={submit} aria-label={`${pending ? "Saving" : error ? "Retry save for" : "Save"} ${item.opportunity.title}`}>
+    <Button variant="secondary" size="sm" disabled={pending} onClick={onSave} aria-label={`${pending ? "Saving" : error ? "Retry save for" : "Save"} ${title}`}>
       {pending ? "Saving…" : error ? "Retry save" : "Save"}
     </Button>
     {error && <p role="alert" className="max-w-48 text-xs text-muted">{error}</p>}
   </div>;
 }
 
+export function StandaloneOpportunitySave({ id, title, status, saveAction }: {
+  id: string;
+  title: string;
+  status?: Application["status"];
+  saveAction?: SaveAction;
+}) {
+  const { stateFor, submit } = useOpportunitySave(saveAction);
+  return <SaveControl title={title} status={status} state={stateFor(id)} onSave={saveAction ? () => submit(id) : undefined} />;
+}
+
 const subscribeHydration = () => () => {};
 
-export function RecommendedJobs({ items, applications = [], label = "Recommended opportunities", saveAction, detailContext = "" }: {
+export function RecommendedJobs({ items, applications = emptyApplications, label = "Recommended opportunities", saveAction, detailContext = "", loadAssessment }: {
   items: RankedOpportunity[];
   applications?: Application[];
   label?: string;
   saveAction?: (id: string) => Promise<SaveResult>;
   detailContext?: string;
+  loadAssessment: (id: string) => Promise<OpportunityAssessment>;
 }) {
   const hydrated = useSyncExternalStore(subscribeHydration, () => true, () => false);
   const [selected, setSelected] = useState(items[0]?.opportunity.id);
   const [open, setOpen] = useState(false);
+  const { stateFor, submit } = useOpportunitySave(saveAction, applications);
   const current = items.find((item) => item.opportunity.id === selected) ?? items[0];
+  const currentId = current?.opportunity.id;
+  const [resolved, setResolved] = useState<{ id: string; value: OpportunityAssessment }>();
+  useEffect(() => {
+    if (!currentId) return;
+    let active = true;
+    loadAssessment(currentId).then(
+      (value) => { if (active) setResolved({ id: currentId, value }); },
+      () => { if (active) setResolved({ id: currentId, value: { match: null, eligibility: null } }); },
+    );
+    return () => { active = false; };
+  }, [currentId, loadAssessment]);
+
   if (!current) return null;
+  function saveControl(item: RankedOpportunity) {
+    const { id, title } = item.opportunity;
+    const onSave = saveAction ? () => submit(id) : undefined;
+    return item.status || onSave ? <SaveControl title={title} status={item.status} state={stateFor(id)} onSave={onSave} /> : undefined;
+  }
+  const assessment = resolved?.id === current.opportunity.id ? resolved.value : null;
+  const application = applications.find((item) => item.opportunity_id === current.opportunity.id);
+  const detail = <OpportunityDetailView opportunity={current.opportunity} status={current.status}
+    companyLogoUrl={current.companyLogoUrl} detailContext={detailContext} assessment={assessment} saveControl={saveControl(current)}
+    applicationControls={<ApplicationControls key={`${current.opportunity.id}:${application?.updated_at ?? "new"}`}
+      opportunityId={current.opportunity.id} application={application} showSave={!saveAction} />} />;
   return <>
     <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
       <div className="min-w-0 space-y-3" aria-label={label}>
@@ -236,15 +151,15 @@ export function RecommendedJobs({ items, applications = [], label = "Recommended
           metadata={cardMetadata(item.opportunity)}
           officialUrl={"url" in item.opportunity ? safeJobSource(item.opportunity.url) : null}
           onSelect={() => { setSelected(item.opportunity.id); setOpen(true); }}
-          action={<SaveControl item={item} saveAction={saveAction} />}
+          action={saveControl(item)}
         />)}
       </div>
-      <div className="sticky top-6 hidden max-h-[calc(100dvh-10rem)] overflow-y-auto rounded-panel bg-surface/60 p-4 xl:block" aria-label="Selected opportunity">
-        <Brief item={current} detailContext={detailContext} application={applications.find((item) => item.opportunity_id === current.opportunity.id)} />
+      <div className="sticky top-6 hidden max-h-[calc(100dvh-10rem)] flex-col overflow-hidden rounded-panel bg-surface/60 xl:flex" aria-label="Selected opportunity">
+        {detail}
       </div>
     </div>
     <Drawer open={open} onClose={() => setOpen(false)} title="Opportunity details" size="detail" closeAt="(min-width: 1280px)">
-      <Brief item={current} detailContext={detailContext} application={applications.find((item) => item.opportunity_id === current.opportunity.id)} />
+      {detail}
     </Drawer>
   </>;
 }

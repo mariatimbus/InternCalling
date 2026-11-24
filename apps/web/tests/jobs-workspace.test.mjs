@@ -31,6 +31,17 @@ const jobsUrl = await load("../src/lib/jobs-url.ts");
 const detailUi = await load("../src/components/jobs/opportunity-details.tsx", {
   "react/jsx-runtime": runtime, "@/components/ui/badge": { Badge: "Badge" },
 });
+const assessmentApi = await load("../src/lib/api/opportunity-assessment.ts");
+const detailView = await load("../src/components/jobs/opportunity-detail-view.tsx", {
+  "react/jsx-runtime": runtime, "next/link": { default: "Link" },
+  "@/components/jobs/company-avatar": { CompanyAvatar: "CompanyAvatar" },
+  "@/components/jobs/eligibility-badge": { EligibilityBadge: "EligibilityBadge" },
+  "@/components/jobs/match-score": { MatchScore: "MatchScore" },
+  "@/components/jobs/tailoring-entry-point": { TailoringEntryPoint: "TailoringEntryPoint" },
+  "@/components/ui/badge": { Badge: "Badge" }, "@/components/ui/icon": { Icon: "Icon" },
+  "@/lib/opportunities": { opportunityTypeLabel: (type) => type },
+  "@/components/jobs/opportunity-details": detailUi,
+});
 
 async function fixture(request) {
   const calls = [];
@@ -50,6 +61,7 @@ async function fixture(request) {
     "@/components/ui/button": { Button: "Button" },
     "@/components/ui/empty-state": { EmptyState: "Empty" }, "@/components/ui/error-state": { ErrorState: "Error" },
     "./save-action": action,
+    "./assessment-action": { loadOpportunityAssessment() {} },
     "@/lib/jobs-url": jobsUrl,
   });
   return { calls, invalidated, save: action.saveOpportunity, visit: async (query = {}) => nodes(await page({ searchParams: Promise.resolve(query) })) };
@@ -378,17 +390,16 @@ test("unconfirmed saves remain retryable, including failed conflict reconciliati
 
 test("the card shows pending, blocks repeated clicks, and only displays the confirmed status", async () => {
   let transition;
-  let pending = false;
-  let result;
-  const lock = { current: false };
+  let states = {};
+  const lock = { current: new Set() };
   const { RecommendedJobs } = await load("../src/components/workspace/recommended-jobs.tsx", {
-    react: { useSyncExternalStore: (_subscribe, snapshot) => snapshot(),
-      useState: (initial) => initial === undefined ? [result, (value) => { result = value; }] : [initial, () => {}],
+    react: {
+      useSyncExternalStore: (_subscribe, snapshot) => snapshot(),
+      useState: (initial) => initial && typeof initial === "object"
+        ? [states, (update) => { states = update(states); }]
+        : [initial, () => {}],
       useRef: () => lock,
-      useTransition: () => [pending, (callback) => {
-        pending = true;
-        transition = callback().finally(() => { pending = false; });
-      }],
+      useEffect: () => {},
     },
     "react/jsx-runtime": runtime, "@/lib/opportunities": { opportunitySummary: () => ({}) },
     "@/components/applications/application-controls": { ApplicationControls: "ApplicationControls" },
@@ -397,39 +408,65 @@ test("the card shows pending, blocks repeated clicks, and only displays the conf
     "@/components/ui/drawer": { Drawer: "Drawer" }, "@/components/ui/button": { Button: "Button" },
     "@/components/jobs/tailoring-entry-point": { TailoringEntryPoint: "TailoringEntryPoint" },
     "@/components/jobs/opportunity-details": detailUi, "next/link": { default: "Link" },
+    "@/components/jobs/opportunity-detail-view": detailView,
     "@/components/jobs/company-avatar": { CompanyAvatar: "CompanyAvatar" }, "@/components/ui/icon": { Icon: "Icon" },
   });
   let complete;
   let attempts = 0;
+  let applications = [];
   const saveAction = () => {
     attempts += 1;
     return new Promise((resolve) => { complete = resolve; });
   };
-  const render = () => {
-    const card = nodes(RecommendedJobs({ items: [{ opportunity, match: null }], saveAction }))
-      .find((node) => node.type === "JobCard");
-    const control = card.props.action;
+  const render = (detail = false) => {
+    const tree = nodes(RecommendedJobs({ items: [{ opportunity, match: null, status: applications[0]?.status }], applications, saveAction }));
+    const control = detail
+      ? tree.find((node) => node.type === detailView.OpportunityDetailView).props.saveControl
+      : tree.find((node) => node.type === "JobCard").props.action;
     return nodes(control.type(control.props));
   };
   const firstClick = render().find((node) => node.type === "Button").props.onClick;
-  firstClick();
-  firstClick();
+  transition = firstClick();
+  await render(true).find((node) => node.type === "Button").props.onClick();
   assert.equal(attempts, 1);
   assert.equal(render().find((node) => node.type === "Button").props.disabled, true);
+  assert.equal(render(true).find((node) => node.type === "Button").props.disabled, true);
   assert.ok(!render().some((node) => node.type === "Badge"));
   complete({ error: "Try again." });
   await transition;
   assert.equal(render().find((node) => node.props.role === "alert").props.children, "Try again.");
-  render().find((node) => node.type === "Button").props.onClick();
+  transition = render(true).find((node) => node.type === "Button").props.onClick();
   complete({ status: "offer" });
   await transition;
   assert.equal(render().find((node) => node.type === "Badge").props.children, "offer");
   assert.ok(!render().some((node) => node.type === "Button"));
+  applications = [row("interview")];
+  assert.equal(render(true).find((node) => node.type === "Badge").props.children, "interview");
+  applications = [];
+  assert.ok(render(true).some((node) => node.type === "Button"));
+});
+
+test("Recommended preserves API ranking even when a later card has a higher score", async () => {
+  const other = { ...opportunity, id: "00000000-0000-4000-8000-000000000002" };
+  const ranked = [
+    { opportunity, match: { score: 20 }, eligibility: { status: "eligible", reasons: [] } },
+    { opportunity: other, match: { score: 49 }, eligibility: { status: "unknown", reasons: [] } },
+  ];
+  const app = await fixture((path) => path === "/api/v1/applications"
+    ? { items: [row("applied", other)] }
+    : { items: ranked, total: 30, page_size: 12 });
+  const page = await app.visit({ q: "engineer", page: "2" });
+  assert.deepEqual(list(page).items.map((item) => item.opportunity.id), [opportunity.id, other.id]);
+  assert.equal(list(page).items[1].status, "applied");
+  assert.equal(list(page).applications[0].opportunity_id, other.id);
+  assert.equal(typeof list(page).loadAssessment, "function");
+  assert.equal(app.calls.filter(([path]) => path.includes("/recommended?")).length, 1);
+  assert.ok(app.calls.every(([path]) => !path.endsWith("/match")));
 });
 
 test("cards omit unknown metadata and keep official links, selection and Save independent", async () => {
   const { RecommendedJobs } = await load("../src/components/workspace/recommended-jobs.tsx", {
-    react: { useSyncExternalStore: (_subscribe, snapshot) => snapshot(), useState: (value) => [value, () => {}] },
+    react: { useSyncExternalStore: (_subscribe, snapshot) => snapshot(), useState: (value) => [value, () => {}], useEffect: () => {}, useRef: (current) => ({ current }) },
     "react/jsx-runtime": runtime, "@/lib/opportunities": {
       opportunitySummary: (job) => ({ title: job.title, company: "Fixture" }), opportunityTypeLabel: (type) => type,
     },
@@ -439,6 +476,7 @@ test("cards omit unknown metadata and keep official links, selection and Save in
     "@/components/ui/drawer": { Drawer: "Drawer" }, "@/components/ui/button": { Button: "Button" },
     "@/components/jobs/tailoring-entry-point": { TailoringEntryPoint: "TailoringEntryPoint" },
     "@/components/jobs/opportunity-details": detailUi, "next/link": { default: "Link" },
+    "@/components/jobs/opportunity-detail-view": detailView,
     "@/components/jobs/company-avatar": { CompanyAvatar: "CompanyAvatar" }, "@/components/ui/icon": { Icon: "Icon" },
   });
   const saveAction = () => { throw new Error("Rendering a link must not save"); };
@@ -451,7 +489,7 @@ test("cards omit unknown metadata and keep official links, selection and Save in
   const logoFixture = "/company-logos/example.png";
   const trackedTree = nodes(RecommendedJobs({ items: [{ ...listings[2], companyLogoUrl: logoFixture }], detailContext: context }));
   assert.equal(trackedTree.find((node) => node.type === "JobCard").props.job.companyLogoUrl, logoFixture);
-  const briefs = trackedTree.filter((node) => typeof node.type === "function" && node.type.name === "Brief");
+  const briefs = trackedTree.filter((node) => node.type === detailView.OpportunityDetailView);
   assert.equal(briefs.length, 2, "desktop panel and mobile drawer share the same brief");
   for (const { type: Brief, props } of briefs) {
     const brief = nodes(Brief(props));
@@ -471,8 +509,8 @@ test("cards omit unknown metadata and keep official links, selection and Save in
   assert.equal(unknown.officialUrl, null);
   assert.equal(tracked.officialUrl, null);
   assert.equal(tracked.job.initials, "–");
-  assert.equal(tracked.action.props.item.status, "offer");
-  assert.equal(known.action.props.saveAction, saveAction);
+  assert.equal(tracked.action.props.status, "offer");
+  assert.equal(typeof known.action.props.onSave, "function");
 
   const { JobCard } = await load("../src/components/jobs/job-card.tsx", {
     "react/jsx-runtime": runtime, "@/components/ui/button": { Button: "Button" }, "@/components/ui/icon": { Icon: "Icon" },
@@ -568,19 +606,25 @@ test("compact cards retain long metadata, meaningful eligibility and top-row act
 async function detailPage(requireCompletedAccount) {
   const { default: render } = await load("../src/app/(workspace)/opportunities/[id]/page.tsx", {
     "react/jsx-runtime": runtime, "next/link": { default: "Link" }, "@/lib/auth/account": { requireCompletedAccount },
-    "@/components/jobs/opportunity-details": detailUi, "@/components/ui/button": { Button: "Button" },
+    "@/components/jobs/opportunity-detail-view": detailView, "@/components/ui/button": { Button: "Button" },
+    "@/components/workspace/recommended-jobs": { StandaloneOpportunitySave: "StandaloneOpportunitySave" },
+    "@/app/(workspace)/jobs/save-action": { saveOpportunity() {} },
+    "@/lib/api/opportunity-assessment": assessmentApi,
     "@/components/ui/error-state": { ErrorState: "Error" }, "@/lib/api/client": { ApiError }, "@/lib/jobs-url": jobsUrl,
   });
   return async (routeId = id, query = {}) => nodes(await render({
     params: Promise.resolve({ id: routeId }), searchParams: Promise.resolve(query),
-  }));
+  })).flatMap((node) => node.type === detailView.OpportunityDetailView ? [node, ...nodes(node.type(node.props))] : [node]);
 }
 
-test("direct detail reads only the public A7 record after the account guard and restores a safe Jobs URL", async () => {
+test("direct detail reads the public record and authenticated assessments after the account guard", async () => {
   const calls = [];
   const page = await detailPage(async () => ({
     api: { request: async (...args) => {
       calls.push(args);
+      if (args[0] === "/api/v1/applications") return { items: [] };
+      if (args[0].endsWith("/match")) return { score: 0, eligibility: "not_eligible" };
+      if (args[0].endsWith("/eligibility")) return { status: "unknown", reasons: [] };
       return { ...opportunity, is_active: true, skills: [] };
     } },
   }));
@@ -592,9 +636,194 @@ test("direct detail reads only the public A7 record after the account guard and 
   const back = tab(refreshed, "Back to Jobs").props.href;
   assert.match(back, /^\/jobs\?/);
   assert.deepEqual(queryOf(back), context);
-  assert.deepEqual(calls, Array(2).fill(["/api/v1/opportunities/" + id, { authentication: "none" }]));
+  const endpoint = "/api/v1/opportunities/" + id;
+  assert.deepEqual(calls, Array.from({ length: 2 }, () =>
+    [[endpoint, { authentication: "none" }], [endpoint + "/match"], [endpoint + "/eligibility"], ["/api/v1/applications"]]).flat());
+  assert.equal(typeof direct.find((node) => node.type === "StandaloneOpportunitySave").props.saveAction, "function");
+  assert.ok(direct.some((node) => node.props.children === "0/100"));
+  assert.ok(direct.some((node) => node.props.children === "Eligibility unknown."));
   const denied = await detailPage(async () => { throw new Error("redirect /sign-in"); });
   await assert.rejects(() => denied(), /redirect \/sign-in/);
+});
+
+test("a failed request does not turn a zero match or unknown eligibility into another outcome", async () => {
+  const match = { score: 0, eligibility: "not_eligible" };
+  const eligibility = { status: "unknown", reasons: [] };
+  for (const failed of ["match", "eligibility"]) {
+    const result = await assessmentApi.readOpportunityAssessment({ request: async (path) => {
+      const suffix = path.split("/").at(-1);
+      if (suffix === failed) throw new ApiError(503, "network_error");
+      return suffix === "match" ? match : eligibility;
+    } }, id);
+    const tree = nodes(detailView.OpportunityDetailView({ opportunity: { ...opportunity, skills: [] }, assessment: result }));
+    if (failed === "match") {
+      assert.ok(tree.some((node) => node.props.children === "Match score could not be loaded."));
+      assert.ok(tree.some((node) => node.props.children === "Eligibility unknown."));
+    } else {
+      assert.ok(tree.some((node) => node.props.children === "0/100"));
+      assert.ok(tree.some((node) => node.props.children === "Eligibility could not be loaded."));
+    }
+  }
+});
+
+test("standalone detail preserves tracker status and withholds Save when tracker state is unavailable", async () => {
+  let trackerAvailable = true;
+  const page = await detailPage(async () => ({ api: { request: async (path) => {
+    if (path === "/api/v1/applications") {
+      if (!trackerAvailable) throw new ApiError(503, "network_error");
+      return { items: [row("applied")] };
+    }
+    if (path.endsWith("/match") || path.endsWith("/eligibility")) return null;
+    return { ...opportunity, skills: [], is_active: true };
+  } } }));
+  const tracked = await page();
+  const save = tracked.find((node) => node.type === "StandaloneOpportunitySave");
+  assert.equal(save.props.status, "applied");
+  assert.equal(save.props.saveAction, undefined);
+  assert.equal(tracked.find((node) => node.type === "a").props.onClick, undefined);
+
+  trackerAvailable = false;
+  const unavailable = await page();
+  assert.ok(!unavailable.some((node) => node.type === "StandaloneOpportunitySave"));
+  assert.ok(unavailable.some((node) => node.props.children === "Save unavailable. Reload to try again."));
+  assert.ok(unavailable.some((node) => node.type === "a"));
+});
+
+test("Match Score uses the final backend value and separates reasons, points, and the cap", () => {
+  const positive = ["Skill overlap: Python", "Remote-friendly location"];
+  const cap = "Eligibility not fully confirmed; score capped";
+  const aiUnavailable = "AI similarity unavailable; deterministic components only";
+  const render = (match) => nodes(detailView.OpportunityDetailView({
+    opportunity: { ...opportunity, skills: [] },
+    assessment: { match, eligibility: { status: "not_eligible", reasons: [] } },
+  }));
+  const capped = render({
+    score: 60, components: { skills: 30, field_fit: 25, interests: 20, location: 0, ai: 0 },
+    reasons: [...positive, cap, aiUnavailable, "Not eligible: A gate failed"],
+  });
+  const text = (tree, value) => tree.some((node) => node.props.children === value);
+  assert.ok(text(capped, "60/100"));
+  assert.ok(text(capped, "Not eligible"));
+  assert.ok(text(capped, "The maximum Match Score is 49/100 while eligibility is unconfirmed."));
+  assert.ok(capped.some((node) => node.type === "summary" && node.props.children === "Score breakdown"));
+  assert.deepEqual(capped.filter((node) => node.type === "li").map((node) => node.props.children), positive);
+  assert.deepEqual(capped.filter((node) => node.type === "dd").map((node) => node.props.children),
+    ["30 points", "25 points", "20 points", "0 points"]);
+  assert.ok(!text(capped, "AI similarity"));
+
+  const sparse = render({ score: 0 });
+  assert.ok(text(sparse, "0/100"));
+  assert.ok(text(sparse, "No positive match reasons were provided for this opportunity."));
+  assert.ok(text(sparse, "No component values were provided."));
+  assert.ok(!text(sparse, "The maximum Match Score is 49/100 while eligibility is unconfirmed."));
+
+  const evaluated = render({ score: 12, components: { skills: 12, ai: 0 },
+    reasons: ["AI similarity: 0.00 (embeddings)"] });
+  assert.ok(text(evaluated, "AI similarity"));
+  assert.deepEqual(evaluated.filter((node) => node.type === "dd").map((node) => node.props.children),
+    ["12 points", "0 points"]);
+  assert.ok(text(evaluated, "No positive match reasons were provided for this opportunity."));
+});
+
+test("eligibility explains reported rules and keeps confirmed mismatches distinct from unverified criteria", () => {
+  const reasons = [
+    { rule: "degree_level", status: "not_eligible", reason: "Opportunity requires master students; student is bachelor" },
+    { rule: "study_year", status: "unknown", reason: "Opportunity does not specify accepted study years" },
+    { rule: "location", status: "unknown", reason: "Opportunity does not specify a location" },
+    { rule: "graduation_year", status: "unknown", reason: "Student graduation year is not known" },
+    { rule: "unclassified_rule", status: "possibly_eligible", reason: "This criterion still needs confirmation" },
+    { rule: "another_rule", status: "eligible", reason: "Requirement met" },
+  ];
+  const render = (eligibility) => nodes(detailView.OpportunityDetailView({
+    opportunity: { ...opportunity, skills: [] }, assessment: { match: { score: 80 }, eligibility },
+  }));
+  const has = (tree, text) => tree.some((node) => node.props.children === text);
+  const outcome = render({ status: "not_eligible", reasons });
+  assert.ok(has(outcome, "80/100"));
+  assert.ok(has(outcome, "Not eligible"));
+  assert.ok(has(outcome, "What to check"));
+  assert.ok(has(outcome, "Confirmed mismatch"));
+  assert.ok(has(outcome, "Unverified"));
+  assert.ok(has(outcome, "Needs confirmation"));
+  assert.ok(has(outcome, "Meets requirement"));
+  assert.ok(reasons.every(({ reason }) => has(outcome, reason)));
+  assert.deepEqual(outcome.filter((node) => node.type === "strong").map((node) => node.props.children),
+    ["degree level", "study year, location", "graduation year", "unclassified rule"]);
+  assert.deepEqual(outcome.filter((node) => node.type === "span" && node.props.className === "block").map((node) => node.props.children),
+    [reasons[0].reason, "Check the official listing.", "Add your expected graduation year to your profile."]);
+  assert.ok(outcome.findIndex((node) => node.props.children === "What to check")
+    < outcome.findIndex((node) => node.type === "summary" && node.props.children === "Eligibility details"));
+
+  const possible = render({ status: "possibly_eligible", reasons: [reasons.find(({ rule }) => rule === "unclassified_rule")] });
+  assert.ok(has(possible, "Possibly eligible"));
+  assert.ok(!has(possible, "Not eligible"));
+  const unknown = render({ status: "unknown" });
+  assert.ok(has(unknown, "Eligibility unknown."));
+  assert.ok(has(unknown, "No per-rule eligibility details are available."));
+  const unavailable = render(null);
+  assert.ok(has(unavailable, "Eligibility could not be loaded."));
+  assert.ok(!has(unavailable, "Eligibility unknown."));
+  assert.ok(!has(unavailable, "What to check"));
+});
+
+test("switching cards scopes both detail surfaces and ignores the earlier in-flight assessment", async () => {
+  const state = [];
+  let cursor = 0;
+  let cleanup;
+  let effectDeps;
+  let nextEffect;
+  const { RecommendedJobs } = await load("../src/components/workspace/recommended-jobs.tsx", {
+    react: {
+      useSyncExternalStore: (_subscribe, snapshot) => snapshot(),
+      useRef: (current) => ({ current }),
+      useState(initial) {
+        const slot = cursor++;
+        if (!(slot in state)) state[slot] = initial;
+        return [state[slot], (value) => { state[slot] = value; }];
+      },
+      useEffect(effect, deps) {
+        if (deps.some((value, index) => value !== effectDeps?.[index])) {
+          effectDeps = deps;
+          nextEffect = effect;
+        }
+      },
+    },
+    "react/jsx-runtime": runtime, "@/lib/opportunities": { opportunitySummary: (job) => ({ id: job.id }) },
+    "@/components/applications/application-controls": { ApplicationControls: "ApplicationControls" },
+    "@/components/jobs/job-card": { JobCard: "JobCard" }, "@/components/ui/badge": { Badge: "Badge" },
+    "@/components/ui/drawer": { Drawer: "Drawer" }, "@/components/ui/button": { Button: "Button" },
+    "@/components/jobs/opportunity-details": detailUi, "@/components/jobs/opportunity-detail-view": detailView,
+  });
+  const second = { ...opportunity, id: "00000000-0000-4000-8000-000000000002", title: "Second role" };
+  const detailContext = "view=recommended&q=python&location=Berlin&page=2";
+  const requests = new Map();
+  const loadAssessment = (jobId) => new Promise((resolve) => requests.set(jobId, resolve));
+  const items = [opportunity, second].map((job) => ({ opportunity: job, match: null }));
+  const applications = [{ ...row("interview", second), notes: "Existing notes", updated_at: "2026-11-20" }];
+  function render() {
+    cursor = 0;
+    const tree = nodes(RecommendedJobs({ items, applications, detailContext, loadAssessment }));
+    if (nextEffect) {
+      cleanup?.();
+      cleanup = nextEffect();
+      nextEffect = undefined;
+    }
+    return tree;
+  }
+  const first = render();
+  first.find((node) => node.type === "JobCard" && node.props.job.id === second.id).props.onSelect();
+  const pending = render().filter((node) => node.type === detailView.OpportunityDetailView);
+  assert.equal(pending.length, 2);
+  assert.ok(pending.every(({ props }) => props.applicationControls.props.application === applications[0]));
+  assert.ok(pending.every(({ props }) => props.applicationControls.props.opportunityId === second.id));
+  assert.ok(pending.every(({ props }) => props.opportunity.id === second.id && props.assessment === null && props.detailContext === detailContext));
+  const active = { match: { score: 0 }, eligibility: { status: "unknown" } };
+  requests.get(second.id)(active);
+  await Promise.resolve();
+  requests.get(id)({ match: { score: 87 }, eligibility: { status: "eligible" } });
+  await Promise.resolve();
+  assert.ok(render().filter((node) => node.type === detailView.OpportunityDetailView)
+    .every(({ props }) => props.opportunity.id === second.id && props.assessment === active));
 });
 
 test("detail distinguishes malformed, 404, and 422 from service errors and preserves retry context", async () => {
@@ -666,22 +895,23 @@ test("inactive is authoritative and deadline dates do not imply expiry or a time
   const page = await detailPage(async () => ({ api: { request: async () => job } }));
   const tree = await page();
   assert.ok(tree.some((node) => node.props.children === "Closed on InternCalling"));
-  const render = (component) => nodes(component({ opportunity: job, value: job.deadline }));
-  assert.equal(render(detailUi.OpportunityDeadline).find((node) => node.type === "time").props.dateTime, "2024-01-10");
-  const source = render(detailUi.OpportunitySource).find((node) => node.type === "a");
+  assert.equal(tree.find((node) => node.type === "time").props.dateTime, "2024-01-10");
+  const source = tree.find((node) => node.type === "a");
   assert.equal(source.props.children[0], "View official listing");
   assert.equal(source.props.rel, "noopener noreferrer");
-  const facts = render(detailUi.OpportunityFacts);
+  assert.equal(source.props.onClick, undefined);
+  assert.ok(!tree.some((node) => node.type === "StandaloneOpportunitySave"));
   for (const word of ["Source overview", "Python", "Master’s", "1"]) {
-    assert.ok(facts.some((node) => node.props.children === word));
+    assert.ok(tree.some((node) => node.props.children === word));
   }
   job = { ...job, is_active: true };
-  assert.ok(!(await page()).some((node) => node.props.children === "Closed on InternCalling"));
-  assert.equal(render(detailUi.OpportunitySource)[0].props.children[0], "View original opportunity");
+  const active = await page();
+  assert.ok(!active.some((node) => node.props.children === "Closed on InternCalling"));
+  assert.equal(active.find((node) => node.type === "a").props.children[0], "Apply on official site");
   job = { ...job, deadline: null };
-  assert.deepEqual(render(detailUi.OpportunityDeadline), []);
+  assert.ok(!(await page()).some((node) => node.type === "time"));
   for (const url of ["javascript:alert(0)", "https://user:pass@example.invalid", "//example.invalid", null]) {
     job = { ...job, url };
-    assert.deepEqual(render(detailUi.OpportunitySource), []);
+    assert.ok(!(await page()).some((node) => node.type === "a"));
   }
 });

@@ -38,27 +38,33 @@ test("Jobs briefs keep source and detail links independent and place tailoring a
   const detailUi = await load("../src/components/jobs/opportunity-details.tsx", {
     "react/jsx-runtime": runtime, "@/components/ui/badge": badge,
   });
-  const { RecommendedJobs } = await load("../src/components/workspace/recommended-jobs.tsx", {
-    react: { useSyncExternalStore: (_subscribe, snapshot) => snapshot(), useState: (value) => [value, () => {}] }, "react/jsx-runtime": runtime,
-    "next/link": { default: "Link" }, "@/components/applications/application-controls": { ApplicationControls: "ApplicationControls" },
-    "@/components/jobs/job-card": { JobCard: "JobCard" },
+  const dependencies = {
+    react: { useSyncExternalStore: (_subscribe, snapshot) => snapshot(), useState: (value) => [value, () => {}], useEffect: () => {}, useRef: (current) => ({ current }) }, "react/jsx-runtime": runtime,
+    "@/components/applications/application-controls": { ApplicationControls: "ApplicationControls" },
+    "next/link": { default: "Link" }, "@/components/jobs/job-card": { JobCard: "JobCard" },
     "@/components/jobs/match-score": { MatchScore: "MatchScore" }, "@/components/jobs/company-avatar": { CompanyAvatar: "CompanyAvatar" },
     "@/components/jobs/eligibility-badge": { EligibilityBadge: "EligibilityBadge" }, "@/components/ui/badge": badge,
     "@/components/ui/drawer": { Drawer: "Drawer" }, "@/components/ui/button": { Button: "Button" },
     "@/components/ui/icon": { Icon: "Icon" }, "@/lib/opportunities": await load("../src/lib/opportunities.ts"),
     "@/components/jobs/tailoring-entry-point": { TailoringEntryPoint: "Entry" },
     "@/components/jobs/opportunity-details": detailUi,
+  };
+  const detail = await load("../src/components/jobs/opportunity-detail-view.tsx", dependencies);
+  const { RecommendedJobs } = await load("../src/components/workspace/recommended-jobs.tsx", {
+    ...dependencies, "@/components/jobs/opportunity-detail-view": detail,
   });
   const description = "Original description\nhttps://example.com/unrelated";
   for (const url of ["https://example.com/apply", "http://example.com/apply", "javascript:alert(1)", "https://user:pass@example.com/apply"]) {
     const job = { id: "job", title: "Role", opportunity_type: "internship", organization: "Stripe", url, description,
       location: "City", skills: [{ id: "skill", name: "Python" }], degree_level: "master", study_year: [1],
       posted_at: "2026-10-08T00:00:00Z", deadline: "2026-11-02", is_active: false };
-    const tree = RecommendedJobs({ items: [{ opportunity: job, match: { score: 72, eligibility: "eligible", reasons: ["Reason"], components: { skills: 30, field_fit: 20, interests: 12, location: 10, ai: 0 } } }] });
-    const briefs = nodes(tree).filter((node) => typeof node.type === "function" && node.type.name === "Brief");
+    const tree = RecommendedJobs({ items: [{ opportunity: job, match: { score: 72, eligibility: "eligible", reasons: ["Reason"] } }] });
+    const briefs = nodes(tree).filter((node) => node.type === detail.OpportunityDetailView);
     assert.equal(briefs.length, 2);
     for (const brief of briefs) {
-      const content = nodes(brief.type(brief.props));
+      const content = nodes(brief.type({ ...brief.props, assessment: {
+        match: { score: 72, eligibility: "unknown" }, eligibility: { status: "eligible", reasons: [] },
+      } }));
       const source = content.find((node) => node.type === "a");
       assert.equal(Boolean(source), /^https?:\/\/example/.test(url));
       if (source) {
@@ -69,24 +75,25 @@ test("Jobs briefs keep source and detail links independent and place tailoring a
       }
       assert.equal(content.find((node) => node.type === "Link").props.href, "/opportunities/job");
       assert.equal(content.find((node) => node.type === "CompanyAvatar").props.initials, "S");
-      assert.equal(content.find((node) => node.type === "MatchScore").props.score, 72);
-      assert.equal(content.find((node) => node.type === "EligibilityBadge").props.status, "eligible");
+      assert.ok(content.some((node) => node.props.children === "72/100"));
+      assert.ok(content.some((node) => node.props.children === "Eligible"));
       assert.deepEqual(content.filter((node) => node.type === "dt").map((node) => node.props.children),
-        ["Degree level", "Study year", "Application deadline", "Published", "skills", "field fit", "interests", "location", "ai"]);
+        ["Degree level", "Study year", "Application deadline", "Published"]);
       assert.ok(content.some((node) => node.props.children === "Closed on InternCalling"));
       const position = (value) => content.findIndex((node) => node.props.children === value);
       assert.ok(position("At a glance") < position("Python"));
       assert.ok(position("Python") < position("View full details"));
       assert.ok(position("View full details") < position("About the opportunity"));
-      assert.ok(position(description) < position("Your match"));
-      assert.equal(content.at(-1).type, "Entry");
+      assert.ok(position(description) < position("Match Score"));
+      assert.ok(content.findIndex((node) => node.type === "Entry") > position("Match Score"));
+      if (source) assert.ok(content.findIndex((node) => node.type === "Entry") < content.indexOf(source));
     }
   }
   const tree = RecommendedJobs({ items: [{ opportunity: { id: "sparse", title: "Sparse", opportunity_type: "internship" }, match: null, status: "saved" }] });
-  const brief = nodes(tree).find((node) => typeof node.type === "function" && node.type.name === "Brief");
+  const brief = nodes(tree).find((node) => node.type === detail.OpportunityDetailView);
   const content = nodes(brief.type(brief.props));
   assert.equal(content.find((node) => node.type === "CompanyAvatar").props.initials, "–");
-  assert.ok(content.some((node) => node.props.children === "saved"));
+  assert.equal(brief.props.saveControl.props.status, "saved");
   assert.ok(!content.some((node) => node.props.children === "At a glance" || node.type === "a" || node.type === "Entry"));
 
   const amazon = "https://www.amazon.jobs/en/jobs/12345/example";
@@ -97,7 +104,7 @@ test("Jobs briefs keep source and detail links independent and place tailoring a
   function listingBrief(description, url, title = "Software Engineer Intern", location = "Berlin") {
     const opportunity = { id: "amazon", title, location, description, url, skills: [], opportunity_type: "internship" };
     const tree = RecommendedJobs({ items: [{ opportunity, match: null }] });
-    const brief = nodes(tree).find((node) => typeof node.type === "function" && node.type.name === "Brief");
+    const brief = nodes(tree).find((node) => node.type === detail.OpportunityDetailView);
     return nodes(brief.type(brief.props));
   }
   function prose(brief) {
