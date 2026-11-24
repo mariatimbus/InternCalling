@@ -324,6 +324,28 @@ Application shape (all endpoints):
 `status` ∈ `saved | applied | interview | offer | rejected`. `opportunity` is
 an embedded summary so the tracker UI renders without extra lookups.
 
+## Review 🔒 (reviewers only)
+
+Ingested postings the scope rules cannot decide (unclear location, role level or
+STEM domain) are held with `review_status = "pending"` and never shown in Jobs.
+Only users whose Supabase `app_metadata.roles` contains `"reviewer"` may call
+these endpoints; anyone else gets `403 forbidden`. `app_metadata` is set with the
+server key only (`user_metadata`, which users can edit, is ignored).
+
+### GET /api/v1/review/opportunities
+
+Up to 100 pending postings, newest `posted_at` first, plus the full count:
+`{ "items": [{ "id", "title", "organization", "location", "url", "description",
+"source", "posted_at", "deadline", "review_reason" }], "total": 52 }`.
+
+### POST /api/v1/review/opportunities/{id}
+
+Body `{ "decision": "approve" | "reject" }`; `204` on success. `approve` publishes
+the posting (unless its deadline has passed); `reject` keeps it hidden. A posting
+that is not pending (already decided, or taken off the queue by ingestion) returns
+`409 conflict`. Later ingestion runs keep the decision while the posting's values
+stay the same; a changed posting that still needs review returns to the queue.
+
 ## Frozen upcoming contracts
 
 Implemented in a later phase; the shapes below are frozen so B and C can build
