@@ -61,7 +61,7 @@ def test_spaces_html_and_raw_record_preserved():
     result = normalize(record)
     assert result["title"] == "Software Engineering Intern"
     assert result["organization"] == "Acme Labs"
-    assert result["description"] == "Our team\nBuild Python & SQL.\nLearn"
+    assert result["description"] == "Our team\nBuild Python & SQL.\n• Learn"  # lists stay lists
     assert "<b>" in record.description
     assert normalize(record) == result
     assert clean_html(None) is None

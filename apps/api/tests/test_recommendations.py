@@ -67,6 +67,7 @@ def test_excludes_mismatch_inactive_expired_but_preserves_unknown(client, db_fac
         "field_fit",
         "interests",
         "location",
+        "recency",
         "ai",
     }
 
