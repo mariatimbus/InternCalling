@@ -44,3 +44,16 @@ test("the route serves cached raster icons and refuses everything else", async (
   globalThis.fetch = async () => { throw new Error("offline"); };
   assert.equal((await call("stripe.com.png")).status, 404);
 });
+
+test("logo lookup retries the www domain when the bare domain has no icon", async (t) => {
+  const real = globalThis.fetch;
+  t.after(() => { globalThis.fetch = real; });
+  const requested = [];
+  globalThis.fetch = async (url) => {
+    requested.push(String(url));
+    return requested.length === 1 ? new Response(null, { status: 404 })
+      : new Response(new Uint8Array([137, 80, 78, 71]), { headers: { "content-type": "image/png" } });
+  };
+  assert.equal((await call("isaraerospace.com.png")).status, 200);
+  assert.equal(requested[1], "https://www.google.com/s2/favicons?domain=www.isaraerospace.com&sz=128");
+});

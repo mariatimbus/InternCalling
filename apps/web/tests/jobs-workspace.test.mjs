@@ -32,6 +32,9 @@ const detailUi = await load("../src/components/jobs/opportunity-details.tsx", {
   "react/jsx-runtime": runtime, "@/components/ui/badge": { Badge: "Badge" },
 });
 const assessmentApi = await load("../src/lib/api/opportunity-assessment.ts");
+const copilotModel = await load("../src/lib/opportunity-copilot.ts", { "./match-reasons": await load("../src/lib/match-reasons.ts") });
+const featureFlags = await load("../src/lib/feature-flags.ts");
+const profileSkillsApi = await load("../src/lib/profile-skills.ts");
 const detailView = await load("../src/components/jobs/opportunity-detail-view.tsx", {
   "react/jsx-runtime": runtime, "next/link": { default: "Link" },
   "@/lib/job-description": await load("../src/lib/job-description.ts"),
@@ -39,8 +42,11 @@ const detailView = await load("../src/components/jobs/opportunity-detail-view.ts
   "@/components/jobs/eligibility-badge": { EligibilityBadge: "EligibilityBadge" },
   "@/components/jobs/match-score": { MatchScore: "MatchScore" },
   "@/components/jobs/tailoring-entry-point": { TailoringEntryPoint: "TailoringEntryPoint" },
+  "@/components/applications/application-controls": { ApplicationControls: "ApplicationControls" },
   "@/components/ui/badge": { Badge: "Badge" }, "@/components/ui/icon": { Icon: "Icon" },
   "@/lib/company-logo": await load("../src/lib/company-logo.ts"), "@/lib/match-reasons": await load("../src/lib/match-reasons.ts"), "@/lib/opportunities": { opportunityTypeLabel: (type) => type },
+  "@/lib/profile-skills": profileSkillsApi,
+  "@/lib/opportunity-copilot": copilotModel,
   "@/components/jobs/opportunity-details": detailUi,
 });
 
@@ -55,15 +61,21 @@ async function fixture(request) {
     "next/cache": { revalidatePath: (path) => invalidated.push(path) },
     "@/lib/auth/account": account, "@/lib/api/client": { ApiError },
   });
+  const continuation = await load(jobs + "load-more-action.ts", {
+    "@/lib/auth/account": account, "@/lib/jobs-url": jobsUrl,
+  });
   const { default: page } = await load(jobs + "page.tsx", {
     "react/jsx-runtime": runtime, "next/link": { default: "Link" }, "@/lib/auth/account": account,
-    "@/components/workspace/recommended-jobs": { RecommendedJobs: "JobsList" },
+    "@/components/workspace/recommended-feed": { RecommendedFeed: "JobsList" },
     "@/components/jobs/jobs-search": { JobsSearch: "JobsSearch" },
     "@/components/ui/button": { Button: "Button" },
     "@/components/ui/empty-state": { EmptyState: "Empty" }, "@/components/ui/error-state": { ErrorState: "Error" },
     "./save-action": action,
-    "./assessment-action": { loadOpportunityAssessment() {} },
+    "./load-more-action": continuation,
     "./saved-search-actions": { savedSearchAction() {} }, "@/components/jobs/saved-searches": { SavedSearches: "SavedSearches" },
+    "./assessment-action": { loadOpportunityAssessment() {}, loadOpportunityCatalog() {} },
+    "@/lib/feature-flags": featureFlags,
+    "@/lib/profile-skills": profileSkillsApi,
     "@/lib/jobs-url": jobsUrl,
   });
   return { calls, invalidated, save: action.saveOpportunity, visit: async (query = {}) => nodes(await page({ searchParams: Promise.resolve(query) })) };
@@ -266,8 +278,13 @@ test("Jobs links preserve q/page across views and Recommended ignores legacy typ
   assert.equal(list(recommended).items[0].match.score, 42);
   assert.ok(app.calls.every(([path]) => !path.endsWith("/match")), "ranking arrives from the global endpoint without per-page scoring calls");
   assert.equal(list(recommended).items[0].status, "rejected");
-  assert.deepEqual(queryOf(tab(recommended, "Next page").props.href), { view: "recommended", q: search, page: "3", ...filters });
-  assert.deepEqual(queryOf(tab(recommended, "Previous page").props.href), { view: "recommended", q: search, page: "1", ...filters });
+  assert.ok(!tab(recommended, "Next page"));
+  assert.ok(!tab(recommended, "Previous page"));
+  assert.deepEqual(list(recommended).pagination, { page: 2, pageSize: 12, total: 36 });
+  await list(recommended).loadMore(3);
+  assert.deepEqual(queryOf(app.calls.filter(([path]) => path.includes("opportunities/recommended?")).at(-1)[0]), {
+    opportunity_type: "internship", is_active: "true", page: "3", page_size: "12", search: "C++ & Python", ...filters,
+  });
   const discovery = recommended.find((node) => node.type === "JobsSearch").props;
   assert.deepEqual(discovery.applied, filters);
   assert.equal(discovery.search, search);
@@ -489,7 +506,10 @@ test("cards omit unknown metadata and keep official links, selection and Save in
   ];
   const context = "view=applied&q=robotics&location=Berlin&degree_level=master&study_year=1&page=2";
   const logoFixture = "/company-logos/example.png";
-  const trackedTree = nodes(RecommendedJobs({ items: [{ ...listings[2], companyLogoUrl: logoFixture }], detailContext: context }));
+  const trackedTree = nodes(RecommendedJobs({ items: [{ ...listings[2], companyLogoUrl: logoFixture }], detailContext: context,
+    children: jsx("h1", { children: "Search this catalog" }) }));
+  assert.ok(trackedTree.findIndex(node => node.type === "h1") >= 0);
+  assert.ok(trackedTree.findIndex(node => node.type === "h1") < trackedTree.findIndex(node => node.type === "JobCard"));
   assert.equal(trackedTree.find((node) => node.type === "JobCard").props.job.companyLogoUrl, logoFixture);
   const briefs = trackedTree.filter((node) => node.type === detailView.OpportunityDetailView);
   assert.equal(briefs.length, 2, "desktop panel and mobile drawer share the same brief");
@@ -559,22 +579,22 @@ test("company avatars keep a fixed frame, reject unsupported URLs and recover wh
   assert.equal(supplied.type, "Image");
   assert.equal(supplied.props.src, first);
   assert.equal(supplied.props.alt, "");
-  assert.equal(supplied.props.width, 40);
+  assert.equal(supplied.props.width, 48);
   assert.match(supplied.props.className, /object-contain/);
-  assert.match(frame.props.className, /\bsize-10\b/);
+  assert.match(frame.props.className, /\bsize-12\b/);
   supplied.props.onError();
   const failed = mount({ companyName: "Example", initials: "EX", logoUrl: first, size: "sm" });
   assert.equal(failed.props.children, "EX");
-  assert.match(failed.props.className, /\bsize-10\b/);
+  assert.match(failed.props.className, /\bsize-12\b/);
   assert.equal(mount({ companyName: "Example", initials: "EX", logoUrl: second, size: "sm" }).props.children.props.src, second);
   assert.equal(mount({ companyName: "Example Two", initials: "EX", logoUrl: first, size: "sm" }).props.children.props.src, first);
   supplied.props.onError();
-  assert.equal(mount({ companyName: "Example", initials: "EX", logoUrl: second }).props.children.props.width, 48);
+  assert.equal(mount({ companyName: "Example", initials: "EX", logoUrl: second }).props.children.props.width, 64);
   for (const logoUrl of [undefined, "//example.invalid/logo.png", "https://example.invalid/company-logos/ex.png",
     "/company-logos/../logo.png", "/company-logos/ex.png?redirect=1", "data:image/png;base64,eA=="]) {
     const fallback = mount({ logoUrl });
     assert.equal(fallback.props.children, "–");
-    assert.match(fallback.props.className, /\bsize-12\b/);
+    assert.match(fallback.props.className, /\bsize-16\b/);
   }
 });
 
@@ -597,13 +617,15 @@ test("compact cards retain long metadata, meaningful eligibility and top-row act
   assert.equal(compact.find((node) => node.type === "MatchScore").props.score, 84);
   assert.ok(compact.findIndex((node) => node.type === "TrackerBadge") < compact.findIndex((node) => node.type === "EligibilityBadge"));
   assert.match(compact.find((node) => node.props.children === job.description).props.className, /line-clamp-2/);
-  assert.match(opportunityCardClasses(true, "compact"), /border-s-4.*border-s-accent/);
-  assert.match(opportunityCardClasses(false, "compact"), /border-s-4.*border-s-transparent/);
+  assert.match(opportunityCardClasses(true, "compact"), /border-primary/);
+  assert.match(opportunityCardClasses(false, "compact"), /border-line/);
   assert.doesNotMatch(opportunityCardClasses(false, "compact"), /\b(?:h-full|min-h-)\b/);
   const sparse = nodes(OpportunityCardContent({ job: { ...job, eligibility: "unknown", matchScore: null, description: undefined }, density: "compact" }));
   assert.equal(sparse.find((node) => node.type === "MatchScore").props.score, null);
   assert.ok(!sparse.some((node) => node.type === "EligibilityBadge"));
-  assert.ok(nodes(OpportunityCardContent({ job })).some((node) => node.type === "CompanyMark"));
+  const comfortable = nodes(OpportunityCardContent({ job }));
+  assert.deepEqual(comfortable.find((node) => node.type === "CompanyAvatar")?.props,
+    { companyName: job.company, initials: "QU", logoUrl: job.companyLogoUrl });
 });
 
 async function detailPage(requireCompletedAccount) {
@@ -613,6 +635,8 @@ async function detailPage(requireCompletedAccount) {
     "@/components/workspace/recommended-jobs": { StandaloneOpportunitySave: "StandaloneOpportunitySave" },
     "@/app/(workspace)/jobs/save-action": { saveOpportunity() {} },
     "@/lib/api/opportunity-assessment": assessmentApi,
+    "@/lib/feature-flags": featureFlags,
+    "@/lib/profile-skills": profileSkillsApi,
     "@/components/ui/error-state": { ErrorState: "Error" }, "@/lib/api/client": { ApiError }, "@/lib/jobs-url": jobsUrl,
   });
   return async (routeId = id, query = {}) => nodes(await render({
@@ -649,7 +673,52 @@ test("direct detail reads the public record and authenticated assessments after 
   await assert.rejects(() => denied(), /redirect \/sign-in/);
 });
 
-test("a failed request does not turn a zero match or unknown eligibility into another outcome", async () => {
+test("the footer is the only official link with Copilot on or off, including full details from Saved", async () => {
+  const listingGap = { rule: "degree_level", status: "unknown", reason: "Opportunity does not specify a degree level" };
+  const assessment = { match: null, eligibility: { status: "unknown", reasons: [listingGap] } };
+  const official = (tree) => tree.filter((node) => node.type === "a" && node.props.href === opportunity.url);
+  for (const copilotEnabled of [false, true]) {
+    for (const is_active of [false, true]) {
+      const tree = nodes(detailView.OpportunityDetailView({
+        opportunity: { ...opportunity, is_active, skills: [] }, assessment, copilotEnabled,
+      }));
+      const footer = tree.find((node) => node.type === "footer");
+      assert.equal(official(tree).length, 1);
+      assert.equal(official(nodes(footer))[0].props.children[0], is_active ? "Apply on official site" : "View official listing");
+    }
+  }
+  const saved = row("saved");
+  const summary = nodes(detailView.OpportunityDetailView({ opportunity: saved.opportunity, assessment, detailContext: "view=saved" }));
+  assert.equal(official(summary).length, 0);
+  const fullDetails = tab(summary, "View full details");
+  const fullUrl = new URL(fullDetails.props.href, "https://fixture.invalid");
+  const page = await detailPage(async () => ({ api: { request: async (path) => {
+    if (path === "/api/v1/applications") return { items: [saved] };
+    if (path.endsWith("/match")) return assessment.match;
+    if (path.endsWith("/eligibility")) return assessment.eligibility;
+    assert.equal(path, "/api/v1" + fullUrl.pathname);
+    return { ...opportunity, is_active: true, skills: [] };
+  } } }));
+  const full = await page(fullUrl.pathname.split("/").at(-1), Object.fromEntries(fullUrl.searchParams));
+  assert.equal(official(full).length, 1);
+  assert.equal(official(full)[0].props.children[0], "Apply on official site");
+  assert.equal(queryOf(tab(full, "Back to Jobs").props.href).view, "saved");
+});
+
+test("the detail overview preserves a zero match and distinguishes unavailable from loading", () => {
+  const overview = (assessment) => {
+    const tree = nodes(detailView.OpportunityDetailView({ opportunity: { ...opportunity, skills: [] }, assessment, standalone: true }));
+    return nodes(tree.find((node) => node.props["aria-label"] === "Match overview"));
+  };
+  const zero = overview({ match: { score: 0, reasons: [] }, eligibility: null });
+  assert.equal(zero.find((node) => node.props.className?.includes("text-4xl")).props.children[0], 0);
+  const missing = overview({ match: null, eligibility: null });
+  assert.ok(missing.some((node) => node.props.children === "Match score unavailable"));
+  assert.ok(!missing.some((node) => node.props.className?.includes("text-4xl")));
+  assert.ok(overview(null).some((node) => node.props.children === "Loading match score…"));
+});
+
+test("a failed request leaves the other Copilot evaluation available", async () => {
   const match = { score: 0, eligibility: "not_eligible" };
   const eligibility = { status: "unknown", reasons: [] };
   for (const failed of ["match", "eligibility"]) {
@@ -658,14 +727,195 @@ test("a failed request does not turn a zero match or unknown eligibility into an
       if (suffix === failed) throw new ApiError(503, "network_error");
       return suffix === "match" ? match : eligibility;
     } }, id);
-    const tree = nodes(detailView.OpportunityDetailView({ opportunity: { ...opportunity, skills: [] }, assessment: result }));
+    const tree = nodes(detailView.OpportunityDetailView({
+      opportunity: { ...opportunity, skills: [] }, assessment: result, copilotEnabled: true,
+    }));
     if (failed === "match") {
       assert.ok(tree.some((node) => node.props.children === "Match score could not be loaded."));
       assert.ok(tree.some((node) => node.props.children === "Eligibility unknown."));
+      assert.ok(!tree.some((node) => node.props.children === "No positive match reasons were provided for this opportunity."));
     } else {
       assert.ok(tree.some((node) => node.props.children === "0/100"));
       assert.ok(tree.some((node) => node.props.children === "Eligibility could not be loaded."));
+      assert.ok(tree.some((node) => node.props.children === "No positive match reasons were provided for this opportunity."));
+      assert.ok(!tree.some((node) => node.props.children === "Eligibility unknown."));
     }
+    assert.ok(!tree.some((node) => node.props.children === "Suggested next action"));
+  }
+});
+
+test("a late catalog response never replaces the selected Saved or Applied listing", async () => {
+  const states = [], effects = [];
+  let stateIndex, effectIndex;
+  const { RecommendedJobs } = await load("../src/components/workspace/recommended-jobs.tsx", {
+    react: {
+      useSyncExternalStore: (_subscribe, snapshot) => snapshot(),
+      useRef: (current) => ({ current }),
+      useState(initial) {
+        const index = stateIndex++;
+        if (!(index in states)) states[index] = initial;
+        return [states[index], (value) => { states[index] = value; }];
+      },
+      useEffect(run, deps) {
+        const index = effectIndex++;
+        const old = effects[index];
+        if (!old || deps.some((value, i) => value !== old.deps[i])) {
+          old?.cleanup?.();
+          effects[index] = { deps, cleanup: run() };
+        }
+      },
+    },
+    "@/lib/company-logo": await load("../src/lib/company-logo.ts"), "@/lib/match-reasons": await load("../src/lib/match-reasons.ts"),
+    "react/jsx-runtime": runtime, "@/lib/opportunities": { opportunitySummary: (job) => ({ id: job.id }) },
+    "@/components/jobs/job-card": { JobCard: "JobCard" }, "@/components/ui/badge": { Badge: "Badge" },
+    "@/components/ui/drawer": { Drawer: "Drawer" }, "@/components/ui/button": { Button: "Button" },
+    "@/components/jobs/opportunity-details": detailUi, "@/components/jobs/opportunity-detail-view": detailView,
+  });
+  const second = { ...opportunity, id: "00000000-0000-4000-8000-000000000002", url: "https://example.invalid/second" };
+  const third = { ...opportunity, id: "00000000-0000-4000-8000-000000000003" };
+  const fourth = { ...opportunity, id: "00000000-0000-4000-8000-000000000004" };
+  const items = [opportunity, second, third, fourth].map((job) =>
+    ({ opportunity: row("saved", job).opportunity, status: "saved", match: null }));
+  const requests = new Map();
+  const loadCatalog = (jobId) => new Promise((resolve, reject) => requests.set(jobId, { resolve, reject }));
+  const loadAssessment = async () => ({ match: null, eligibility: null });
+  function render() {
+    stateIndex = effectIndex = 0;
+    return nodes(RecommendedJobs({ items, loadAssessment, loadCatalog, copilotEnabled: false }));
+  }
+  const select = (tree, jobId) => tree.find((node) => node.type === "JobCard" && node.props.job.id === jobId).props.onSelect();
+  function details(tree) {
+    const views = tree.filter((node) => node.type === detailView.OpportunityDetailView);
+    assert.equal(views.length, 2);
+    return views.map(({ type, props }) => nodes(type(props)));
+  }
+  const first = render();
+  assert.deepEqual([...requests.keys()], [id]);
+  select(first, second.id);
+  const pending = render();
+  assert.deepEqual([...requests.keys()], [id, second.id]);
+  requests.get(second.id).resolve({ ...second, is_active: true, skills: [] });
+  await Promise.resolve();
+  requests.get(id).resolve({ ...opportunity, is_active: true, skills: [] });
+  await Promise.resolve();
+  for (const tree of details(render())) {
+    assert.deepEqual(tree.filter((node) => node.type === "a").map((node) => node.props.href), [second.url]);
+  }
+  select(pending, third.id);
+  const missing = render();
+  requests.get(third.id).resolve({ ...third, url: null, is_active: true, skills: [] });
+  await Promise.resolve();
+  for (const tree of details(render())) {
+    assert.ok(tree.some((node) => node.props.children === "No official link is available for this opportunity."));
+  }
+  select(missing, fourth.id);
+  render();
+  requests.get(fourth.id).reject(new Error("catalog unavailable"));
+  await Promise.resolve();
+  for (const tree of details(render())) {
+    assert.ok(tab(tree, "View full details"));
+    assert.ok(tree.some((node) => node.props.children === "The official listing could not be loaded. Open full details to try again."));
+  }
+});
+
+test("the flag gates profile skills reads across Recommended, Saved and Applied", async (t) => {
+  const env = { ...process.env };
+  delete env.OPPORTUNITY_COPILOT_ENABLED;
+  t.mock.property(process, "env", env);
+  const savedSkills = [{ id: "python", name: "Python" }];
+  const jobsFixture = await fixture((path) => {
+    if (path === "/api/v1/profile/skills") return savedSkills;
+    if (path === "/api/v1/applications") return { items: [row("saved"), row("applied", { ...opportunity, id: "applied-fixture" })], total: 2 };
+    return { items: [{ opportunity, match: null }], total: 1, page_size: 12 };
+  });
+  const calls = [];
+  const page = await detailPage(async () => ({ api: { request: async (path) => {
+    calls.push(path);
+    if (path.endsWith("/match")) return { score: 42, reasons: ["Matches 1 of 3 skills: Python"] };
+    if (path.endsWith("/eligibility")) return { status: "possibly_eligible", reasons: [] };
+    if (path === "/api/v1/profile/skills") return savedSkills;
+    if (path === "/api/v1/applications") return { items: [] };
+    return { ...opportunity, is_active: true, skills: savedSkills };
+  } } }));
+  for (const enabled of [false, true]) {
+    if (enabled) env.OPPORTUNITY_COPILOT_ENABLED = "true";
+    for (const view of ["saved", "applied"]) {
+      const trackerList = list(await jobsFixture.visit({ view }));
+      assert.equal(trackerList.copilotEnabled, enabled);
+      assert.deepEqual(trackerList.profileSkills, enabled ? savedSkills : null);
+    }
+    const jobsList = list(await jobsFixture.visit());
+    assert.equal(jobsList.copilotEnabled, enabled);
+    assert.deepEqual(jobsList.profileSkills, enabled ? savedSkills : null);
+    const tree = await page();
+    assert.equal(tree.some((node) => node.props["aria-label"] === "Opportunity Copilot"), enabled);
+    assert.equal(tree.some((node) => node.props["aria-label"] === "Skills matched"), enabled);
+    const explanation = nodes(tree.find((node) => node.props["aria-label"] === "Your fit for this opportunity"));
+    for (const label of ["Why this fits", "What to check", "Matches 1 of 3 skills: Python", "Possibly eligible"]) {
+      assert.equal(explanation.filter((node) => node.props.children === label).length, 1);
+    }
+  }
+  const endpoint = "/api/v1/opportunities/" + id;
+  assert.deepEqual(calls, [endpoint, endpoint + "/match", endpoint + "/eligibility", "/api/v1/applications",
+    endpoint, endpoint + "/match", endpoint + "/eligibility", "/api/v1/applications", "/api/v1/profile/skills"]);
+  assert.equal(jobsFixture.calls.filter(([path]) => path === "/api/v1/profile/skills").length, 3);
+});
+
+test("Copilot suggests one grounded action and preserves the B6 verdict and checks", () => {
+  const profileGap = { rule: "study_year", status: "unknown", reason: "Student study year is not known" };
+  const listingGap = { rule: "degree_level", status: "unknown", reason: "Opportunity does not specify a degree level" };
+  const mismatch = { rule: "location", status: "not_eligible", reason: "A confirmed mismatch for this fixture" };
+  const unclear = { ...listingGap, reason: "Unknown reason from the evaluator" };
+  const render = (reasons, options = {}) => nodes(detailView.OpportunityDetailView({
+    opportunity: { ...opportunity, skills: [], ...options.listing },
+    assessment: { match: { score: 99 }, eligibility: { status: "not_eligible", reasons } },
+    copilotEnabled: options.enabled ?? true,
+  }));
+  const action = (tree) => tree.find((node) => Array.isArray(node.props.children)
+    && node.props.children[0]?.props?.children === "Suggested next action");
+  const profile = render([listingGap, profileGap, mismatch]);
+  assert.equal(action(profile).props.children[1].props.href, "/profile");
+  assert.ok(profile.some((node) => node.props.children === "Not eligible"));
+  assert.ok(profile.some((node) => node.props.children === "Confirmed mismatch"));
+  assert.ok(profile.some((node) => node.props.children === "Eligibility details"));
+  const listingOnly = render([listingGap]);
+  assert.equal(action(listingOnly), undefined);
+  assert.equal(listingOnly.filter((node) => node.type === "a" && node.props.href === opportunity.url).length, 1);
+  const closed = render([listingGap], { listing: { is_active: false } });
+  assert.equal(closed.filter((node) => node.type === "a" && node.props.href === opportunity.url).length, 1);
+  assert.match(closed.find((node) => node.type === "a" && node.props.href === opportunity.url).props.children[0], /View official listing/);
+  assert.equal(action(render([listingGap], { listing: { url: "javascript:alert(1)" } })), undefined);
+  assert.equal(action(render([unclear, mismatch])), undefined);
+  const b6 = render([listingGap], { enabled: false });
+  assert.equal(action(b6), undefined);
+  assert.ok(b6.some((node) => node.props.children === "Check the official listing."));
+});
+
+test("Copilot compares structured skill IDs and distinguishes empty lists from unavailable data", async () => {
+  const listed = [{ id: "one", name: "Python" }, { id: "two", name: "Rust" }];
+  const assessment = { match: { score: 42, reasons: ["Matches 1 of 3 skills: Java"] }, eligibility: null };
+  const render = (profileSkills, job = { ...opportunity, skills: listed }) =>
+    nodes(detailView.OpportunityDetailView({ opportunity: job, assessment, profileSkills, copilotEnabled: true }));
+  const badges = (tree, label) => nodes(tree.find((node) => node.props["aria-label"] === label))
+    .filter((node) => node.type === "Badge").map((node) => node.props.children);
+  const mixed = render([{ id: "one", name: "Renamed Python" }, { id: "other", name: "Rust" }]);
+  assert.deepEqual(badges(mixed, "Skills matched"), ["Python"]);
+  assert.deepEqual(badges(mixed, "Potential gaps"), ["Rust"]);
+  assert.ok(mixed.some((node) => node.props.children === "Listed in this opportunity, not added to your profile"));
+  const empty = await profileSkillsApi.readProfileSkills({ request: async () => [] });
+  assert.deepEqual(badges(render(empty), "Potential gaps"), ["Python", "Rust"]);
+  assert.ok(render(empty).some((node) => node.props.children === "No listed skills match those in your profile."));
+  assert.ok(render(empty, { ...opportunity, skills: [] }).some((node) => node.props.children === "No additional listed skills to check."));
+
+  const missing = await profileSkillsApi.readProfileSkills({ request: async () => { throw new Error("API offline"); } });
+  assert.equal(missing, null);
+  const unavailable = render(missing);
+  assert.ok(unavailable.some((node) => node.props.children === "Profile skills could not be loaded."));
+  assert.ok(unavailable.some((node) => node.props.children === "42/100"));
+  const summary = render(empty, row("saved").opportunity);
+  assert.ok(summary.some((node) => node.props.children === "View full details"));
+  for (const tree of [unavailable, summary, render(empty, opportunity)]) {
+    assert.ok(!tree.some((node) => node.props.children === "Potential gaps"));
   }
 });
 
@@ -771,7 +1021,7 @@ test("eligibility explains reported rules and keeps confirmed mismatches distinc
   assert.ok(!has(unavailable, "What to check"));
 });
 
-test("switching cards scopes both detail surfaces and ignores the earlier in-flight assessment", async () => {
+test("switching cards scopes both Copilot surfaces and ignores the earlier in-flight assessment", async () => {
   const state = [];
   let cursor = 0;
   let cleanup;
@@ -803,11 +1053,14 @@ test("switching cards scopes both detail surfaces and ignores the earlier in-fli
   const detailContext = "view=recommended&q=python&location=Berlin&page=2";
   const requests = new Map();
   const loadAssessment = (jobId) => new Promise((resolve) => requests.set(jobId, resolve));
-  const items = [opportunity, second].map((job) => ({ opportunity: job, match: null }));
+  const items = [opportunity, second].map((job, index) => ({
+    opportunity: { ...job, skills: [{ id: String(index), name: index ? "Second skill" : "First skill" }] }, match: null,
+  }));
+  const profileSkills = [];
   const applications = [{ ...row("interview", second), notes: "Existing notes", updated_at: "2026-11-20" }];
   function render() {
     cursor = 0;
-    const tree = nodes(RecommendedJobs({ items, applications, detailContext, loadAssessment }));
+    const tree = nodes(RecommendedJobs({ items, applications, detailContext, loadAssessment, copilotEnabled: true, profileSkills }));
     if (nextEffect) {
       cleanup?.();
       cleanup = nextEffect();
@@ -819,16 +1072,33 @@ test("switching cards scopes both detail surfaces and ignores the earlier in-fli
   first.find((node) => node.type === "JobCard" && node.props.job.id === second.id).props.onSelect();
   const pending = render().filter((node) => node.type === detailView.OpportunityDetailView);
   assert.equal(pending.length, 2);
-  assert.ok(pending.every(({ props }) => props.applicationControls.props.application === applications[0]));
-  assert.ok(pending.every(({ props }) => props.applicationControls.props.opportunityId === second.id));
+  assert.ok(pending.every(({ props }) => props.tracking.application === applications[0]));
   assert.ok(pending.every(({ props }) => props.opportunity.id === second.id && props.assessment === null && props.detailContext === detailContext));
+  assert.ok(pending.every(({ props }) => props.copilotEnabled));
+  for (const { props } of pending) {
+    const rendered = nodes(detailView.OpportunityDetailView(props));
+    const controls = rendered.find((node) => node.type === "ApplicationControls");
+    assert.equal(controls.props.opportunityId, second.id);
+    assert.equal(controls.props.inline, true);
+    const gaps = nodes(rendered.find((node) => node.props["aria-label"] === "Potential gaps"));
+    assert.deepEqual(gaps.filter((node) => node.type === "Badge").map((node) => node.props.children), ["Second skill"]);
+    assert.equal(props.profileSkills, profileSkills);
+  }
   const active = { match: { score: 0 }, eligibility: { status: "unknown" } };
   requests.get(second.id)(active);
   await Promise.resolve();
   requests.get(id)({ match: { score: 87 }, eligibility: { status: "eligible" } });
   await Promise.resolve();
-  assert.ok(render().filter((node) => node.type === detailView.OpportunityDetailView)
-    .every(({ props }) => props.opportunity.id === second.id && props.assessment === active));
+  const current = render().filter((node) => node.type === detailView.OpportunityDetailView);
+  assert.equal(current.length, 2);
+  assert.equal(requests.size, 2);
+  for (const { props } of current) {
+    assert.equal(props.opportunity.id, second.id);
+    assert.equal(props.assessment, active);
+    const content = nodes(detailView.OpportunityDetailView(props));
+    assert.ok(content.some((node) => node.props.children === "0/100"));
+    assert.ok(!content.some((node) => node.props.children === "87/100"));
+  }
 });
 
 test("detail distinguishes malformed, 404, and 422 from service errors and preserves retry context", async () => {

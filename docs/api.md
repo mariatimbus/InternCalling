@@ -177,6 +177,14 @@ Query params (all optional, combined with AND):
 
 Item shape (same as the detail endpoint):
 
+`title` and `description` are display text: prepared English translations are used
+when their source content matches the current record. Internal ATS markers and the
+known job-board promotional footer are omitted. Missing or stale translations fall
+back to the employer text. The source URL, eligibility and matching inputs remain
+unchanged. See [English catalog display](english-catalog.md) for cache preparation
+and hosting requirements. The `search` filter still searches the persisted employer
+text; it does not index translated display text.
+
 ```json
 {
   "id": "1d9a…",

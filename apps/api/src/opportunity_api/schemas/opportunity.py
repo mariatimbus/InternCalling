@@ -3,8 +3,9 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, computed_field
+from pydantic import BaseModel, ConfigDict, computed_field, model_validator
 
+from opportunity_api.catalog_presentation import english_text
 from opportunity_api.ingestion.sources.employers import company_domains
 from opportunity_api.models.opportunity import OpportunityDegreeLevel, OpportunityType
 
@@ -31,6 +32,11 @@ class OpportunityResponse(BaseModel):
     degree_level: OpportunityDegreeLevel | None
     study_year: list[int] | None
     skills: list[SkillResponse]
+
+    @model_validator(mode="after")
+    def display_in_english(self):
+        self.title, self.description = english_text(self.title, self.description)
+        return self
 
     @computed_field
     @property

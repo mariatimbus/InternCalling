@@ -1,11 +1,13 @@
 """Opportunity endpoint tests: list, detail, pagination, filters."""
 
 import itertools
+import json
 import uuid
 from datetime import datetime
 
 from fastapi.testclient import TestClient
 
+from opportunity_api.catalog_presentation import source_hash
 from opportunity_api.models import Opportunity, OpportunityDegreeLevel, OpportunityType, Skill
 
 URL = "/api/v1/opportunities"
@@ -291,3 +293,30 @@ def test_company_domain_comes_from_the_employer_registry(client: TestClient, db_
     items = {item["title"]: item for item in client.get(URL).json()["items"]}
     assert items["Known"]["company_domain"] == "stripe.com"
     assert items["Board"]["company_domain"] is None  # job boards have no single company site
+
+
+def test_english_display_is_shared_by_list_and_detail_without_overwriting_source(
+    client: TestClient, db_factory, tmp_path, monkeypatch
+):
+    monkeypatch.setenv("APP_OPPORTUNITY_TRANSLATIONS_DIR", str(tmp_path))
+    original_title = "Werkstudent Software"
+    original_text = "Deine Aufgaben\n• Entwickle Software.\n#LI-AG4"
+    opportunity = make_opportunity(title=original_title, description=original_text)
+    seed(db_factory, opportunity)
+    digest = source_hash(original_title, original_text)
+    (tmp_path / (digest + ".json")).write_text(
+        json.dumps(
+            {
+                "source_hash": digest,
+                "title": "Software Working Student",
+                "description": "Responsibilities\n• Develop software.",
+            }
+        )
+    )
+    for item in [client.get(URL).json()["items"][0], client.get(f"{URL}/{opportunity.id}").json()]:
+        assert item["title"] == "Software Working Student"
+        assert item["description"] == "Responsibilities\n• Develop software."
+    with db_factory() as session:
+        persisted = session.get(Opportunity, opportunity.id)
+        assert persisted.title == original_title
+        assert persisted.description == original_text

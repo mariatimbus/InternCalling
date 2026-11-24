@@ -1,6 +1,6 @@
 /** Live editor contract; persisted through /api/backend/workspace/collections. */
 import type { CollectionService } from "./experience";
-import { validateExperience, emptyExperience } from "./experience";
+import { validateExperience, emptyExperience, partialDate } from "./experience";
 import { validateResumeUrl } from "./resume-link";
 export type ProjectDraft = { name: string; role: string; description: string; technologies: string[]; startDate: string; endDate: string; ongoing: boolean; repositoryUrl: string; demoUrl: string };
 export type Project = ProjectDraft & { id: string; revision: number; position: number };
@@ -9,6 +9,18 @@ export class ProjectConflict extends Error {}
 export const emptyProject = (): ProjectDraft => ({ name: "", role: "", description: "", technologies: [], startDate: "", endDate: "", ongoing: false, repositoryUrl: "", demoUrl: "" });
 export function projectDraft(entry: Project): ProjectDraft {
   return { name: entry.name, role: entry.role, description: entry.description, technologies: [...entry.technologies], startDate: entry.startDate, endDate: entry.endDate, ongoing: entry.ongoing, repositoryUrl: entry.repositoryUrl, demoUrl: entry.demoUrl };
+}
+
+export function projectPeriod(project: Pick<ProjectDraft, "startDate" | "endDate" | "ongoing">): string {
+  const format = (value: string) => {
+    const date = partialDate(value);
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    return date ? date.month ? `${months[date.month - 1]} ${date.year}` : String(date.year) : "";
+  };
+  const start = format(project.startDate), end = format(project.endDate);
+  if (project.ongoing) return start ? `${start} – Present` : "Ongoing";
+  if (start && end) return `${start} – ${end}`;
+  return start ? `Started ${start}` : end ? `Ended ${end}` : "Dates not provided";
 }
 export function validateProject(draft: ProjectDraft): Partial<Record<keyof ProjectDraft, string>> {
   const errors: Partial<Record<keyof ProjectDraft, string>> = {};
