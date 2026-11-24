@@ -88,8 +88,7 @@ def upload(client, headers):
     return response.json()
 
 
-def test_text_parsers_and_schema_grounding():
-    assert "Fixture University" in extract_text(docx(), DOCX)
+def _pdf(content: bytes) -> bytes:
     writer = PdfWriter()
     page = writer.add_blank_page(width=200, height=200)
     font = DictionaryObject(
@@ -103,11 +102,23 @@ def test_text_parsers_and_schema_grounding():
         {NameObject("/Font"): DictionaryObject({NameObject("/F1"): writer._add_object(font)})}
     )
     stream = DecodedStreamObject()
-    stream.set_data(b"BT /F1 12 Tf 10 100 Td (Synthetic Python CV) Tj ET")
+    stream.set_data(b"BT /F1 12 Tf 10 100 Td (" + content + b") Tj ET")
     page[NameObject("/Contents")] = writer._add_object(stream)
     file = BytesIO()
     writer.write(file)
-    assert "Synthetic Python CV" in extract_text(file.getvalue(), PDF)
+    return file.getvalue()
+
+
+def test_unmapped_glyphs_do_not_reject_the_cv():
+    from opportunity_api.ai.documents import _parse_text
+
+    text = _parse_text(_pdf(b"Universitatea Babe\x00-Bolyai"), PDF)
+    assert "\x00" not in text and "Babe-Bolyai" in text
+
+
+def test_text_parsers_and_schema_grounding():
+    assert "Fixture University" in extract_text(docx(), DOCX)
+    assert "Synthetic Python CV" in extract_text(_pdf(b"Synthetic Python CV"), PDF)
     CVExtraction.model_validate(output()).verify_evidence(TEXT)
     invalid = output()
     invalid["university"]["value"] = "Invented University"
@@ -213,8 +224,8 @@ def test_review_rejects_profile_changes_and_missing_facts(client, cv_setup):
     )
 
 
-@pytest.mark.parametrize("failure,status", [(AIUnavailable, 503), (AIInvalidOutput, 422)])
-def test_extraction_failure_leaves_file_and_profile_unchanged(client, cv_setup, failure, status):
+@pytest.mark.parametrize("failure", [AIUnavailable, AIInvalidOutput])
+def test_model_failure_falls_back_to_rules_without_writing_profile(client, cv_setup, failure):
     headers, _ = cv_setup
     document_id = upload(client, headers)["id"]
 
@@ -223,9 +234,25 @@ def test_extraction_failure_leaves_file_and_profile_unchanged(client, cv_setup, 
             raise failure("safe fixture error")
 
     client.app.dependency_overrides[get_model] = lambda: FailingModel()
-    assert client.post(f"/api/v1/cv/{document_id}/extract", headers=headers).status_code == status
-    assert client.get(f"/api/v1/cv/{document_id}", headers=headers).json()["status"] == "uploaded"
+    response = client.post(f"/api/v1/cv/{document_id}/extract", headers=headers)
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["extraction_model"] == "rules-v1" and body["status"] == "extracted"
+    assert body["extraction"]["university"]["value"] == "Fixture University"
     assert client.get("/api/v1/profile", headers=headers).json()["university"] is None
+
+
+def test_no_facts_from_model_or_rules_is_rejected(client, cv_setup):
+    headers, _ = cv_setup
+    client.app.dependency_overrides[get_model] = lambda: None
+    response = client.post(
+        "/api/v1/cv?filename=resume.docx",
+        headers={**headers, "Content-Type": DOCX},
+        content=docx("Hello world. This file states no profile facts at all."),
+    )
+    document_id = response.json()["id"]
+    assert client.post(f"/api/v1/cv/{document_id}/extract", headers=headers).status_code == 422
+    assert client.get(f"/api/v1/cv/{document_id}", headers=headers).json()["status"] == "uploaded"
 
 
 def test_upload_limits_and_storage_failure(client, cv_setup):
@@ -298,3 +325,22 @@ def test_unconfigured_ai_and_storage_do_not_break_core_product(client):
         ).status_code
         == 503
     )
+
+
+def test_parser_process_settings_are_serverless_safe(monkeypatch):
+    import sys
+
+    from opportunity_api.ai import documents
+
+    monkeypatch.setattr(sys, "platform", "linux")
+    assert documents._start_method() == "fork"
+    monkeypatch.setattr(sys, "platform", "darwin")
+    assert documents._start_method() == "spawn"
+    assert documents._mapped_bytes() >= 0
+
+
+@pytest.mark.skipif(
+    not __import__("sys").platform.startswith("linux"), reason="fork path is Linux-only"
+)
+def test_forked_parser_reads_pdf_under_memory_cap():
+    assert "Fixture University" in extract_text(docx(), DOCX)

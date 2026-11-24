@@ -116,3 +116,11 @@ test("email quota errors are distinct from request throttling and do not promise
   assert.equal(authErrorMessage({ status: 429 }), requests);
   assert.equal(authErrorMessage({ code: "invalid_credentials", status: 400 }), "Check your email and password and try again.");
 });
+
+test("CV proposals fill the onboarding form without erasing typed answers", async () => {
+  const { prefillOnboarding } = await load("../src/lib/onboarding.ts");
+  const typed = { degree_level: "", university: "Typed University", field_of_study: "", graduation_year: "", location: "Cluj", skills: ["sql"] };
+  const filled = prefillOnboarding(typed, { profile: { degree_level: "bachelor", university: "University of Bucharest", field_of_study: "Computer Engineering", graduation_year: "2029", location: null }, skills: ["Python", "sql", " "] });
+  assert.deepEqual(filled, { degree_level: "bachelor", university: "University of Bucharest", field_of_study: "Computer Engineering", graduation_year: "2029", location: "Cluj", skills: ["sql", "python"] });
+  assert.equal(prefillOnboarding(typed, { profile: { degree_level: "phd" }, skills: [] }).degree_level, "", "unknown degree levels are ignored");
+});

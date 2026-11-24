@@ -29,12 +29,12 @@ def _get_or_create_skill(db: Session, name: str) -> Skill:
     skill = db.scalar(select(Skill).where(func.lower(Skill.name) == name))
     if skill is None:
         skill = Skill(name=name)
-        db.add(skill)
         try:
-            db.flush()
+            with db.begin_nested():
+                db.add(skill)
+                db.flush()
         except IntegrityError:
-            # Concurrent request created the skill first; re-read after rollback.
-            db.rollback()
+            # Keep the outer profile/review transaction intact on a shared skill race.
             skill = db.scalar(select(Skill).where(func.lower(Skill.name) == name))
             if skill is None:
                 raise
@@ -50,6 +50,9 @@ def get_profile(db: Db, current_user: CurrentUser) -> ProfileResponse:
 
 @router.put("", response_model=ProfileResponse)
 def replace_profile(db: Db, current_user: CurrentUser, payload: ProfileUpsert) -> ProfileResponse:
+    from ..workspace.common import lock_user
+
+    lock_user(db, current_user)
     profile = get_or_create_profile(db, current_user)
     data = payload.model_dump()
     for field, value in data.items():
@@ -60,6 +63,9 @@ def replace_profile(db: Db, current_user: CurrentUser, payload: ProfileUpsert) -
 
 @router.patch("", response_model=ProfileResponse)
 def update_profile(db: Db, current_user: CurrentUser, payload: ProfilePatch) -> ProfileResponse:
+    from ..workspace.common import lock_user
+
+    lock_user(db, current_user)
     profile = get_or_create_profile(db, current_user)
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(profile, field, value)
@@ -74,6 +80,9 @@ def get_my_skills(db: Db, current_user: CurrentUser) -> list[Skill]:
 
 @router.put("/skills", response_model=list[SkillResponse])
 def replace_my_skills(db: Db, current_user: CurrentUser, payload: SkillsReplace) -> list[Skill]:
+    from ..workspace.common import lock_user
+
+    lock_user(db, current_user)
     names = {_normalize_skill_name(name) for name in payload.names if name.strip()}
     current_user.skills = [_get_or_create_skill(db, name) for name in sorted(names)]
     db.commit()
@@ -82,6 +91,9 @@ def replace_my_skills(db: Db, current_user: CurrentUser, payload: SkillsReplace)
 
 @router.post("/skills", response_model=list[SkillResponse], status_code=status.HTTP_201_CREATED)
 def add_my_skill(db: Db, current_user: CurrentUser, payload: SkillAdd) -> list[Skill]:
+    from ..workspace.common import lock_user
+
+    lock_user(db, current_user)
     skill = _get_or_create_skill(db, _normalize_skill_name(payload.name))
     if skill not in current_user.skills:
         current_user.skills.append(skill)
@@ -91,6 +103,9 @@ def add_my_skill(db: Db, current_user: CurrentUser, payload: SkillAdd) -> list[S
 
 @router.delete("/skills/{name}", response_model=list[SkillResponse])
 def remove_my_skill(db: Db, current_user: CurrentUser, name: str) -> list[Skill]:
+    from ..workspace.common import lock_user
+
+    lock_user(db, current_user)
     skill = db.scalar(select(Skill).where(func.lower(Skill.name) == _normalize_skill_name(name)))
     if skill is None or skill not in current_user.skills:
         raise APIError("Skill not found on profile", status_code=404, code="skill_not_found")

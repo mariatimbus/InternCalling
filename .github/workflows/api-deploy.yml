@@ -1,0 +1,111 @@
+name: API container and deploy
+
+# PRs: build the production image and smoke-test it locally.
+# main: apply Supabase migrations, then smoke-test the Vercel-hosted API.
+on:
+  pull_request:
+    branches: [develop, main]
+    paths: ["apps/api/**", "supabase/migrations/**", "apps/api/vercel.json", "scripts/deploy/api-smoke.mjs", ".github/workflows/api-deploy.yml"]
+  push:
+    branches: [main]
+    paths: ["apps/api/**", "supabase/migrations/**", "apps/api/vercel.json", "scripts/deploy/api-smoke.mjs", ".github/workflows/api-deploy.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: api-deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  container:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+      - name: Build production image
+        run: docker build --pull -t opportunity-api:ci apps/api
+      - name: Image runs as a non-root user
+        run: test "$(docker run --rm --entrypoint id opportunity-api:ci -u)" != "0"
+      - name: Start container (synthetic local config only)
+        run: |
+          docker run -d --name api -p 8000:8000 \
+            -e DATABASE_URL=sqlite:////tmp/smoke.db \
+            -e CORS_ORIGINS=https://frontend.example.invalid \
+            -e APP_SUPABASE_URL=https://example.invalid \
+            opportunity-api:ci
+          for _ in $(seq 1 30); do curl -fsS http://localhost:8000/health && exit 0; sleep 1; done
+          docker logs api; exit 1
+      - name: Create schema for the smoke database
+        run: docker exec api python -c "import opportunity_api.models; from opportunity_api.core.database import Base, _get_engine; Base.metadata.create_all(_get_engine())"
+      - name: Smoke-test container
+        env:
+          API_URL: http://localhost:8000
+          FRONTEND_ORIGIN: https://frontend.example.invalid
+        run: node scripts/deploy/api-smoke.mjs
+      - name: Container logs
+        if: failure()
+        run: docker logs api || true
+
+  migrate:
+    needs: container
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    env:
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+      # Session pooler (IPv4, supports migrations); direct db.<ref> hosts are IPv6-only.
+      SUPABASE_POOLER_HOST: ${{ vars.SUPABASE_POOLER_HOST || 'aws-1-eu-central-1.pooler.supabase.com' }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+      - run: npm ci
+      - name: Build database URL
+        run: |
+          test -n "$SUPABASE_DB_PASSWORD" && test -n "$SUPABASE_PROJECT_REF"
+          encoded=$(node -e 'process.stdout.write(encodeURIComponent(process.env.SUPABASE_DB_PASSWORD))')
+          # The encoded form differs from the stored secret, so mask it explicitly.
+          echo "::add-mask::$encoded"
+          url="postgresql://postgres.${SUPABASE_PROJECT_REF}:${encoded}@${SUPABASE_POOLER_HOST}:5432/postgres?sslmode=require"
+          echo "::add-mask::$url"
+          echo "SUPABASE_DB_URL=$url" >> "$GITHUB_ENV"
+      - name: Preview pending migrations
+        run: npx supabase db push --db-url "$SUPABASE_DB_URL" --dry-run
+      - name: Apply migrations
+        run: npx supabase db push --db-url "$SUPABASE_DB_URL" --yes
+
+  production-smoke:
+    # Vercel's Git integration deploys apps/api from main; this verifies the result
+    # after migrations have been applied.
+    needs: migrate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    env:
+      API_URL: ${{ vars.API_PUBLIC_URL || 'https://interncalling-api.vercel.app' }}
+      FRONTEND_ORIGIN: https://interncalling.vercel.app
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+      - name: Wait for the API deployment
+        run: |
+          for _ in $(seq 1 60); do curl -fsS "$API_URL/health/db" >/dev/null && exit 0; sleep 10; done
+          echo "API did not become healthy"; exit 1
+      - name: Smoke-test production
+        run: node scripts/deploy/api-smoke.mjs

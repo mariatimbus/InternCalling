@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import sys
+import time
 from pathlib import Path
 
 from sqlalchemy import select
@@ -12,6 +13,7 @@ from opportunity_api.models import Opportunity
 
 from .database import checked_url, explicit_database_url, ingestion_session
 from .persistence import OpportunityStore
+from .prefetch import prefetch
 from .registry import build_registry
 from .runner import IngestionRunner
 
@@ -47,6 +49,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--fail-on-anomaly", action="store_true", help="nonzero exit for source-health warnings"
     )
+    parser.add_argument(
+        "--publish",
+        action="store_true",
+        help="with --apply, publish in-scope postings that need no review",
+    )
+    parser.add_argument(
+        "--allow-partial",
+        action="store_true",
+        help="succeed when some sources fail but at least one source was ingested",
+    )
     args = parser.parse_args(argv)
     try:
         registry = build_registry(providers=args.providers, employers=args.employers)
@@ -77,12 +89,18 @@ def main(argv: list[str] | None = None) -> int:
             with ingestion_session(
                 value, dry_run=args.dry_run, allow_hosted=args.allow_hosted
             ) as session:
-                store = OpportunityStore(session)
+                store = OpportunityStore(session, publish=args.publish and args.apply)
                 # Verify an existing schema/connection before requesting live boards.
                 session.execute(select(Opportunity).limit(0))
+                started = time.monotonic()
+                # Hosts download in parallel; each finished source is processed at once.
                 report = IngestionRunner(
                     store, dry_run=args.dry_run, track_freshness=args.freshness
-                ).run(adapters)
+                ).run(prefetch(adapters))
+                print(
+                    f"Ingested {len(adapters)} sources in {time.monotonic() - started:.0f}s.",
+                    file=sys.stderr,
+                )
         except Exception:
             print(
                 "Ingestion database or execution failed; sensitive details omitted.",
@@ -119,11 +137,11 @@ def main(argv: list[str] | None = None) -> int:
             anomalies = args.fail_on_anomaly and any(
                 issue.stage == "health" for issue in report.issues
             )
-            exit_code = (
-                1
-                if output_failed or report.failed_sources or report.totals().failed or anomalies
-                else 0
-            )
+            source_trouble = bool(report.failed_sources or report.totals().failed or anomalies)
+            if args.allow_partial:
+                # Frequent schedules tolerate a flaky board; a run with no healthy source fails.
+                source_trouble = len(set(report.failed_sources)) >= len(adapters)
+            exit_code = 1 if output_failed or source_trouble else 0
     finally:
         if artifact is not None:
             try:

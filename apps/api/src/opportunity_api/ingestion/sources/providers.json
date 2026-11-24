@@ -1,5 +1,7 @@
 {
   "greenhouse": true,
   "lever": true,
-  "smartrecruiters": true
+  "smartrecruiters": false,
+  "ashby": true,
+  "arbeitnow": true
 }

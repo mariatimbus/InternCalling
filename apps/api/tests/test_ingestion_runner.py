@@ -221,3 +221,85 @@ def test_dedupe_callback_skips_records(session):
 
     assert report.source("greenhouse").duplicates == 1
     assert report.source("greenhouse").created == 1
+
+
+def _active(session):
+    return {
+        row.source_id: (row.is_active, row.inactive_reason)
+        for row in session.scalars(select(Opportunity))
+    }
+
+
+def test_publish_mode_puts_clear_postings_live_and_keeps_review_hidden(session):
+    clear = make_raw("ashby", 1, deadline_raw=None)
+    unclear = make_raw("ashby", 2, deadline_raw=None, location="Worldwide")
+    IngestionRunner(OpportunityStore(session, publish=True)).run(
+        [StaticAdapter("ashby", [clear, unclear])]
+    )
+    assert _active(session) == {
+        "ashby-job-1": (True, None),
+        "ashby-job-2": (False, None),
+    }
+
+
+def test_default_mode_still_keeps_new_postings_unpublished(session):
+    IngestionRunner(OpportunityStore(session)).run(
+        [StaticAdapter("ashby", [make_raw("ashby", 1, deadline_raw=None)])]
+    )
+    assert _active(session) == {"ashby-job-1": (False, None)}
+
+
+def test_publish_mode_revives_returning_postings_but_not_expired_ones(session):
+    records = [make_raw("ashby", i, deadline_raw=None) for i in (1, 2)]
+    IngestionRunner(OpportunityStore(session, publish=True)).run([StaticAdapter("ashby", records)])
+    rows = {row.source_id: row for row in session.scalars(select(Opportunity))}
+    rows["ashby-job-1"].is_active, rows["ashby-job-1"].inactive_reason = False, "source_missing"
+    rows["ashby-job-2"].is_active, rows["ashby-job-2"].inactive_reason = False, "deadline_expired"
+    session.commit()
+    IngestionRunner(OpportunityStore(session, publish=True)).run([StaticAdapter("ashby", records)])
+    assert _active(session) == {
+        "ashby-job-1": (True, None),
+        "ashby-job-2": (False, "deadline_expired"),
+    }
+
+
+def test_publish_mode_hides_live_postings_that_scope_now_rejects(session):
+    record = make_raw("ashby", 1, deadline_raw=None, title="Software Engineering Intern")
+    IngestionRunner(OpportunityStore(session, publish=True)).run([StaticAdapter("ashby", [record])])
+    assert _active(session) == {"ashby-job-1": (True, None)}
+    marketing = make_raw("ashby", 1, deadline_raw=None, title="Brand Marketing Intern")
+    IngestionRunner(OpportunityStore(session, publish=True)).run(
+        [StaticAdapter("ashby", [marketing])]
+    )
+    assert _active(session) == {"ashby-job-1": (False, None)}
+
+
+def test_rerun_needs_one_catalogue_snapshot_and_no_per_record_reads(session):
+    from sqlalchemy import event
+
+    engine = session.get_bind()
+    records = [make_raw(source, i, deadline_raw=None) for source in ("a", "b") for i in range(5)]
+
+    def run():
+        # Same session settings as the CLI: rows stay loaded across per-source commits.
+        with Session(engine, autoflush=False, expire_on_commit=False) as cli_session:
+            store = OpportunityStore(cli_session, publish=True)
+            return IngestionRunner(store).run(
+                [StaticAdapter("a", records[:5]), StaticAdapter("b", records[5:])]
+            )
+
+    run()
+    statements = []
+
+    def listener(*args):
+        statements.append(args[2])
+
+    event.listen(engine, "before_cursor_execute", listener)
+    try:
+        report = run()
+    finally:
+        event.remove(engine, "before_cursor_execute", listener)
+    assert report.totals().updated == 10
+    reads = [s for s in statements if s.lstrip().upper().startswith("SELECT")]
+    assert len(reads) == 1  # one snapshot for both sources; unchanged rows write nothing
+    assert not any("SAVEPOINT" in s.upper() for s in statements)

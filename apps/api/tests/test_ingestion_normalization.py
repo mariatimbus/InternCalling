@@ -67,6 +67,14 @@ def test_spaces_html_and_raw_record_preserved():
     assert clean_html(None) is None
     assert clean_html("<p> </p>") is None
     assert clean_html("<script>ignore <b>all</b></script>visible") == "visible"
+    # Boards that escape their HTML once must not leak markup into the description.
+    escaped = (
+        '&lt;div class="content-intro"&gt;&lt;p&gt;&lt;strong&gt;About Pinterest:'
+        "&lt;/strong&gt;&lt;/p&gt;&lt;p&gt;Ideas &amp;amp; the&amp;nbsp;"
+        '&lt;a href="https://example.org"&gt;flexibility&lt;/a&gt;.&lt;/p&gt;&lt;/div&gt;'
+    )
+    assert clean_html(escaped) == "About Pinterest:\nIdeas & the flexibility."
+    assert clean_html("Use 3 &lt; 4 in maths") == "Use 3 < 4 in maths"
 
 
 def test_url_removes_only_known_tracking_preserves_identifiers_order_and_fragment():
@@ -212,9 +220,11 @@ def test_validation_alias_utc_lists_and_unsupported_shape():
         ("Software Intern", "Python", "Milwaukee, USA", "rejected"),
         ("Software Intern", "Python", "Remote - US only", "rejected"),
         ("Software Intern", "Python", "Remote excluding Europe", "rejected"),
-        ("Software Intern", "Python", "Remote", "review"),
+        ("Software Intern", "Python", "Remote", "accepted"),
+        ("Software Intern", "Python", "Worldwide", "review"),
         ("Software Intern", "Python", None, "review"),
-        ("Software Intern", "Python", "Berlin", "review"),
+        ("Software Intern", "Python", "Berlin", "accepted"),
+        ("Software Intern", "Python", "Greven", "review"),
         ("Software Intern", "Python", "Germany / USA", "review"),
         ("Student Researcher", "Python", "Germany", "review"),
         ("Intern", None, "Germany", "review"),
@@ -229,7 +239,7 @@ def test_scope_three_outcomes(title, description, location, status):
 def test_cleanup_before_scope_review_persistence_and_structured_rejections(store):
     records = [
         raw("1", title="Software Intern", description="<p>Soft<b>ware</b></p>", location="Germany"),
-        raw("2", location="Remote"),
+        raw("2", location="Worldwide"),
         raw("3", location="Remote - US only"),
         raw("4", deadline_raw="01/02/2027", study_year_raw="2 years completed"),
     ]
@@ -438,7 +448,7 @@ def test_regression_validator_cannot_bypass_final_scope(store, changed):
 def test_regression_final_ambiguous_scope_is_review_not_plain_inactive(store):
     def move_to_remote(value):
         result = validate(value)
-        result.location = "Remote"
+        result.location = "Worldwide"
         return result
 
     plain = IngestionRunner(store).run([FixtureAdapter("fixture", [raw("plain")])])
@@ -505,7 +515,7 @@ def test_regression_review_report_distinguishes_unsaved_dry_run_and_rollback(sto
     assert missing.review_records()[0]["persistence"] == "not_persisted"
     assert missing.review_records()[0]["opportunity_id"] is None
     dry = IngestionRunner(store, dry_run=True).run(
-        [FixtureAdapter("fixture", [raw(location="Remote")])]
+        [FixtureAdapter("fixture", [raw(location="Worldwide")])]
     )
     assert dry.review_records()[0]["persistence"] == "dry_run"
 
@@ -514,7 +524,7 @@ def test_regression_review_report_distinguishes_unsaved_dry_run_and_rollback(sto
             raise RuntimeError("fixture failure")
 
     failed = IngestionRunner(FailCommit(store.session)).run(
-        [FixtureAdapter("fixture", [raw(location="Remote")])]
+        [FixtureAdapter("fixture", [raw(location="Worldwide")])]
     )
     assert failed.review_records()[0]["persistence"] == "rolled_back"
     assert failed.review_records()[0]["opportunity_id"] is None
@@ -576,7 +586,7 @@ def test_regression_review_duplicate_hold_rollback_is_reported_truthfully(
 
 
 def test_regression_export_review_report_roundtrip_and_retention(store, tmp_path):
-    records = [raw("review", location="Remote"), raw("plain"), raw("missing", source_url=None)]
+    records = [raw("review", location="Worldwide"), raw("plain"), raw("missing", source_url=None)]
     report = IngestionRunner(store).run([FixtureAdapter("fixture", records)])
     destination = report.export_json(tmp_path / "run-001.json")
     saved_payload = json.loads(destination.read_text(encoding="utf-8"))

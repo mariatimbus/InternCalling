@@ -26,8 +26,8 @@
       "applyUrl",
       "hostedUrl"
     ],
-    "title": "Deployment Strategist, Internship",
-    "sanitization": "Retained parser fields only; public contact emails redacted. Empty/malformed fixtures are synthetic."
+    "title": "Software Engineer, Internship",
+    "sanitization": "Retained parser fields only; public contact emails redacted. Title changed from the business role \"Deployment Strategist, Internship\" so the fixture stays in STEM scope. Empty/malformed fixtures are synthetic."
   },
   "smartrecruiters": {
     "url": "https://api.smartrecruiters.com/v1/companies/BoschGroup/postings/744000160555829",
