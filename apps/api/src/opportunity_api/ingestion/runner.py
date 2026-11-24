@@ -365,7 +365,14 @@ class IngestionRunner:
         if self.freshness is not None:
             previous_freshness = (source.seen, source.missing, source.inactivated)
             try:
-                self.freshness.assess(name, observations, source, report, dry_run=self.dry_run)
+                self.freshness.assess(
+                    name,
+                    observations,
+                    source,
+                    report,
+                    dry_run=self.dry_run,
+                    european_source=european,
+                )
             except Exception:
                 self.store.rollback()
                 source.seen, source.missing, source.inactivated = previous_freshness
