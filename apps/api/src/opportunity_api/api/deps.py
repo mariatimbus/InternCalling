@@ -86,3 +86,21 @@ def get_or_create_profile(db: Session, user: User) -> Profile:
         return existing
     db.expire(user, ["profile"])
     return profile
+
+
+def require_reviewer(
+    user: Annotated[User, Depends(get_current_user)],
+    creds: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
+) -> User:
+    """A user whose Supabase ``app_metadata.roles`` lists ``reviewer``.
+
+    ``app_metadata`` can only be set with the server key, unlike ``user_metadata``,
+    which every user can edit, so the claim cannot be self-granted.
+    """
+    claims = decode_supabase_token(creds.credentials)  # already verified by get_current_user
+    roles = (claims.get("app_metadata") or {}).get("roles")
+    if not isinstance(roles, list) or "reviewer" not in roles:
+        raise APIError(
+            "Reviewer access required", status_code=status.HTTP_403_FORBIDDEN, code="forbidden"
+        )
+    return user

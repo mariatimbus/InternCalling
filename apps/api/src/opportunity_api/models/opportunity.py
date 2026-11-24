@@ -87,6 +87,12 @@ class Opportunity(TimestampMixin, Base):
     last_checked_on: orm.Mapped[date | None] = orm.mapped_column(sa.Date, nullable=True)
     missing_runs: orm.Mapped[int] = orm.mapped_column(sa.Integer, default=0, server_default="0")
     inactive_reason: orm.Mapped[str | None] = orm.mapped_column(sa.String(40), nullable=True)
+    # Human review of postings the scope rules could not decide (pending/approved/rejected).
+    review_status: orm.Mapped[str | None] = orm.mapped_column(sa.String(20), nullable=True)
+    review_reason: orm.Mapped[str | None] = orm.mapped_column(sa.String(500), nullable=True)
+    reviewed_at: orm.Mapped[datetime | None] = orm.mapped_column(
+        sa.DateTime(timezone=True), nullable=True
+    )
 
     skills: orm.Mapped[list["Skill"]] = orm.relationship(
         secondary="opportunity_skills", back_populates="opportunities"
