@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { createProfileServices } from "@/lib/profile-services";
 import type { Profile, Skill } from "@/lib/api/types";
 import { completionItems, isProfileFieldComplete } from "@/lib/profile-completion";
@@ -16,8 +16,8 @@ import { CertificatesSection } from "./certificates-section";
 import { ProjectsSection } from "./projects-section";
 import { ExperienceSection } from "./experience-section";
 
-export function ProfileHub({ initialProfile, initialSkills, preferences, insightsEnabled = false, contactEmail }: {
-  initialProfile: Profile; initialSkills: Skill[] | null; preferences?: ReactNode; insightsEnabled?: boolean; contactEmail?: string;
+export function ProfileHub({ initialProfile, initialSkills, insightsEnabled = false, contactEmail }: {
+  initialProfile: Profile; initialSkills: Skill[] | null; insightsEnabled?: boolean; contactEmail?: string;
 }) {
   const [profile, setProfile] = useState(initialProfile);
   const [skills, setSkills] = useState(initialSkills);
@@ -64,7 +64,6 @@ export function ProfileHub({ initialProfile, initialSkills, preferences, insight
       <HonoursSection service={services.honours} />
       <LanguagesSection service={services.languages} />
       <PublicationsSection service={services.publications} />
-      {preferences}
     </div>
     <aside aria-label="Profile completion" data-profile-sidebar className="min-w-0 space-y-5">
       <ProfileCompletion profile={profileKnown ? profile : null} skills={skillsKnown ? skills : null} pending={pending} onRetry={() => { void retry(); }} />

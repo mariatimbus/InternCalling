@@ -1,5 +1,4 @@
 import { requireAccount } from "@/lib/auth/account";
-import { PreferencesForm } from "@/components/profile/preferences-form";
 import { ProfileHub } from "@/components/profile/profile-hub";
 import { isSkillList } from "@/lib/profile-skills";
 import { profileInsightsEnabled } from "@/lib/feature-flags";
@@ -15,7 +14,6 @@ export default async function ProfilePage() {
       <p className="reading-text mt-3">Your experience, studies and skills, in one place.</p>
     </div>
     <ProfileHub initialProfile={profile} initialSkills={isSkillList(selected) ? selected : null} insightsEnabled={profileInsightsEnabled()}
-      contactEmail={user?.email.includes("@") ? user.email : undefined}
-      preferences={<PreferencesForm profile={profile} />} />
+      contactEmail={user?.email.includes("@") ? user.email : undefined} />
   </div>;
 }
