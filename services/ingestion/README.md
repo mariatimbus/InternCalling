@@ -417,6 +417,14 @@ over ~170 sources takes under 2 minutes locally: hosts download in parallel (one
 worker per host, so per-host spacing and robots rules are unchanged) and each finished
 source is written while slower hosts are still downloading. `concurrency` queues
 rather than overlaps runs. Manual dispatch defaults to dry-run.
+
+Because GitHub's schedule rarely fires for this repository, Supabase also starts the
+workflow: migration `20261124100000_ingestion_dispatch_cron.sql` schedules the
+`dispatch-ingestion` `pg_cron` job (every 10 minutes, `mode=apply` on `main`) through
+`pg_net`. Its token lives only in Vault as `github_dispatch_token`: a fine-grained
+token with **Actions: read and write** on this repository alone. Without the secret
+the job sends nothing. Check results in `net._http_response` (204 = dispatched); to
+stop it, `select cron.unschedule('dispatch-ingestion');` or set `INGESTION_ENABLED=false`.
 The live job runs only on main/develop when `INGESTION_ENABLED=true`; it uses the
 `ingestion-production` environment and its `INGESTION_DATABASE_URL` secret. No
 credentials belong in provider JSON, workflow arguments, artifacts or logs.
