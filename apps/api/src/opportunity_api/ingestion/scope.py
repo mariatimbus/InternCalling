@@ -231,7 +231,28 @@ NON_STEM_TITLE = re.compile(
     r"crm|account\s+management|merchant|customer\s+success|business\s+development|"
     r"events?|graphic|creative|vertrieb|commercial|comptab\w*|juridique|customer\s+service|"
     r"kundenservice|office\s+management|"
-    r"ressources\s+humaines)\b",
+    r"ressources\s+humaines|culinary|menu|ingredients?|facilit\w*|founders?(?:'s)?|ceo|"
+    r"m&a|private\s+equity|ventures?|venture\s*dev\w*|investor\s+relations|investment|"
+    r"procurement|purchasing|hr|learning\s+and\s+development|media\s+buying|plurimedia|"
+    r"account\s+strategist|partnerships?|strateg(?:y|ist)|operations?|operational|"
+    r"pre-?sales|e-?commerce|marketplace|seller|onboarding|service\s+client|"
+    r"commerci\w*|binnendienst|social\s+project|policy|compliance|export|logisti\w*|"
+    r"supply\s+chain|buybulk|trade-in|general\s+secretary|ambassadors?|consult\w*|"
+    r"enablement|program\s+management|website\s+manager|seo|go-to-market|"
+    r"grafikdesign|deposit|card)\b",
+    re.IGNORECASE,
+)
+# Technical subjects that only count in a title (too broad for descriptions). They
+# win over business words ("Manufacturing Operations", "IT Operations").
+TECH_TITLE = re.compile(
+    r"\b(?:firmware|hardware|silicon|fpga|cpu|gpu|semiconductors?|signal\s+processing|"
+    r"digital\s+design|controls?(?=\s*(?:&|and|systems?|engineer))|estimation|mechatronics?|"
+    r"propulsion|aerospace|avionics|graphics|vulkan|quants?|quantitative|applied\s+science|"
+    r"scientific|autonomy|autonomous|teleoperation|ground\s+systems|electronics?|"
+    r"manufacturing|[ée]nerg\w*|researchers?|digital\s+product|produktmanag\w*|(?-i:IT)|\w*informati(?:k|cs|on\s*s?systeme)|informationssysteme|sap|"
+    r"ki|ing[ée]nieur\w*|d[ée]veloppeur\w*|\w*entwickl\w*|software\w*|logiciel\w*|informatique|daten\w*|\w*technik\w*|cybersecurity|sre|mlops|"
+    r"analytics|bi|power\s+bi|technical|technology|technologies|product\s+manag\w*|"
+    r"product\s+design\w*|ux|ui|it-\w+|statisti\w*|mathemati\w*|r&d)\b",
     re.IGNORECASE,
 )
 
@@ -253,11 +274,17 @@ def maybe_student_title(title: str) -> bool:
     return _is_student_role(title) or re.search(r"\b(?:student|trainee)\b", title, re.I) is not None
 
 
+# Words every company page uses ("our AI-powered tech platform"); not evidence of a role.
+BOILERPLATE = frozenset({"ai", "tech"})
+
+
 def _is_stem(title: str, description: str) -> bool:
-    return (
-        STEM_PATTERN.search(f"{title}\n{description}") is not None
-        or IT_TITLE_PATTERN.search(title) is not None
-    )
+    """A technical title, or a neutral title whose description is clearly technical."""
+    if _technical_title(title):
+        return True
+    terms = [m.group(0).lower() for m in STEM_PATTERN.finditer(description)]
+    terms = [term for term in terms if term not in BOILERPLATE]
+    return len(terms) >= 3 and len(set(terms)) >= 2
 
 
 def _is_europe(location: str) -> bool:
@@ -267,7 +294,11 @@ def _is_europe(location: str) -> bool:
 def _technical_title(title: str) -> bool:
     """A STEM title, ignoring a bare "AI" that is often part of a company name."""
     words = {m.group(0).lower() for m in STEM_PATTERN.finditer(title)}
-    return bool(words - {"ai"}) or IT_TITLE_PATTERN.search(title) is not None
+    return (
+        bool(words - {"ai"})
+        or IT_TITLE_PATTERN.search(title) is not None
+        or TECH_TITLE.search(title) is not None
+    )
 
 
 def assess_scope(
