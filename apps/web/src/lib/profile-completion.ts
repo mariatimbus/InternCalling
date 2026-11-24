@@ -12,18 +12,23 @@ export const completionItems = [
 ] as const;
 export type CompletionKey = typeof completionItems[number]["key"];
 
+export function isProfileFieldComplete(profile: Profile, key: Exclude<CompletionKey, "skills">) {
+  if (key === "degree_level") return profile.degree_level === "bachelor" || profile.degree_level === "master";
+  if (key === "graduation_year") {
+    const year = profile.graduation_year;
+    return typeof year === "number" && Number.isInteger(year) && year >= 1900 && year <= 2100;
+  }
+  const value = profile[key];
+  return typeof value === "string" && !!value.trim() && (key === "bio" || value.trim().length <= 255);
+}
+
 /** Pass only confirmed backend snapshots. null means unknown, never zero percent. */
 export function profileCompletion(profile: Profile | null, skills: Skill[] | null) {
   if (!profile || !Array.isArray(skills) || skills.some((skill) => !skill || typeof skill.id !== "string" || typeof skill.name !== "string")) return null;
   const items = completionItems.map((item) => {
-    let completed: boolean;
-    if (item.key === "skills") completed = skills.some((skill) => !!skill.id.trim() && !!skill.name.trim() && skill.name.trim().length <= 100);
-    else if (item.key === "degree_level") completed = profile.degree_level === "bachelor" || profile.degree_level === "master";
-    else if (item.key === "graduation_year") completed = typeof profile.graduation_year === "number" && Number.isInteger(profile.graduation_year) && profile.graduation_year >= 1900 && profile.graduation_year <= 2100;
-    else {
-      const value = profile[item.key];
-      completed = typeof value === "string" && !!value.trim() && (item.key === "bio" || value.trim().length <= 255);
-    }
+    const completed = item.key === "skills"
+      ? skills.some((skill) => !!skill.id.trim() && !!skill.name.trim() && skill.name.trim().length <= 100)
+      : isProfileFieldComplete(profile, item.key);
     return { ...item, completed };
   });
   const completed = items.filter((item) => item.completed).length;

@@ -1,13 +1,13 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Locator, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { randomUUID } from "node:crypto";
 const password = "Local-E2E-Fixture-Only-2026";
 
-async function submit(page: Page, name: string) {
+async function submit(page: Page, name: string, scope: Locator | Page = page) {
   const pathname = new URL(page.url()).pathname;
   const response = page.waitForResponse((result) => result.request().method() === "POST"
     && new URL(result.url()).pathname === pathname);
-  await page.getByRole("button", { name, exact: true }).click();
+  await scope.getByRole("button", { name, exact: true }).click();
   await (await response).finished();
 }
 
@@ -72,6 +72,15 @@ test("confirmed signup, profile, ranking, filters, save/apply/status/notes and r
   const detail = page.getByRole("article").filter({
     has: page.getByRole("region", { name: "Opportunity information", exact: true }),
   });
+  await expect(detail.getByRole("link", { name: /Apply on official site/ })).toBeInViewport();
+  await expect(detail.getByRole("link", { name: /Check the official listing/ })).toHaveCount(0);
+  const tailor = detail.getByRole("button", { name: "Tailor resume", exact: true });
+  await expect(detail.getByRole("button", { name: "Status · Not tracked", exact: true })).toBeInViewport();
+  await expect(tailor).toBeInViewport();
+  await tailor.focus();
+  await page.keyboard.press("Enter");
+  await expect(detail.getByRole("button", { name: "Request tailored draft", exact: true })).toBeVisible();
+  await page.keyboard.press("Enter");
   await expect(detail.getByRole("heading", { name: "Match Score", exact: true })).toBeVisible();
   await expect(detail.getByRole("heading", { name: "Eligibility", exact: true })).toBeVisible();
   const scoreBreakdown = detail.locator("details").filter({
@@ -87,7 +96,7 @@ test("confirmed signup, profile, ranking, filters, save/apply/status/notes and r
   const criteria = eligibilityDetails.getByRole("list", { name: "Eligibility criteria" });
   await expect(criteria.getByText("Opportunity does not specify a degree level", { exact: true })).toBeVisible();
   await expect(criteria.getByText("Remote opportunity; no location barrier", { exact: true })).toBeVisible();
-  await page.locator("summary:visible").filter({hasText:"Tailor resume for this job"}).click();
+  await tailor.click();
   await page.getByRole("button", {name:"Request tailored draft",exact:true}).click();
   await expect.poll(async () => page.locator("textarea").evaluateAll(nodes => nodes.some(node => node instanceof HTMLTextAreaElement && node.value.includes("Persistent solver project")))).toBeTruthy();
   const accept = page.getByRole("button", {name:"Accept item", exact:true});
@@ -101,12 +110,27 @@ test("confirmed signup, profile, ranking, filters, save/apply/status/notes and r
   await page.getByRole("button", {name:"Get download link",exact:true}).click();
   await expect(page.getByRole("link", {name:"Download approved resume",exact:true})).toHaveAttribute("href", /^blob:/);
   await detail.getByRole("button", { name: "Save Python Engineering Intern", exact: true }).click();
-  await expect(page.getByRole("combobox", { name: "Application status", exact: true })).toHaveValue("saved");
-  await page.goto("/applications?view=saved");
-  await expect(page.getByRole("heading", { name: "Python Engineering Intern" })).toBeVisible();
-  await page.getByRole("combobox", { name: "Application status", exact: true }).selectOption("applied");
-  await page.getByLabel("Notes", { exact: true }).fill("Fixture application note");
-  await submit(page, "Save progress");
+  const saved = detail.getByRole("button", { name: "Status · Saved", exact: true });
+  const notes = detail.getByRole("button", { name: "Notes", exact: true });
+  await saved.focus();
+  await page.keyboard.press("Enter");
+  await expect(detail.getByRole("combobox", { name: "Application status", exact: true })).toHaveValue("saved");
+  await notes.focus();
+  await page.keyboard.press("Space");
+  await detail.getByLabel("Notes", { exact: true }).fill("Fixture application note");
+  await saved.click();
+  await detail.getByRole("combobox", { name: "Application status", exact: true }).selectOption("applied");
+  await notes.click();
+  await expect(detail.getByLabel("Notes", { exact: true })).toHaveValue("Fixture application note");
+  await submit(page, "Save progress", detail);
+  await expect(detail.getByRole("button", { name: "Status · Applied", exact: true })).toBeVisible();
+  const fullDetails = await detail.getByRole("link", { name: "View full details" }).getAttribute("href");
+  expect(fullDetails).toBeTruthy();
+  await page.goto(fullDetails!);
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Status · Applied", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Edit notes", exact: true }).click();
+  await expect(page.getByLabel("Notes", { exact: true })).toHaveValue("Fixture application note");
   await page.goto("/applications?view=applied");
   for (const status of ["interview", "offer", "rejected"]) {
     await page.getByRole("combobox", { name: "Application status", exact: true }).selectOption(status);

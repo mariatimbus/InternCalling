@@ -67,11 +67,11 @@ function hooks() {
 function nodes(tree) { return !tree || typeof tree !== "object" ? [] : [tree, ...[tree.props?.children].flat(Infinity).flatMap(nodes)]; }
 const find = (tree, predicate) => nodes(tree).find(predicate);
 
-async function fixture({ profile = empty, skills = [], save = {}, mutate = {}, refreshed = {} } = {}) {
+async function fixture({ profile = empty, skills = [], save = {}, mutate = {}, refreshed = {}, insightsEnabled = false } = {}) {
   const hubHooks = hooks(), editorHooks = hooks(), skillsHooks = hooks();
   const { ProfileEditor } = await load("../src/components/profile/profile-editor.tsx", {
     react: editorHooks.react, "react/jsx-runtime": runtime, "@/lib/profile-edit": editing,
-    "@/app/(workspace)/profile/actions": { saveProfile: async () => save },
+    "@/app/(workspace)/profile/actions": { saveProfile: async (fields) => typeof save === "function" ? save(fields) : save },
     "@/components/ui/drawer": { Drawer: "Drawer" }, "@/components/ui/button": { Button: "Button" }, "@/components/ui/input": { Input: "Input" },
     "@/components/ui/select": { Select: "Select" }, "@/components/ui/field": { Field: "Field", fieldControl: "" },
     "@/components/ui/error-state": { ErrorState: "ErrorState" },
@@ -91,10 +91,11 @@ async function fixture({ profile = empty, skills = [], save = {}, mutate = {}, r
     "@/lib/profile-services": { createProfileServices: () => Object.fromEntries(["experience", "projects", "certificates", "honours", "languages", "publications", "pdf", "review"].map(name => [name, { name }])) },
     "./resume-review-flow": { ResumeReviewFlow: "ReviewFlow" },
     "@/app/(workspace)/profile/completion-actions": { refreshCompletion: async () => refreshed },
+    "@/lib/profile-completion": helper, "@/components/ui/button": { Button: "Button" },
     "./profile-completion": { ProfileCompletion: "Completion" },
     "./profile-editor": { ProfileEditor }, "./profile-skills": { ProfileSkills }, "./resume-editor": { ResumeEditor: "ResumeEditor" }, "./resume-pdf-section": { ResumePdfSection: "ResumePdfSection" }, "./experience-section": { ExperienceSection: "ExperienceSection" }, "./projects-section": { ProjectsSection: "ProjectsSection" }, "./certificates-section": { CertificatesSection: "CertificatesSection" }, "./honours-section": { HonoursSection: "HonoursSection" }, "./languages-section": { LanguagesSection: "LanguagesSection" }, "./publications-section": { PublicationsSection: "PublicationsSection" }, "./profile-collection-sections": { ProfileCollectionSections: "CollectionSections" },
   });
-  const hub = () => hubHooks.render(ProfileHub, { initialProfile: profile, initialSkills: skills });
+  const hub = () => hubHooks.render(ProfileHub, { initialProfile: profile, initialSkills: skills, insightsEnabled });
   const editor = () => editorHooks.render(ProfileEditor, find(hub(), n => n.type === ProfileEditor).props);
   const skillsView = () => skillsHooks.render(ProfileSkills, find(hub(), n => n.type === ProfileSkills).props);
   const completion = () => { const props = find(hub(), n => n.type === "Completion").props; return calculate(props.profile, props.skills); };
@@ -228,10 +229,41 @@ test("expanded hub keeps the actual editor, Skills and Resume alongside the sepa
   const tree = f.hub();
   assert.ok(find(tree, n => typeof n.type === "function" && n.type.name === "ProfileEditor"));
   assert.ok(find(tree, n => typeof n.type === "function" && n.type.name === "ProfileSkills"));
-  assert.ok(find(tree, n => n.type === "ResumeEditor"));
+  assert.equal(find(tree, n => n.type === "ResumePdfSection").props.profileLayout, true);
+  assert.equal(find(tree, n => n.type === "ResumeEditor"), undefined);
+  assert.equal(nodes(tree).filter(n => n.type === "Completion").length, 1);
   assert.ok(find(tree, n => n.type === "CertificatesSection"));
   assert.ok(find(tree, n => n.type === "HonoursSection"));
   assert.ok(find(tree, n => n.type === "LanguagesSection"));
   assert.ok(find(tree, n => n.type === "PublicationsSection"));
   assert.equal(f.completion().total, 8);
+});
+
+test("Profile Insights is opt-in and only suggests confirmed incomplete fields and an empty skills list", async () => {
+  const visible = (tree, label) => !!find(tree, n => n.props?.children === label);
+  assert.equal(visible((await fixture()).hub(), "Profile Insights"), false);
+  const incomplete = (await fixture({ profile: { ...full, headline: null }, insightsEnabled: true })).hub();
+  assert.equal(visible(incomplete, "Profile Insights"), true);
+  assert.equal(visible(incomplete, "Add headline"), true);
+  assert.equal(visible(incomplete, "Add skills"), true);
+  assert.equal(visible(incomplete, "Add location"), false);
+  const unknown = (await fixture({ profile: full, skills: null, insightsEnabled: true })).hub();
+  assert.equal(visible(unknown, "Add skills"), false);
+  const complete = (await fixture({ profile: full, skills: savedSkills, insightsEnabled: true })).hub();
+  assert.equal(visible(complete, "Profile Insights"), false);
+});
+
+
+test("editing after a confirmed refresh compares against the refreshed profile", async () => {
+  const writes = [];
+  const f = await fixture({ skills: null, refreshed: { profile: full, skills: savedSkills },
+    save: async (fields) => { writes.push(fields); return { profile: { ...full, headline: null } }; },
+  });
+  f.editor();
+  find(f.hub(), n => n.type === "Completion").props.onRetry();
+  await new Promise(resolve => setImmediate(resolve));
+  find(f.editor(), n => n.type === "Button" && n.props.children === "Edit profile").props.onClick();
+  find(f.editor(), n => n.type === "Input" && n.props.name === "headline").props.onChange({ target: { value: "" } });
+  await find(f.editor(), n => n.type === "form").props.onSubmit({ preventDefault() {} });
+  assert.deepEqual(writes, [{ headline: null }]);
 });

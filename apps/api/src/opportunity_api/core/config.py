@@ -59,6 +59,15 @@ class Settings(BaseSettings):
     supabase_publishable_key: str = Field(
         default="", validation_alias=AliasChoices("APP_SUPABASE_PUBLISHABLE_KEY")
     )
+    # Job alert emails (opportunity_api.alerts). Empty host disables sending.
+    smtp_host: str = Field(default="", validation_alias=AliasChoices("SMTP_HOST"))
+    smtp_port: int = Field(default=587, validation_alias=AliasChoices("SMTP_PORT"))
+    smtp_user: str = Field(default="", validation_alias=AliasChoices("SMTP_USER"))
+    smtp_password: str = Field(default="", validation_alias=AliasChoices("SMTP_PASSWORD"))
+    alerts_from: str = Field(default="", validation_alias=AliasChoices("ALERTS_FROM"))
+    site_url: str = Field(
+        default="https://interncalling.vercel.app", validation_alias=AliasChoices("SITE_URL")
+    )
 
     @field_validator("cors_origins")
     @classmethod

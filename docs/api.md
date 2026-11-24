@@ -338,6 +338,21 @@ Application shape (all endpoints):
 `status` ∈ `saved | applied | interview | offer | rejected`. `opportunity` is
 an embedded summary so the tracker UI renders without extra lookups.
 
+## Saved searches 🔒
+
+A student's saved Jobs searches (up to 10), scoped to the owner like Applications
+(another user's search is a `404`); Supabase RLS enforces the same rule.
+
+- `GET /api/v1/saved-searches` → `{ "items": [{ "id", "name", "search", "location", "degree_level", "study_year", "alert", "created_at" }] }`
+- `POST /api/v1/saved-searches` `{ name, search?, location?, degree_level?, study_year?, alert? }` → `201`.
+  At least one criterion is required (`422`); a duplicate name or an 11th search → `409`.
+- `PATCH /api/v1/saved-searches/{id}` `{ "alert": true|false }` → the search. Turning alerts on starts
+  the window now, so the backlog is never emailed.
+- `DELETE /api/v1/saved-searches/{id}` → `204`.
+
+With `alert` on, the daily `job-alerts` workflow (`python -m opportunity_api.alerts --send`) emails
+new internships matching the search, ranked by matching v2, with confirmed mismatches left out.
+
 ## Review 🔒 (reviewers only)
 
 Ingested postings the scope rules cannot decide (unclear location, role level or

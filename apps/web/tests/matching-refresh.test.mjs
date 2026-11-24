@@ -66,7 +66,10 @@ test("confirmed profile/skill writes feed fresh Jobs requests and the real score
       "@/components/jobs/jobs-search": { JobsSearch: "JobsSearch" }, "@/components/ui/button": { Button: "Button" },
       "@/components/ui/empty-state": { EmptyState: "EmptyState" }, "@/components/ui/error-state": { ErrorState: "ErrorState" },
       "./save-action": { saveOpportunity() {} },
-      "./assessment-action": { loadOpportunityAssessment() {} },
+      "./saved-search-actions": { savedSearchAction() {} }, "@/components/jobs/saved-searches": { SavedSearches: "SavedSearches" },
+      "./assessment-action": { loadOpportunityAssessment() {}, loadOpportunityCatalog() {} },
+      "@/lib/feature-flags": { opportunityCopilotEnabled: () => false },
+      "@/lib/profile-skills": skillsHelper,
       "@/lib/jobs-url": await load("../src/lib/jobs-url.ts"),
     });
     const searchParams = Promise.resolve({ q: "Python", type: "internship", page: "1" });
@@ -100,7 +103,7 @@ test("confirmed profile/skill writes feed fresh Jobs requests and the real score
     let cursor = 0;
     const { RecommendedJobs } = await load("../src/components/workspace/recommended-jobs.tsx", {
       react: { useSyncExternalStore: (_subscribe, snapshot) => snapshot(), useEffect() {}, useRef: (current) => ({ current }), useState(initial) { const slot = cursor++; if (!(slot in state)) state[slot] = initial; return [state[slot], next => { state[slot] = next; }]; } },
-      "@/lib/company-logo": await load("../src/lib/company-logo.ts"), "react/jsx-runtime": runtime, "@/lib/opportunities": opportunityHelpers,
+      "@/lib/company-logo": await load("../src/lib/company-logo.ts"), "@/lib/match-reasons": await load("../src/lib/match-reasons.ts"), "react/jsx-runtime": runtime, "@/lib/opportunities": opportunityHelpers,
       "@/components/applications/application-controls": { ApplicationControls: "ApplicationControls" },
       "@/components/jobs/job-card": { JobCard: "JobCard" }, "@/components/jobs/match-score": { MatchScore: "MatchScore" },
       "@/components/jobs/eligibility-badge": { EligibilityBadge: "EligibilityBadge" }, "@/components/ui/badge": { Badge: "Badge" },
