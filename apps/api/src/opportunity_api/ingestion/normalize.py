@@ -73,6 +73,8 @@ class _Text(HTMLParser):
             self.hidden.append(tag)
         if not self.hidden and tag in BLOCK_TAGS | {"br"}:
             self.parts.append("\n")
+        if not self.hidden and tag == "li":
+            self.parts.append("• ")  # keeps lists recognisable in the plain-text description
 
     def handle_endtag(self, tag):
         if self.hidden:
