@@ -34,6 +34,7 @@ const detailUi = await load("../src/components/jobs/opportunity-details.tsx", {
 const assessmentApi = await load("../src/lib/api/opportunity-assessment.ts");
 const detailView = await load("../src/components/jobs/opportunity-detail-view.tsx", {
   "react/jsx-runtime": runtime, "next/link": { default: "Link" },
+  "@/lib/job-description": await load("../src/lib/job-description.ts"),
   "@/components/jobs/company-avatar": { CompanyAvatar: "CompanyAvatar" },
   "@/components/jobs/eligibility-badge": { EligibilityBadge: "EligibilityBadge" },
   "@/components/jobs/match-score": { MatchScore: "MatchScore" },
@@ -581,6 +582,7 @@ test("compact cards retain long metadata, meaningful eligibility and top-row act
     "react/jsx-runtime": runtime, "@/components/ui/badge": { Badge: "Badge" }, "@/components/ui/icon": { Icon: "Icon" },
     "./company-mark": { CompanyMark: "CompanyMark" }, "./company-avatar": { CompanyAvatar: "CompanyAvatar" },
     "./eligibility-badge": { EligibilityBadge: "EligibilityBadge" }, "./match-score": { MatchScore: "MatchScore" },
+    "@/lib/job-description": await load("../src/lib/job-description.ts"),
   });
   const location = "Berlin, Frankfurt am Main, Munich, London, and Zürich";
   const job = { company: "QuantCo", initials: "QU", companyLogoUrl: "/company-logos/example.png", skills: [],
@@ -689,9 +691,10 @@ test("standalone detail preserves tracker status and withholds Save when tracker
   assert.ok(unavailable.some((node) => node.type === "a"));
 });
 
-test("Match Score uses the final backend value and separates reasons, points, and the cap", () => {
-  const positive = ["Skill overlap: Python", "Remote-friendly location"];
-  const cap = "Eligibility not fully confirmed; score capped";
+test("Match Score uses the final backend value and separates fit, gaps, points and the discount note", () => {
+  const positive = ["Matches 2 of 4 skills: python, sql", "Software role fits your background", "Remote-friendly"];
+  const gap = "Also asks for: docker, kafka";
+  const cap = "Some requirements are not stated in the posting";
   const aiUnavailable = "AI similarity unavailable; deterministic components only";
   const render = (match) => nodes(detailView.OpportunityDetailView({
     opportunity: { ...opportunity, skills: [] },
@@ -699,14 +702,15 @@ test("Match Score uses the final backend value and separates reasons, points, an
   }));
   const capped = render({
     score: 60, components: { skills: 30, field_fit: 25, interests: 20, location: 0, ai: 0 },
-    reasons: [...positive, cap, aiUnavailable, "Not eligible: A gate failed"],
+    reasons: [...positive, gap, cap, aiUnavailable, "Not eligible: A gate failed"],
   });
   const text = (tree, value) => tree.some((node) => node.props.children === value);
   assert.ok(text(capped, "60/100"));
   assert.ok(text(capped, "Not eligible"));
-  assert.ok(text(capped, "The maximum Match Score is 49/100 while eligibility is unconfirmed."));
+  assert.ok(text(capped, "To stand out"));
+  assert.ok(capped.some((node) => node.type === "p" && [node.props.children].flat().join("") === cap + ", so the score is slightly lower."));
   assert.ok(capped.some((node) => node.type === "summary" && node.props.children === "Score breakdown"));
-  assert.deepEqual(capped.filter((node) => node.type === "li").map((node) => node.props.children), positive);
+  assert.deepEqual(capped.filter((node) => node.type === "li").map((node) => node.props.children), [...positive, gap]);
   assert.deepEqual(capped.filter((node) => node.type === "dd").map((node) => node.props.children),
     ["30 points", "25 points", "20 points", "0 points"]);
   assert.ok(!text(capped, "AI similarity"));
@@ -715,7 +719,7 @@ test("Match Score uses the final backend value and separates reasons, points, an
   assert.ok(text(sparse, "0/100"));
   assert.ok(text(sparse, "No positive match reasons were provided for this opportunity."));
   assert.ok(text(sparse, "No component values were provided."));
-  assert.ok(!text(sparse, "The maximum Match Score is 49/100 while eligibility is unconfirmed."));
+  assert.ok(!text(sparse, "To stand out"));
 
   const evaluated = render({ score: 12, components: { skills: 12, ai: 0 },
     reasons: ["AI similarity: 0.00 (embeddings)"] });

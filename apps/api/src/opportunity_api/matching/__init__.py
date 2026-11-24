@@ -2,7 +2,7 @@
 
 from .ai import AI_CAP, AIScorer, cosine_similarity
 from .embeddings import Embedder, OllamaEmbedder, StaticEmbedder
-from .engine import GATE_RULES, UNCONFIRMED_CAP, score_match
+from .engine import GATE_RULES, UNCONFIRMED_FACTOR, score_match
 from .scoring import (
     score_field_fit,
     score_interests,
@@ -17,7 +17,7 @@ __all__ = [
     "GATE_RULES",
     "OllamaEmbedder",
     "StaticEmbedder",
-    "UNCONFIRMED_CAP",
+    "UNCONFIRMED_FACTOR",
     "cosine_similarity",
     "score_field_fit",
     "score_interests",

@@ -232,21 +232,35 @@ The profile currently carries `degree_level`, `graduation_year` and
 
 ### GET /api/v1/opportunities/{id}/match 🔒
 
-A10 explainable match score, gated by A9 eligibility (degree level, study
+A10 explainable match score (v2), gated by A9 eligibility (degree level, study
 year, location rules only — graduation cannot gate matching without a
-structured source). `not_eligible` always scores `0`;
-`possibly_eligible`/`unknown` caps the score at `49`; `eligible` is
-uncapped (max 100). The optional `ai` component (A11/A12, Ollama
-embeddings) is `0` when Ollama is not configured — the deterministic core
-is the product, AI is a bonus.
+structured source). Components (100 in total):
+
+- `skills` (40): share of the posting's skills the student has — structured skills
+  plus known technologies the text names; 3 to 8 of them count. Student skills
+  include technologies saved in Profile projects and experience; spellings are
+  normalised (`JS`, `ReactJS`, `k8s`).
+- `field_fit` (25): the title is in a domain of the student's field of study,
+  saved roles or preferred domains (12 when only the description is).
+- `location` (15): chosen city 15, remote 12 (15 if remote is preferred), same country 9.
+- `interests` (10): 5 per interest the posting mentions.
+- `recency` (10): posted within 7 days 10, 30 days 6, 90 days or unknown 3.
+
+`not_eligible` always scores `0`. `possibly_eligible` (nothing failed, some
+requirements not stated) is multiplied by 0.95 and `unknown` by 0.9 — most
+postings never state a degree or year, so missing data no longer buries a strong
+match. `/opportunities/recommended` sorts by score alone. The optional `ai`
+component (A11/A12, Ollama embeddings) is `0` when Ollama is not configured — the
+deterministic core is the product, AI is a bonus.
 
 ```json
 // 200
 {
-  "score": 54,
-  "eligibility": "eligible",
-  "components": { "skills": 12, "field_fit": 25, "interests": 10, "location": 7, "ai": 0 },
-  "reasons": ["Skill overlap: Python, SQL", "Field of study matches: computer science", "Remote-friendly location"]
+  "score": 57,
+  "eligibility": "possibly_eligible",
+  "components": { "skills": 20, "field_fit": 25, "interests": 0, "location": 12, "recency": 3, "ai": 0 },
+  "reasons": ["Matches 3 of 6 skills: python, react, typescript", "Also asks for: java, kotlin, docker",
+              "Software role fits your background", "Remote-friendly", "Some requirements are not stated in the posting"]
 }
 ```
 

@@ -48,6 +48,7 @@ test("Jobs briefs keep source and detail links independent and place tailoring a
     "@/lib/company-logo": await load("../src/lib/company-logo.ts"), "@/components/ui/icon": { Icon: "Icon" }, "@/lib/opportunities": await load("../src/lib/opportunities.ts"),
     "@/components/jobs/tailoring-entry-point": { TailoringEntryPoint: "Entry" },
     "@/components/jobs/opportunity-details": detailUi,
+    "@/lib/job-description": await load("../src/lib/job-description.ts"),
   };
   const detail = await load("../src/components/jobs/opportunity-detail-view.tsx", dependencies);
   const { RecommendedJobs } = await load("../src/components/workspace/recommended-jobs.tsx", {
@@ -84,7 +85,7 @@ test("Jobs briefs keep source and detail links independent and place tailoring a
       assert.ok(position("At a glance") < position("Python"));
       assert.ok(position("Python") < position("View full details"));
       assert.ok(position("View full details") < position("About the opportunity"));
-      assert.ok(position(description) < position("Match Score"));
+      assert.ok(position("Original description") < position("Match Score"));
       assert.ok(content.findIndex((node) => node.type === "Entry") > position("Match Score"));
       if (source) assert.ok(content.findIndex((node) => node.type === "Entry") < content.indexOf(source));
     }
@@ -108,8 +109,13 @@ test("Jobs briefs keep source and detail links independent and place tailoring a
     return nodes(brief.type(brief.props));
   }
   function prose(brief) {
-    return brief.find((node) => node.type === "p" && node.props.className.includes("whitespace-pre-wrap"));
+    return brief.find((node) => node.type === "div" && String(node.props.className).includes("max-w-prose"));
   }
+  // One entry per rendered block (paragraph, heading or list item).
+  function blocks(body) {
+    return nodes(body).filter((node) => ["p", "li", "h3", "h4"].includes(node.type)).map((node) => renderedText(node.props.children));
+  }
+  const lines = (value) => value.split(/\r?\n/).filter(Boolean);
   function renderedText(value) {
     if (typeof value === "string") return value;
     if (Array.isArray(value)) return value.map(renderedText).join("");
@@ -117,17 +123,17 @@ test("Jobs briefs keep source and detail links independent and place tailoring a
   }
   const amazonBrief = listingBrief(fixtureDescription, amazon);
   const descriptionNode = prose(amazonBrief);
-  assert.equal(renderedText(descriptionNode), before + "\r\n" + after);
+  assert.deepEqual(blocks(descriptionNode), lines(before + "\r\n" + after));
   assert.deepEqual(nodes(descriptionNode).filter((node) => node.type === "strong").map((node) => node.props.children),
     ["Software Engineer Intern", "Berlin"]);
   assert.match(nodes(descriptionNode).find((node) => node.type === "span").props.className, /metadata-text/);
   assert.deepEqual(amazonBrief.filter((node) => node.type === "a").map((node) => node.props.href), [amazon]);
   assert.match(amazonBrief.find((node) => node.type === "a").props.className, /focus-visible:outline/);
   const inline = "Read Official source: " + amazon + " before applying.";
-  assert.equal(renderedText(prose(listingBrief(inline, amazon))), inline);
-  assert.equal(renderedText(prose(listingBrief(fixtureDescription, "javascript:alert(0)"))), fixtureDescription);
+  assert.deepEqual(blocks(prose(listingBrief(inline, amazon))), [inline]);
+  assert.deepEqual(blocks(prose(listingBrief(fixtureDescription, "javascript:alert(0)"))), lines(fixtureDescription));
   const sparse = prose(listingBrief("Details will follow.", amazon));
-  assert.equal(sparse.props.children, "Details will follow.");
+  assert.deepEqual(blocks(sparse), ["Details will follow."]);
   assert.equal(nodes(sparse).some((node) => node.type === "strong"), false);
 });
 test("development route returns notFound in production and never imports real persistence",async()=>{const {default:Page}=await load("../src/app/dev/resume-tailoring/page.tsx",{"next/navigation":{notFound(){throw new Error("404");}},"@/components/dev/resume-tailoring-preview":{ResumeTailoringPreview:"Preview"},"react/jsx-runtime":runtime});const old=process.env.NODE_ENV;try{for(const mode of ["production","test"]){process.env.NODE_ENV=mode;assert.throws(()=>Page(),/404/);}process.env.NODE_ENV="development";assert.equal(Page().type,"Preview");}finally{if(old===undefined)delete process.env.NODE_ENV;else process.env.NODE_ENV=old;}for(const path of ["../src/lib/resume-tailoring-preview-service.ts","../src/components/dev/resume-tailoring-preview.tsx","../src/components/profile/resume-tailoring-flow.tsx"]){const code=await readFile(new URL(path,import.meta.url),"utf8");assert.doesNotMatch(code,/fetch\(|localStorage|IndexedDB|api\/v1|profile\/actions|skills-actions/);}});
