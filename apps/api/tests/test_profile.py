@@ -90,6 +90,18 @@ def test_patch_profile_can_clear_a_field(client, headers):
     assert response.json()["headline"] is None
 
 
+def test_profile_social_links_are_private_and_validated(client, headers):
+    links = {"linkedin_url": "https://www.linkedin.com/in/ada", "github_url": "https://github.com/ada"}
+    response = client.patch("/api/v1/profile", headers=headers, json=links)
+    assert response.status_code == 200
+    assert all(response.json()[key] == value for key, value in links.items())
+    other = auth_headers(client, "other@example.com")
+    assert client.get("/api/v1/profile", headers=other).json()["github_url"] is None
+    for field, invalid in [("linkedin_url", "https://evil.example/in/ada"), ("github_url", "http://github.com/ada")]:
+        assert client.patch("/api/v1/profile", headers=headers, json={field: invalid}).status_code == 422
+    assert client.patch("/api/v1/profile", headers=headers, json={"github_url": None}).json()["github_url"] is None
+
+
 def test_skills_replace_get_create(client, headers):
     response = client.put(
         "/api/v1/profile/skills", headers=headers, json={"names": ["Python", "SQL", "python"]}

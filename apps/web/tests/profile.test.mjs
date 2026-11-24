@@ -16,7 +16,7 @@ async function load(path, dependencies = {}) {
 const helpers = await load("../src/lib/profile-edit.ts");
 const types = await load("../src/lib/api/types.ts");
 const { ApiError } = await load("../src/lib/api/client.ts");
-const profile = { id: "synthetic-profile", user_id: "synthetic-user", headline: "Student", bio: "Original bio", resume_url: null, degree_level: "bachelor", university: "Test University", field_of_study: "Computing", graduation_year: 2027, location: "Test City", created_at: "2026-11-01T00:00:00Z", updated_at: "2026-11-01T00:00:00Z" };
+const profile = { id: "synthetic-profile", user_id: "synthetic-user", headline: "Student", bio: "Original bio", resume_url: null, linkedin_url: "https://www.linkedin.com/in/student", github_url: "https://github.com/student", degree_level: "bachelor", university: "Test University", field_of_study: "Computing", graduation_year: 2027, location: "Test City", created_at: "2026-11-01T00:00:00Z", updated_at: "2026-11-01T00:00:00Z" };
 
 async function action(options = {}) {
   const writes = [], revalidated = [];
@@ -55,6 +55,14 @@ test("backend field limits, degree enum and year range are validated without inv
   assert.ok(helpers.validateProfilePatch({ degree_level: "phd" }).fields.degree_level);
   assert.equal(helpers.validateProfilePatch({ bio: "x".repeat(10000) }).error, undefined);
   assert.ok(helpers.validateProfileDraft({ ...helpers.profileDraft(profile), graduation_year: "2e3" }).graduation_year);
+});
+
+test("social links accept only secure profile URLs for their own service", () => {
+  for (const [field, url] of [["linkedin_url", "https://www.linkedin.com/in/bianca"], ["github_url", "https://github.com/bianca"]]) {
+    assert.deepEqual(helpers.validateProfilePatch({ [field]: url }).patch, { [field]: url });
+    for (const invalid of ["https://example.com/bianca", "http://" + new URL(url).host + "/bianca", "https://" + new URL(url).host]) assert.ok(helpers.validateProfilePatch({ [field]: invalid }).fields[field]);
+    assert.deepEqual(helpers.changedProfileFields(profile, { ...helpers.profileDraft(profile), [field]: url }), { [field]: url });
+  }
 });
 
 test("uneditable properties and malformed payloads are rejected", () => {

@@ -45,6 +45,8 @@ class Profile(TimestampMixin, Base):
     bio: orm.Mapped[str | None] = orm.mapped_column(sa.Text, nullable=True)
     location: orm.Mapped[str | None] = orm.mapped_column(sa.String(255), nullable=True)
     resume_url: orm.Mapped[str | None] = orm.mapped_column(sa.String(512), nullable=True)
+    linkedin_url: orm.Mapped[str | None] = orm.mapped_column(sa.String(512), nullable=True)
+    github_url: orm.Mapped[str | None] = orm.mapped_column(sa.String(512), nullable=True)
     # null = student hasn't declared a degree yet (eligibility treats it as unknown).
     degree_level: orm.Mapped[DegreeLevel | None] = orm.mapped_column(
         sa.Enum(DegreeLevel), nullable=True

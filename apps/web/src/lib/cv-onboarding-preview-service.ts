@@ -4,7 +4,7 @@ import { applyReviewChanges, isParsingResult, ResumeReviewConflict, ResumeReview
 import { validateOnboarding, onboardingPayload } from "./onboarding";
 import { cvDemoProposals, type CvDemoScenario } from "./cv-onboarding-scenarios";
 import { cvConfirmationErrors, type CvOnboardingServices } from "./cv-onboarding";
-export function emptyCvSnapshot():ReviewSnapshot{return {profileRevision:"synthetic-first-profile",profile:{headline:"",bio:"",degree_level:"",university:"",field_of_study:"",graduation_year:"",location:""},skills:[],collections:{experience:[],projects:[],certificates:[],honours:[],languages:[],publications:[]}};}
+export function emptyCvSnapshot():ReviewSnapshot{return {profileRevision:"synthetic-first-profile",profile:{headline:"",bio:"",degree_level:"",university:"",field_of_study:"",graduation_year:"",location:"",linkedin_url:"",github_url:""},skills:[],collections:{experience:[],projects:[],certificates:[],honours:[],languages:[],publications:[]}};}
 /** No real profile/skills/upload/parser endpoints. Synthetic extraction is independent of file contents. */
 export function createCvOnboardingPreviewServices(options:{delayMs?:number;scenario?:CvDemoScenario}={}){
   const pdf=createResumePdfPreviewService(options),review=createResumeReviewPreviewService({...options,initialSnapshot:emptyCvSnapshot()});

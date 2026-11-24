@@ -1,6 +1,6 @@
 import type { Profile } from "./api/types";
 
-export const editableProfileFields = ["headline", "bio", "degree_level", "university", "field_of_study", "graduation_year", "location"] as const;
+export const editableProfileFields = ["headline", "bio", "degree_level", "university", "field_of_study", "graduation_year", "location", "linkedin_url", "github_url"] as const;
 export type ProfileField = typeof editableProfileFields[number];
 export type ProfileDraft = Record<ProfileField, string>;
 export type ProfilePatch = Partial<Pick<Profile, ProfileField>>;
@@ -29,11 +29,19 @@ export function validateProfilePatch(value: unknown): { patch?: ProfilePatch; fi
     else {
       const text = raw.trim();
       if (key === "degree_level" && text && text !== "bachelor" && text !== "master") fields[key] = "Choose Bachelor's, Master's or Not provided.";
-      else if (key !== "bio" && text.length > 255) fields[key] = "Use 255 characters or fewer.";
+      else if ((key === "linkedin_url" || key === "github_url") && text && !validSocialUrl(text, key === "linkedin_url" ? "linkedin.com" : "github.com")) fields[key] = `Enter a valid ${key === "linkedin_url" ? "LinkedIn" : "GitHub"} profile URL starting with https://.`;
+      else if (key !== "bio" && text.length > (key.endsWith("_url") ? 512 : 255)) fields[key] = `Use ${key.endsWith("_url") ? 512 : 255} characters or fewer.`;
       else patch[key] = text || null;
     }
   }
   return Object.keys(fields).length ? { fields, error: "Review the highlighted fields and try again." } : { patch: patch as ProfilePatch };
+}
+
+function validSocialUrl(value: string, host: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && [host, `www.${host}`].includes(url.hostname) && url.pathname.replaceAll("/", "") !== "" && !url.username && !url.password && !url.port;
+  } catch { return false; }
 }
 
 export function validateProfileDraft(draft: ProfileDraft): ProfileFieldErrors {

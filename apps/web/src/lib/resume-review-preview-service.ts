@@ -2,7 +2,7 @@ import { reviewSections, reviewDefaults, applyReviewChanges, ResumeReviewConflic
 export const syntheticReviewSource = { id: "synthetic-resume", revision: 1 };
 /** Only synthetic hand-authored fixtures. Never extracted from a user's PDF. */
 export function syntheticReviewSnapshot(): ReviewSnapshot {
-  return { profileRevision:"synthetic-profile-1",profile:{headline:"Existing introduction",bio:"Keep this existing biography",degree_level:"bachelor",university:"Synthetic University",field_of_study:"Computing",graduation_year:"2027",location:"Synthetic City"},skills:["python"],collections:{
+  return { profileRevision:"synthetic-profile-1",profile:{headline:"Existing introduction",bio:"Keep this existing biography",degree_level:"bachelor",university:"Synthetic University",field_of_study:"Computing",graduation_year:"2027",location:"Synthetic City",linkedin_url:"",github_url:""},skills:["python"],collections:{
     experience:[{id:"saved-role-a",revision:1,position:1,values:{...reviewDefaults.experience,role:"Developer",organization:"Existing organization",startDate:"2023",endDate:"2024"}},{id:"saved-role-b",revision:1,position:2,values:{...reviewDefaults.experience,role:"Developer",organization:"Another organization",startDate:"2022",endDate:"2023"}}],
     projects:[{id:"saved-project",revision:1,position:1,values:{...reviewDefaults.projects,name:"Existing project",description:"Keep this project description",technologies:["python"]}}],certificates:[],honours:[],languages:[],publications:[] } };
 }

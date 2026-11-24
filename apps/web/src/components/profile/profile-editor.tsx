@@ -10,7 +10,12 @@ import { Select } from "@/components/ui/select";
 import { Field, fieldControl } from "@/components/ui/field";
 import { ErrorState } from "@/components/ui/error-state";
 
-const labels: Record<ProfileField, string> = { headline: "Headline", bio: "Bio", degree_level: "Degree level", university: "University", field_of_study: "Field of study", graduation_year: "Graduation year", location: "Location" };
+const labels: Record<ProfileField, string> = { headline: "Headline", bio: "Bio", degree_level: "Degree level", university: "University", field_of_study: "Field of study", graduation_year: "Graduation year", location: "Location", linkedin_url: "LinkedIn", github_url: "GitHub" };
+
+const socialIcons = {
+  linkedin_url: <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="size-5"><path d="M20.4 2H3.6C2.7 2 2 2.7 2 3.6v16.8c0 .9.7 1.6 1.6 1.6h16.8c.9 0 1.6-.7 1.6-1.6V3.6c0-.9-.7-1.6-1.6-1.6ZM8 18.5H5V9h3v9.5ZM6.5 7.7a1.7 1.7 0 1 1 0-3.4 1.7 1.7 0 0 1 0 3.4Zm12 10.8h-3v-4.6c0-1.1 0-2.5-1.5-2.5s-1.8 1.2-1.8 2.4v4.7h-3V9h2.9v1.3c.4-.8 1.4-1.5 2.8-1.5 3 0 3.6 1.9 3.6 4.3v5.4Z" /></svg>,
+  github_url: <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="size-5"><path d="M12 2a10 10 0 0 0-3.2 19.5c.5.1.7-.2.7-.5v-1.7c-2.8.6-3.4-1.2-3.4-1.2-.5-1.1-1.1-1.4-1.1-1.4-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.5 2.3 1.1 2.9.8.1-.7.4-1.1.7-1.4-2.2-.3-4.5-1.1-4.5-5a4 4 0 0 1 1-2.7c-.1-.3-.4-1.3.1-2.7 0 0 .8-.3 2.8 1a9.6 9.6 0 0 1 5.1 0c2-1.3 2.8-1 2.8-1 .5 1.4.2 2.4.1 2.7a4 4 0 0 1 1 2.7c0 3.9-2.3 4.7-4.5 5 .4.3.8.9.8 1.8V21c0 .3.2.6.7.5A10 10 0 0 0 12 2Z" /></svg>,
+};
 
 export type ProfileEditorHandle = { edit: (field: ProfileField) => void };
 export function ProfileEditor({ initialProfile, persistedProfile, onConfirmed, onUnavailable, ref, contactEmail }: {
@@ -60,7 +65,7 @@ export function ProfileEditor({ initialProfile, persistedProfile, onConfirmed, o
     const value = current[key];
     return typeof value === "string" ? value.trim() || "Not provided" : value ?? "Not provided";
   }
-  const input = (key: Exclude<ProfileField, "bio" | "degree_level">) => <Input label={labels[key]} name={key} value={draft[key]} type={key === "graduation_year" ? "number" : "text"} min={key === "graduation_year" ? 1900 : undefined} max={key === "graduation_year" ? 2100 : undefined} step={key === "graduation_year" ? 1 : undefined} maxLength={key === "graduation_year" ? undefined : 255} disabled={saving} error={fields[key]} onChange={(event) => update(key, event.target.value)} />;
+  const input = (key: Exclude<ProfileField, "bio" | "degree_level">) => <Input label={labels[key]} name={key} value={draft[key]} type={key === "graduation_year" ? "number" : key.endsWith("_url") ? "url" : "text"} min={key === "graduation_year" ? 1900 : undefined} max={key === "graduation_year" ? 2100 : undefined} step={key === "graduation_year" ? 1 : undefined} maxLength={key === "graduation_year" ? undefined : key.endsWith("_url") ? 512 : 255} placeholder={key === "linkedin_url" ? "https://www.linkedin.com/in/your-name" : key === "github_url" ? "https://github.com/your-name" : undefined} disabled={saving} error={fields[key]} onChange={(event) => update(key, event.target.value)} />;
 
   return <>
     <section id="profile-overview" className="py-7" aria-labelledby="profile-details-title">
@@ -77,6 +82,7 @@ export function ProfileEditor({ initialProfile, persistedProfile, onConfirmed, o
         {input("graduation_year")}{input("university")}{input("field_of_study")}
       </div>
       {input("location")}
+      <div className="grid gap-6 sm:grid-cols-2">{input("linkedin_url")}{input("github_url")}</div>
       {error && <ErrorState variant="danger" title="Profile could not be saved" description={error} />}
       {saving && <p role="status" className="text-sm text-muted">Saving your profile…</p>}
       <div className="flex flex-wrap gap-3"><Button type="submit" disabled={saving}>{saving ? "Saving…" : "Save"}</Button><Button variant="secondary" disabled={saving} onClick={close}>Cancel</Button></div>
@@ -87,6 +93,9 @@ export function ProfileEditor({ initialProfile, persistedProfile, onConfirmed, o
         {current.location?.trim() && <span className="inline-flex max-w-full items-center gap-2 rounded-full bg-elevated px-3 py-1.5 [overflow-wrap:anywhere]"><span className="font-medium">Location</span>{current.location}</span>}
         {contactEmail && <span className="inline-flex max-w-full flex-wrap items-center gap-x-2 rounded-full bg-elevated px-3 py-1.5 [overflow-wrap:anywhere]"><span className="font-medium">Email</span><span>{contactEmail}</span></span>}
       </div>
+      {(current.linkedin_url || current.github_url) && <div className="flex flex-wrap gap-3">
+        {(["linkedin_url", "github_url"] as const).map((key) => current[key] && <a key={key} href={current[key]} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-full border border-line px-3 py-2 text-sm font-medium text-foreground hover:bg-elevated focus-visible:outline-2 focus-visible:outline-offset-2">{socialIcons[key]}{labels[key]}</a>)}
+      </div>}
     </div>}
     </section>
     <section id="profile-education" aria-labelledby="profile-education-title" className="border-t border-line py-7">
