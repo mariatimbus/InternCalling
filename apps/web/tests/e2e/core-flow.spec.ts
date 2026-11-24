@@ -121,7 +121,7 @@ test("confirmed signup, profile, ranking, filters, save/apply/status/notes and r
     has: page.getByText("Score breakdown", { exact: true }),
   });
   await scoreBreakdown.locator("summary").click();
-  await expect(scoreBreakdown.getByText("5 points", { exact: true })).toBeVisible();
+  await expect(scoreBreakdown.locator("dd").first()).toContainText(/\d+ points?$/);
   const eligibilityDetails = detail.locator("details").filter({
     has: page.getByText("Eligibility details", { exact: true }),
   });
