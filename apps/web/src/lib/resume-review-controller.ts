@@ -1,4 +1,4 @@
-import { isParsingJob, isParsingResult, isReviewSnapshot, sameResume, createReviewDraft, buildReviewChanges, ResumeReviewConflict, ResumeReviewRejected, type ParsingJob, type ParsingResult, type ReviewDraft, type ReviewChanges, type ReviewReceipt, type ResumeReviewService } from "./resume-review";
+import { isParsingJob, isParsingResult, isReviewSnapshot, sameResume, selectProposals, buildReviewChanges, ResumeReviewConflict, ResumeReviewRejected, type ParsingJob, type ParsingResult, type ReviewDraft, type ReviewChanges, type ReviewReceipt, type ResumeReviewService } from "./resume-review";
 import type { ResumeIdentity } from "./resume-pdf";
 export type ResumeReviewState = { phase:"idle"|"processing"|"review"|"confirm"|"saving"|"success"|"cancelled"; job:ParsingJob|null; result:ParsingResult|null; draft:ReviewDraft|null; changes:ReviewChanges|null; receipt:ReviewReceipt|null; errors:Record<string,string>; message:string; stale:boolean; uncertain:boolean; checking:boolean };
 export const initialReviewState=():ResumeReviewState=>({phase:"idle",job:null,result:null,draft:null,changes:null,receipt:null,errors:{},message:"",stale:false,uncertain:false,checking:false});
@@ -38,7 +38,7 @@ export class ResumeReviewController {
       if(!this.current(operation))return;
       if(!isParsingResult(result))throw new ResumeReviewRejected("Missing or invalid result");
       if(result.jobId!==job.id||!sameResume(result.source,this.source)||result.snapshot.profileRevision!==job.profileRevision)throw new ResumeReviewConflict("Stale result");
-      this.update({phase:"review",result,draft:createReviewDraft(result),errors:{},message:"Review the proposals. Nothing is selected or saved by default."});
+      this.update({phase:"review",result,draft:selectProposals(result),errors:{},message:"Everything found in your CV is selected. Untick or fix anything wrong, then confirm. Nothing is saved until you confirm."});
     }catch(cause){if(this.current(operation))this.update({errors:{processing:cause instanceof ResumeReviewConflict?"The resume or profile changed, or the result is inconsistent. Load the current resume and start a fresh review.":"Processing or its result could not be loaded. Retry processing; your saved profile is unchanged."},stale:cause instanceof ResumeReviewConflict,message:"No review changes have been confirmed."});}
     finally{if(this.active===operation){this.active=null;this.update({checking:false});}}
   }

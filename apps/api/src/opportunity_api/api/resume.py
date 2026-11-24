@@ -13,6 +13,7 @@ from ..ai.documents import PDF
 from ..ai.extract import extract_cv_facts
 from ..ai.rules import RULES_MODEL
 from ..ai.schemas import CVExtraction
+from ..ai.sections import propose as propose_sections
 from ..core.errors import APIError
 from ..models import CVDocument, Profile, ResumeState
 from ..schemas.profile import ProfilePatch
@@ -242,11 +243,11 @@ def start_review(
         "proposed": {
             "profile": proposed,
             "skills": extraction.values_for("skills"),
-            "collections": [],
+            # Experience, projects, languages, certificates, awards and papers the CV states.
+            "collections": propose_sections(text),
         },
         "warnings": [
-            "Only explicit core profile facts and skills were extracted. "
-            "Review every value; add other profile sections manually."
+            "Review every value before saving; anything missing can be added in Profile."
         ]
         + (
             [

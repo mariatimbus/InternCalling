@@ -190,7 +190,7 @@ def normalize(raw: RawOpportunity) -> dict[str, object]:
                     f"Explicit {name} could not be mapped without assumptions.",
                 )
             )
-    # Validation happens after scope. No fabricated URN or source publication date.
+    # Validation happens after scope. No fabricated URN; publication date only as sourced.
     url = raw.source_url
     if url:
         try:
@@ -206,6 +206,7 @@ def normalize(raw: RawOpportunity) -> dict[str, object]:
         "description": clean_html(raw.description),
         "location": clean_text(raw.location),
         "deadline": deadline,
+        "posted_at": raw.posted_at,
         "degree_level": degree,
         "study_year": years,
         "opportunity_type": (raw.model_extra or {}).get("opportunity_type", "internship"),
