@@ -6,7 +6,7 @@ import { isSaved, searchHref, type SavedSearch, type SearchFields } from "@/lib/
 export function SavedSearches({ saved, current, action }: { saved: SavedSearch[]; current: SearchFields; action: (form: FormData) => Promise<void> }) {
   const canSave = Object.values(current).some((value) => value.trim()) && !isSaved(saved, current) && saved.length < 10;
   if (!saved.length && !canSave) return null;
-  return <section aria-label="Saved searches" className="mt-3 flex flex-wrap items-center gap-2">
+  return <section aria-label="Saved searches" className="flex min-w-0 flex-wrap items-center gap-2">
     {saved.map((row) => <div key={row.id} className="inline-flex max-w-full items-center rounded-full border border-border bg-surface text-sm">
       <Link href={searchHref(row)} prefetch={false} className="min-h-10 truncate py-2 ps-4 pe-2 text-foreground hover:text-accent">{row.name}</Link>
       <form action={action}>

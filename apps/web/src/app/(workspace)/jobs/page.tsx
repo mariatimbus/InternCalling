@@ -77,15 +77,18 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
     </div>
     {view === "recommended" && <div className="mt-6">
       <JobsSearch search={search} applied={{ location, degree_level: degree, study_year: year }} navigationKey={href(view)} />
-      <SavedSearches saved={saved} current={{ search, location, degree, year }} action={savedSearchAction} />
     </div>}
-    <nav aria-label="Job lists" className={`segmented-track mb-5 ${view === "recommended" ? "" : "mt-6"}`}>
+    {/* Saved searches share the tabs' row so the list and detail panel keep their height. */}
+    <div className={`mb-5 flex flex-wrap items-center gap-x-4 gap-y-2 ${view === "recommended" ? "" : "mt-6"}`}>
+    <nav aria-label="Job lists" className="segmented-track">
       {(Object.keys(views) as JobsView[]).map((target) => <Link key={target} href={href(target)} prefetch={false}
         aria-current={target === view ? "page" : undefined}
         className="segmented-link">
         {views[target].label}
       </Link>)}
     </nav>
+    {view === "recommended" && <SavedSearches saved={saved} current={{ search, location, degree, year }} action={savedSearchAction} />}
+    </div>
     {failed ? <ErrorState title={copy.error} action={<form action="/jobs">
       {Array.from(urlParams(view, page), ([name, value]) => <input key={name} type="hidden" name={name} value={value} />)}
       <Button type="submit">Try again</Button>

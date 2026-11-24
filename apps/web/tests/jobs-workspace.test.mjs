@@ -804,7 +804,7 @@ test("the flag gates profile skills reads and Saved does not fetch skills for tr
   const calls = [];
   const page = await detailPage(async () => ({ api: { request: async (path) => {
     calls.push(path);
-    if (path.endsWith("/match")) return { score: 42, reasons: ["Skill overlap: Python"] };
+    if (path.endsWith("/match")) return { score: 42, reasons: ["Matches 1 of 3 skills: python"] };
     if (path.endsWith("/eligibility")) return { status: "possibly_eligible", reasons: [] };
     if (path === "/api/v1/profile/skills") return savedSkills;
     if (path === "/api/v1/applications") return { items: [] };
@@ -819,7 +819,7 @@ test("the flag gates profile skills reads and Saved does not fetch skills for tr
     const tree = await page();
     assert.equal(tree.some((node) => node.props["aria-label"] === "Opportunity Copilot"), enabled);
     assert.equal(tree.some((node) => node.props["aria-label"] === "Skills matched"), enabled);
-    for (const label of ["Why this fits", "What to check", "Skill overlap: Python", "Possibly eligible"]) {
+    for (const label of ["Why this fits", "What to check", "Matches 1 of 3 skills: python", "Possibly eligible"]) {
       assert.equal(tree.filter((node) => node.props.children === label).length, 1);
     }
   }
