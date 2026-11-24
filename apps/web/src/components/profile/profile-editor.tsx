@@ -13,11 +13,12 @@ import { ErrorState } from "@/components/ui/error-state";
 const labels: Record<ProfileField, string> = { headline: "Headline", bio: "Bio", degree_level: "Degree level", university: "University", field_of_study: "Field of study", graduation_year: "Graduation year", location: "Location" };
 
 export type ProfileEditorHandle = { edit: (field: ProfileField) => void };
-export function ProfileEditor({ initialProfile, onConfirmed, onUnavailable, ref, compactDesktop = false }: {
-  initialProfile: Profile; onConfirmed?: (profile: Profile) => void; onUnavailable?: () => void;
+export function ProfileEditor({ initialProfile, persistedProfile, onConfirmed, onUnavailable, ref, compactDesktop = false }: {
+  initialProfile: Profile; persistedProfile?: Profile; onConfirmed?: (profile: Profile) => void; onUnavailable?: () => void;
   ref?: Ref<ProfileEditorHandle>; compactDesktop?: boolean;
 }) {
   const [profile, setProfile] = useState(initialProfile);
+  const current = persistedProfile ?? profile;
   const [draft, setDraft] = useState(() => profileDraft(initialProfile));
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -32,11 +33,11 @@ export function ProfileEditor({ initialProfile, onConfirmed, onUnavailable, ref,
   useImperativeHandle(ref, () => ({ edit(field) {
     focusField.current = field;
     if (editing) form.current?.querySelector<HTMLElement>('[name="' + field + '"]')?.focus();
-    else { setDraft(profileDraft(profile)); setSuccess(""); setEditing(true); }
-  } }), [editing, profile]);
+    else { setProfile(current); setDraft(profileDraft(current)); setSuccess(""); setEditing(true); }
+  } }), [editing, current]);
 
   function update(key: ProfileField, value: string) { setDraft((current) => ({ ...current, [key]: value })); setFields((current) => ({ ...current, [key]: undefined })); }
-  function close() { setDraft(profileDraft(profile)); setEditing(false); setError(""); setFields({}); sectionTitle.current?.focus(); }
+  function close() { setDraft(profileDraft(current)); setEditing(false); setError(""); setFields({}); sectionTitle.current?.focus(); }
   function focusInvalid(problems: ProfileFieldErrors) { const key = Object.keys(problems)[0]; if (key) form.current?.querySelector<HTMLElement>(`[name="${key}"]`)?.focus(); }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -54,14 +55,14 @@ export function ProfileEditor({ initialProfile, onConfirmed, onUnavailable, ref,
     finally { inFlight.current = false; setSaving(false); }
   }
   function display(key: ProfileField) {
-    if (key === "degree_level") return profile.degree_level === "bachelor" ? "Bachelor's" : profile.degree_level === "master" ? "Master's" : "Not provided";
-    const value = profile[key];
+    if (key === "degree_level") return current.degree_level === "bachelor" ? "Bachelor's" : current.degree_level === "master" ? "Master's" : "Not provided";
+    const value = current[key];
     return typeof value === "string" ? value.trim() || "Not provided" : value ?? "Not provided";
   }
   const input = (key: Exclude<ProfileField, "bio" | "degree_level">) => <Input label={labels[key]} name={key} value={draft[key]} type={key === "graduation_year" ? "number" : "text"} min={key === "graduation_year" ? 1900 : undefined} max={key === "graduation_year" ? 2100 : undefined} step={key === "graduation_year" ? 1 : undefined} maxLength={key === "graduation_year" ? undefined : 255} disabled={saving} error={fields[key]} onChange={(event) => update(key, event.target.value)} />;
 
   return <section data-profile-compact={compactDesktop ? "editor" : undefined} className={`mt-8 rounded-panel bg-card p-6 sm:p-9 ${compactDesktop ? "xl:mt-5 xl:p-4" : ""}`} aria-labelledby="profile-details-title">
-    <div className="flex flex-wrap items-center justify-between gap-4"><h2 ref={sectionTitle} id="profile-details-title" tabIndex={-1} className="section-title">Profile details</h2>{!editing && <Button onClick={() => { focusField.current = "headline"; setDraft(profileDraft(profile)); setSuccess(""); setEditing(true); }}>Edit profile</Button>}</div>
+    <div className="flex flex-wrap items-center justify-between gap-4"><h2 ref={sectionTitle} id="profile-details-title" tabIndex={-1} className="section-title">Profile details</h2>{!editing && <Button onClick={() => { focusField.current = "headline"; setDraft(profileDraft(current)); setSuccess(""); setEditing(true); }}>Edit profile</Button>}</div>
     {success && <p role="status" className="mt-5 text-sm leading-6">{success}</p>}
     {editing ? <form ref={form} onSubmit={submit} noValidate aria-busy={saving} className="mt-6 space-y-6">
       <p className="text-sm leading-6 text-muted">Leave a field blank to clear it. Clearing study or location details may require onboarding again before opening Jobs.</p>

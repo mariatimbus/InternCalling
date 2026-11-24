@@ -25,6 +25,7 @@ try {
   }
   await db.exec(await readFile(new URL('./tests/rls.sql', import.meta.url), 'utf8'));
   await db.exec(await readFile(new URL('./tests/cv-rls.sql', import.meta.url), 'utf8'));
+  await db.exec(await readFile(new URL('./tests/workspace-rls.sql', import.meta.url), 'utf8'));
   console.log('PASS: fresh PostgreSQL migration replay and RLS/Auth behavior');
 } finally {
   await db.close();

@@ -12,6 +12,8 @@ from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.orm.exc import StaleDataError
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +59,8 @@ def _serialize_validation_errors(errors: list[dict[str, Any]]) -> list[dict[str,
     """Make pydantic error dicts JSON-safe (ctx may hold live exception objects)."""
     serialized = []
     for error in errors:
-        error = dict(error)
+        # Never echo private submitted data or arbitrary exception objects.
+        error = {key: value for key, value in error.items() if key in {"loc", "msg", "type"}}
         ctx = error.get("ctx")
         if ctx and "error" in ctx:
             error["ctx"] = {**ctx, "error": str(ctx["error"])}
@@ -83,6 +86,22 @@ def install_exception_handlers(app: FastAPI) -> None:
                 "validation_error",
                 "Request validation failed",
                 _serialize_validation_errors(exc.errors()),
+            ),
+        )
+
+    @app.exception_handler(SQLAlchemyError)
+    async def database_error_handler(request: Request, exc: SQLAlchemyError) -> JSONResponse:
+        # SQLAlchemy exception text can contain private CV/profile bind parameters.
+        conflict = isinstance(exc, (IntegrityError, StaleDataError))
+        workspace = request.url.path.startswith("/api/v1/workspace")
+        logger.error("Database request failed (%s)", type(exc).__name__)
+        return JSONResponse(
+            status_code=(409 if workspace else 500) if conflict else 503,
+            content=_error_payload(
+                "workspace_conflict" if conflict else "database_unavailable",
+                "Saved data changed. Reload and retry."
+                if conflict
+                else "Saved data is temporarily unavailable. Retry later.",
             ),
         )
 

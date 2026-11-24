@@ -247,7 +247,11 @@ def load_verification(path: Path = VERIFICATION) -> dict:
         if entry.get("outcome") not in {"verified", "flagged"}:
             raise ValueError("invalid source verification outcome")
         if entry.get("availability") not in {
-            "open", "rolling", "announced", "closed", "unverified"
+            "open",
+            "rolling",
+            "announced",
+            "closed",
+            "unverified",
         }:
             raise ValueError("invalid source availability")
         if type(entry.get("eligible_for_import")) is not bool:
@@ -501,7 +505,8 @@ def main(argv=None) -> int:
     if publication_mode:
         for payload in approved:
             payload["is_active"] = verification[payload["url"]]["availability"] in {
-                "open", "rolling"
+                "open",
+                "rolling",
             }
     report = dict(
         mode="apply" if args.apply else "dry-run",

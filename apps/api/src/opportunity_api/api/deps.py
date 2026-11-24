@@ -6,6 +6,7 @@ from uuid import UUID
 import jwt
 from fastapi import Depends, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -64,11 +65,24 @@ def get_current_user(
 
 
 def get_or_create_profile(db: Session, user: User) -> Profile:
-    """Return the user's profile, creating an empty row on first use (bootstrap)."""
-    if user.profile is None:
-        profile = Profile()
-        user.profile = profile
-        db.add(profile)
-        db.flush()
-        return profile
-    return user.profile
+    """Return the user's profile, creating an empty row on first use (bootstrap).
+
+    A new user's first page load issues parallel requests; if another request created
+    the profile first, the unique ``user_id`` rejects ours. The insert runs in a
+    savepoint so only it is undone, and the winner's row is returned instead of a 500.
+    """
+    if user.profile is not None:
+        return user.profile
+    profile = Profile(user_id=user.id)
+    try:
+        with db.begin_nested():
+            db.add(profile)
+            db.flush()
+    except IntegrityError:
+        existing = db.scalar(select(Profile).where(Profile.user_id == user.id))
+        if existing is None:
+            raise
+        db.expire(user, ["profile"])
+        return existing
+    db.expire(user, ["profile"])
+    return profile

@@ -2,12 +2,15 @@
 
 import os
 import sys
+from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from uuid import UUID
 
 import uvicorn
-from sqlalchemy import URL, create_engine
+from fastapi import Response
+from reportlab.pdfgen.canvas import Canvas
+from sqlalchemy import URL, create_engine, event
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
 
@@ -21,12 +24,22 @@ def serve(database_url: URL) -> None:
     os.environ["APP_RATE_LIMIT_PER_MINUTE"] = "0"
     os.environ["APP_OLLAMA_URL"] = ""
 
+    os.environ["APP_SUPABASE_PUBLISHABLE_KEY"] = "sb_publishable_local_e2e_fixture"
+
+    from opportunity_api.api.cv import get_storage
     from opportunity_api.core.database import Base, get_db
     from opportunity_api.main import create_app
     from opportunity_api.models import Opportunity, OpportunityType
 
     # Jobs makes parallel API requests even with a single Playwright worker.
-    engine = create_engine(database_url, poolclass=NullPool)
+    engine = create_engine(database_url, connect_args={"timeout": 30}, poolclass=NullPool)
+
+    @event.listens_for(engine, "connect")
+    def set_busy_timeout(connection, _record):
+        connection.execute("PRAGMA busy_timeout=30000")
+
+    with engine.begin() as connection:
+        connection.exec_driver_sql("PRAGMA journal_mode=WAL")
     try:
         Base.metadata.create_all(engine)
         Session = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
@@ -50,6 +63,24 @@ def serve(database_url: URL) -> None:
                 )
 
         app = create_app()
+
+        # Synthetic private Storage transport, injected only into this loopback fixture.
+        class FixtureStorage:
+            files = {}
+            def upload(self, path, data, media_type):
+                self.files[path] = data
+            def download(self, path):
+                return self.files[path]
+            def delete(self, path):
+                self.files.pop(path, None)
+        app.dependency_overrides[get_storage] = FixtureStorage
+        @app.get("/__test/resume.pdf")
+        def fixture_pdf():
+            buffer = BytesIO()
+            canvas = Canvas(buffer)
+            canvas.drawString(60, 760, "Synthetic fixture resume: Python research")
+            canvas.save()
+            return Response(buffer.getvalue(), media_type="application/pdf")
 
         def test_db():
             with Session() as db:

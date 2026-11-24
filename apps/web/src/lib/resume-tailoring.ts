@@ -1,4 +1,4 @@
-/** PROPOSED contracts only. No live generation/persistence/export endpoints are agreed. */
+/** Live tailoring contracts backed by source-scoped drafts, approvals and private PDF exports. */
 import { safeResumeAccess, type ResumeAccess } from "./resume-pdf";
 export type TailoringRef={id:string;revision:string};
 export const tailoringSections=["profile","skills","experience","projects","certificates","honours","languages","publications"] as const;

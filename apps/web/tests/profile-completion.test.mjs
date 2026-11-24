@@ -57,6 +57,8 @@ function hooks() {
       useState(initial) { const slot = index++; if (!(slot in values)) values[slot] = typeof initial === "function" ? initial() : initial; return [values[slot], (next) => { values[slot] = typeof next === "function" ? next(values[slot]) : next; }]; },
       useRef(current) { const slot = refIndex++; if (!(slot in refs)) refs[slot] = { current }; return refs[slot]; },
       useEffect() {},
+      useMemo(factory) { return factory(); },
+      useCallback(callback) { return callback; },
       useImperativeHandle(ref, create) { if (ref) ref.current = create(); },
     },
     render(Component, props) { index = 0; refIndex = 0; return Component(props); },
@@ -85,6 +87,9 @@ async function fixture({ profile = empty, skills = [], save = {}, mutate = {}, r
   });
   const { ProfileHub } = await load("../src/components/profile/profile-hub.tsx", {
     react: hubHooks.react, "react/jsx-runtime": runtime,
+    "next/navigation": { useRouter: () => ({ refresh() {} }) },
+    "@/lib/profile-services": { createProfileServices: () => Object.fromEntries(["experience", "projects", "certificates", "honours", "languages", "publications", "pdf", "review"].map(name => [name, { name }])) },
+    "./resume-review-flow": { ResumeReviewFlow: "ReviewFlow" },
     "@/app/(workspace)/profile/completion-actions": { refreshCompletion: async () => refreshed },
     "@/lib/profile-completion": helper, "@/components/ui/button": { Button: "Button" },
     "./profile-completion": { ProfileCompletion: "Completion" },

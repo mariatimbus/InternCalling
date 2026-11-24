@@ -249,7 +249,7 @@ export function OpportunityDetailView({ opportunity: job, assessment, status, co
           <ApplicationControls key={`${job.id}:${tracking?.application?.updated_at ?? "new"}`}
             opportunityId={job.id} application={tracking?.application} showSave={tracking?.showSave}
             inline allowTracking={!!tracking}
-            tailoring={listing ? <TailoringEntryPoint title={job.title} organization={job.organization ?? ""} embedded /> : undefined} />
+            tailoring={listing ? <TailoringEntryPoint jobId={job.id} title={job.title} organization={job.organization ?? ""} embedded /> : undefined} />
         </div>}
         <div className="mt-3 flex flex-wrap gap-2">
           {listing?.is_active === false && <Badge>Closed on InternCalling</Badge>}

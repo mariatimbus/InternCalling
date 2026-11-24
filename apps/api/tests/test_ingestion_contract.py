@@ -123,14 +123,16 @@ def test_scope_keeps_missing_location_for_review():
     assert decision.code == "scope_ambiguous"
 
 
-def test_scope_keeps_unrestricted_remote_for_review_without_assuming_europe():
-    decision = assess_scope(
+def test_scope_accepts_unrestricted_remote_but_reviews_unknown_regions():
+    remote = assess_scope(
         "Software Engineering Intern",
         "Python and cloud work for students.",
         "Remote",
     )
-    assert not decision.accepted
-    assert decision.requires_review
+    assert remote.accepted
+    worldwide = assess_scope("Software Engineering Intern", "Python", "Worldwide")
+    assert not worldwide.accepted
+    assert worldwide.requires_review
 
 
 def test_adapter_interface_is_abstract():
@@ -150,3 +152,42 @@ def test_adapter_interface_is_abstract():
     assert len(records) == 1
     assert records[0].source == "demo"
     assert records[0].source_id == "1"
+
+
+@pytest.mark.parametrize(
+    "title",
+    [
+        "Founder's Associate Intern (M&A, VentureDev Focus)",
+        "Working Student - Investor Relations (f/m/d)",
+        "Werkstudent:in Grafikdesign (m/w/d)",
+        "Praktikum PreSales AI Scale Up (m/w/d)",
+        "Stage - Strategy & Operations (x/f/m) - mars 2027",
+        "Intern Menu Planning & Ingredients (f/m/x)",
+        "Working Student, Export Control/ International Trade Compliance (m/f/d)",
+    ],
+)
+def test_business_titles_are_rejected_even_at_tech_companies(title):
+    description = "Our AI platform: software, data, cloud and engineering teams."
+    assert assess_scope(title, description, "Berlin, Germany").code == "not_stem"
+
+
+@pytest.mark.parametrize(
+    "title",
+    [
+        "Manufacturing Operations (Product Test) Summer Intern 2027",
+        "Working Student IT Helpdesk (m/f/d)",
+        "Werkstudent:in digitales Produktmanagement (w/m/d)",
+        "Firmware Summer Intern 2027",
+        "Control & Estimation Intern",
+        "Sales Engineering Intern (London), Summer 2027",
+    ],
+)
+def test_technical_titles_win_over_business_words(title):
+    assert assess_scope(title, None, "Berlin, Germany").accepted
+
+
+def test_neutral_title_needs_a_clearly_technical_description():
+    weak = "Join our tech team! We love AI. Some data."
+    strong = "You will write Python and SQL against our data warehouse."
+    assert assess_scope("Stagiaire 6 mois", weak, "Paris, France").requires_review
+    assert assess_scope("Stagiaire 6 mois", strong, "Paris, France").accepted

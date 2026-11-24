@@ -14,6 +14,7 @@ export function ApplicationControls({ opportunityId, application = null, showSav
 }) {
   const notesId = useId();
   const [open, setOpen] = useState<"status" | "notes" | "tailor" | null>(null);
+  const [tailorOpened, setTailorOpened] = useState(false);
   const [draftStatus, setDraftStatus] = useState<Application["status"]>();
   const [draftNotes, setDraftNotes] = useState<string>();
   const [state, action, pending] = useActionState(async (previous: TrackingState, form: FormData) => {
@@ -29,6 +30,7 @@ export function ApplicationControls({ opportunityId, application = null, showSav
   const notesPanelId = notesId + "-notes";
   const tailorPanelId = notesId + "-tailor";
   function toggle(panel: NonNullable<typeof open>) {
+    if (panel === "tailor") setTailorOpened(true);
     setOpen((previous) => previous === panel ? null : panel);
   }
   return <>
@@ -40,7 +42,7 @@ export function ApplicationControls({ opportunityId, application = null, showSav
       {tailoring && <Button variant="secondary" size="sm" aria-expanded={open === "tailor"} aria-controls={tailorPanelId}
         onClick={() => toggle("tailor")}>Tailor resume</Button>}
     </div>}
-    {inline && tailoring && <div id={tailorPanelId} hidden={open !== "tailor"} className="mt-3">{tailoring}</div>}
+    {inline && tailoring && <div id={tailorPanelId} hidden={open !== "tailor"} className="mt-3">{tailorOpened && tailoring}</div>}
     {allowTracking && <form action={action} hidden={inline && open !== "status" && open !== "notes"}
       className={inline ? "mt-3 space-y-3 border-t border-border pt-3" : "space-y-4 border-t border-border pt-5"}>
     <input type="hidden" name="opportunity_id" value={opportunityId} />
