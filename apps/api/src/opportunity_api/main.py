@@ -14,6 +14,7 @@ from .api import (
     opportunities,
     profile,
     resume,
+    review,
     tailoring,
     workspace,
 )
@@ -49,6 +50,7 @@ def create_app() -> FastAPI:
     app.include_router(profile.skills_router, prefix="/api/v1")
     app.include_router(opportunities.router, prefix="/api/v1")
     app.include_router(applications.router, prefix="/api/v1")
+    app.include_router(review.router, prefix="/api/v1")
 
     if settings.debug:
         app.include_router(dev.router)
