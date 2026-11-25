@@ -12,12 +12,17 @@ test("Projects persist GitHub links, show readable dates and retain saved text a
   const control = await (await request.get("http://127.0.0.1:8300/__test")).json();
   await page.goto(`/auth/callback?code=${encodeURIComponent(control.confirmationCode)}`);
   await page.getByRole("button", { name: "Continue without CV", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Studies", exact: true })).toBeVisible();
   await page.getByLabel("Bachelor's", { exact: true }).check();
   for (const [label, value] of [["University", "Fixture University"], ["Field of study", "Computer Science"], ["Graduation year", "2027"], ["City (optional)", "Berlin, Germany"]]) await page.getByLabel(label, { exact: true }).fill(value);
   await page.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Skills", exact: true })).toBeVisible();
   await page.getByLabel("Skills", { exact: true }).fill("Python");
   await page.getByRole("button", { name: "Add skill", exact: true }).click();
-  for (let step = 0; step < 6; step++) await page.getByRole("button", { name: "Next", exact: true }).click();
+  for (const title of ["Experience", "Personal projects", "Certifications", "Awards", "Languages", "Publications"]) {
+    await page.getByRole("button", { name: "Next", exact: true }).click();
+    await expect(page.getByRole("heading", { name: title, exact: true })).toBeVisible();
+  }
   await page.getByRole("button", { name: "Finish and see jobs", exact: true }).click();
   await expect(page).toHaveURL(/\/jobs/);
   await page.goto("/profile");

@@ -202,7 +202,7 @@ export function QuickOnboarding({ initial, suggestions }: { initial: OnboardingD
       {state.error && <p role="alert" className="text-sm">{state.error}</p>}
       <div className="flex flex-wrap justify-between gap-3 border-t border-line pt-5">
         <Button variant="secondary" disabled={step === 0 || pending || reading} onClick={() => { setPageError(""); setStep(value => value - 1); }}>Back</Button>
-        {step === steps.length - 1 ? <Button type="submit" disabled={pending || reading}>{pending ? "Saving…" : "Finish and see jobs"}</Button> : <Button disabled={pending || reading} onClick={next}>{current === "cv" && !parsed ? "Continue without CV" : "Next"}</Button>}
+        {step === steps.length - 1 ? <Button key="finish" type="submit" disabled={pending || reading}>{pending ? "Saving…" : "Finish and see jobs"}</Button> : <Button key="next" disabled={pending || reading} onClick={next}>{current === "cv" && !parsed ? "Continue without CV" : "Next"}</Button>}
       </div>
     </form>
   </section></div>;
