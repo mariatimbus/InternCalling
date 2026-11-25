@@ -91,3 +91,26 @@ Provider references:
 [Greenhouse Job Board API](https://docs.greenhouse.io/job-board),
 [Lever public Postings API](https://github.com/lever/postings-api),
 [SmartRecruiters public endpoints](https://developers.smartrecruiters.com/docs/endpoints).
+
+## Full text for curated postings
+
+Curated shortlist rows (`source = maria_europe_master_2026_10_12`) were imported with a short
+summary and the official link. Matching, eligibility (graduation years, final year) and the ATS
+check read the posting text, so `opportunity_api.ingestion.full_text` replaces each summary with
+the official posting's full text:
+
+1. the ATS's public API (Greenhouse, Lever, Ashby, Workday);
+2. a schema.org `JobPosting` embedded in the page (Stripe, Optiver, SIG, BlackRock);
+3. headed description sections (amazon.jobs) or the page's `<main>`.
+
+Requests go through `PublicJSONClient` (robots.txt, per-host interval, no redirects, size cap).
+Text under 120 words is not trusted and the row keeps its summary. The official link stays as
+the last lines with a fresh "Source last checked" date, and re-running is idempotent.
+
+```bash
+cd apps/api
+uv run python -m opportunity_api.ingestion.full_text --dry-run            # report only
+uv run python -m opportunity_api.ingestion.full_text --apply --allow-hosted
+```
+
+Sites that refuse automated reads (403) or closed postings (404) are reported as skipped.
