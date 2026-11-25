@@ -48,7 +48,7 @@ const jsx = (type, props) => ({ type, props: props ?? {} });
 const runtime = { jsx, jsxs: jsx };
 function nodes(tree) { return !tree || typeof tree !== "object" ? [] : [tree, ...[tree.props?.children].flat(Infinity).flatMap(nodes)]; }
 const find = (tree, type) => nodes(tree).find(n => n.type === type);
-const button = (tree, label) => nodes(tree).find(n => n.type === "Button" && [n.props.children].flat()[0] === label);
+const button = (tree, label) => nodes(tree).find(n => n.type === "Button" && [n.props.children].flat().includes(label));
 async function fixture(service) {
   const values = [], refs = [], effects = [];
   let cursor = 0, refCursor = 0;
@@ -61,7 +61,7 @@ async function fixture(service) {
   const { ExperienceSection } = await load("../src/components/profile/experience-section.tsx", {
     react, "react/jsx-runtime": runtime, "@/lib/experience": model,
     "./collection-view": { CollectionView: "CollectionView" }, "@/components/ui/input": { Input: "Input" },
-    "@/components/ui/button": { Button: "Button" }, "@/components/ui/field": { Field: "Field", fieldControl: "" },
+    "@/components/ui/button": { Button: "Button" }, "@/components/ui/icon": { Icon: "Icon" }, "@/components/ui/field": { Field: "Field", fieldControl: "" },
   });
   const render = () => { cursor = 0; refCursor = 0; return ExperienceSection({ service }); };
   const initial = render(); effects[0](); await new Promise(r => setImmediate(r));
@@ -117,7 +117,7 @@ test("load errors are retryable; typed rendering distinguishes unknown, loading,
   assert.equal(f.state().kind, "error");
   await find(f.render(), "CollectionView").props.onRetry(); await new Promise(r => setImmediate(r));
   assert.equal(f.state().kind, "ready");
-  const { CollectionView } = await load("../src/components/profile/collection-view.tsx", { "react/jsx-runtime": runtime, "@/components/ui/button": { Button: "Button" } });
+  const { CollectionView } = await load("../src/components/profile/collection-view.tsx", { "react/jsx-runtime": runtime, "@/components/ui/button": { Button: "Button" }, "@/components/ui/icon": { Icon: "Icon" } });
   assert.match(JSON.stringify(CollectionView({ state: { kind: "unconnected" } })), /not connected/);
   assert.match(JSON.stringify(CollectionView({ state: { kind: "ready", entries: [] } })), /No experience/);
   assert.equal(CollectionView({ state: { kind: "loading" } }).props.role, "status");

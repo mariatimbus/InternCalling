@@ -6,7 +6,8 @@ const routes: Record<string, RegExp[]> = {
     new RegExp(`^workspace/resume/${UUID}/file$`), new RegExp(`^workspace/resume/review/${UUID}(?:/result)?$`),
     new RegExp(`^workspace/tailoring/(?:context|generation)/${UUID}$`), new RegExp(`^workspace/tailoring/export/${UUID}(?:/file)?$`)],
   POST: [/^workspace\/(?:resume|manual-confirm)$/, new RegExp(`^workspace/collections/${sections}$`),
-    /^workspace\/resume\/review\/(?:start|confirm)$/, /^workspace\/tailoring\/(?:generate|save|approve|export)$/],
+    /^workspace\/resume\/review\/(?:start|confirm)$/, /^workspace\/tailoring\/(?:generate|save|approve|export)$/,
+    new RegExp(`^workspace/ats/${UUID}$`), new RegExp(`^workspace/documents/${UUID}/(?:resume|cover-letter)$`)],
   PATCH: [new RegExp(`^workspace/collections/${sections}/${UUID}$`)],
   DELETE: [new RegExp(`^workspace/collections/${sections}/${UUID}$`), new RegExp(`^workspace/resume/${UUID}$`)],
 };
@@ -88,7 +89,7 @@ export async function workspaceProxy(request: Request, path: string[], dependenc
     if (!bytes) return failure(502, "invalid_response");
     return new Response(bytes as BodyInit, { status: response.status, headers: {
       "Content-Type": type, "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff",
-      ...(type === "application/pdf" ? { "Content-Disposition": 'inline; filename="resume.pdf"' } : {}),
+      ...(type === "application/pdf" ? { "Content-Disposition": `inline; filename="${joined.endsWith("cover-letter") ? "cover-letter" : "resume"}.pdf"` } : {}),
     } });
   } catch { return failure(503, "service_unavailable"); }
 }
