@@ -218,3 +218,17 @@ def test_posted_at_is_the_source_date_not_our_first_seen_time():
     from opportunity_api.ingestion.normalize import normalize
 
     assert normalize(records[0])["posted_at"] == records[0].posted_at
+
+
+def test_arbeitnow_footer_is_not_part_of_the_posting():
+    from opportunity_api.ingestion.sources.ats import ARBEITNOW_FOOTER
+
+    for footer in [
+        '<p>Find <a href="https://www.arbeitnow.com">Jobs in Germany</a> on Arbeitnow</a>',
+        'Find more <a href="https://www.arbeitnow.com/english-speaking-jobs">English Speaking '
+        "Jobs in Germany</a> on Arbeitnow</a>",
+    ]:
+        assert ARBEITNOW_FOOTER.sub("", "<p>Build APIs.</p>" + footer) == "<p>Build APIs.</p>"
+    assert ARBEITNOW_FOOTER.sub("", "<p>Find bugs on Arbeitnow's API.</p>") == (
+        "<p>Find bugs on Arbeitnow's API.</p>"
+    )

@@ -240,35 +240,41 @@ The profile currently carries `degree_level`, `graduation_year` and
 
 ### GET /api/v1/opportunities/{id}/match 🔒
 
-A10 explainable match score (v2), gated by A9 eligibility (degree level, study
-year, location rules only — graduation cannot gate matching without a
-structured source). Components (100 in total):
+A10 explainable match score (v3): **the share of the posting's stated requirements the
+student meets**, gated by A9 eligibility (`not_eligible` always scores `0`).
 
-- `skills` (40): share of the posting's skills the student has — structured skills
-  plus known technologies the text names; 3 to 8 of them count. Student skills
-  include technologies saved in Profile projects and experience; spellings are
-  normalised (`JS`, `ReactJS`, `k8s`).
-- `field_fit` (25): the title is in a domain of the student's field of study,
-  saved roles or preferred domains (12 when only the description is).
-- `location` (15): chosen city 15, remote 12 (15 if remote is preferred), same country 9.
-- `interests` (10): 5 per interest the posting mentions.
-- `recency` (10): posted within 7 days 10, 30 days 6, 90 days or unknown 3.
+    score = 100 × earned / max(sum of the weights of the requirements the posting states, 55)
 
-`not_eligible` always scores `0`. `possibly_eligible` (nothing failed, some
-requirements not stated) is multiplied by 0.95 and `unknown` by 0.9 — most
-postings never state a degree or year, so missing data no longer buries a strong
-match. `/opportunities/recommended` sorts by score alone. The optional `ai`
-component (A11/A12, Ollama embeddings) is `0` when Ollama is not configured — the
-deterministic core is the product, AI is a bonus.
+Each requirement is read from the posting and checked against the profile. A requirement
+the posting does not state is not listed and not counted. The floor of 55 (skills +
+role field) keeps a posting that names no skills or no role from showing a perfect match.
+
+| key | weight | read from the posting | looked for in the profile |
+|---|---|---|---|
+| `skills` | 35 | structured skills + known technologies in the text (up to 6 count) | skills, technologies in saved projects/experience, technologies named in certificates |
+| `field_fit` | 20 | role domain from the title (software, data, hardware, mechanical, security, product, business) | field of study, saved roles, preferred domains; description-only domain = half |
+| `languages` | 15 | required languages and CEFR level ("fluent German" = C1), or the posting's own language when not English (B2) | saved languages with CEFR level (native = above C2) |
+| `experience` | 10 | asks for prior/relevant experience | saved experience in the role's domain or using its skills (relevant project only = half) |
+| `eligibility` | 10 | degree level / study year, when stated | degree level, study year |
+| `location` | 10 | place or remote | chosen locations, own city, remote; same country = half |
+
+`requirements` lists each one: `{ key, label, status: met|partial|missing, summary,
+matched[], missing[], weight, earned }`. `components` holds the points earned per key (plus
+the optional `ai` bonus, capped at 100 in total), and `reasons` repeats the requirements in
+plain text for older clients. `/opportunities/recommended` sorts by score, then by most
+recent `posted_at`.
 
 ```json
 // 200
 {
-  "score": 57,
+  "score": 64,
   "eligibility": "possibly_eligible",
-  "components": { "skills": 20, "field_fit": 25, "interests": 0, "location": 12, "recency": 3, "ai": 0 },
-  "reasons": ["Matches 3 of 6 skills: python, react, typescript", "Also asks for: java, kotlin, docker",
-              "Software role fits your background", "Remote-friendly", "Some requirements are not stated in the posting"]
+  "components": { "skills": 23, "field_fit": 20, "languages": 8, "experience": 0, "eligibility": 0, "location": 10, "ai": 0 },
+  "requirements": [
+    { "key": "skills", "label": "Skills", "status": "partial", "summary": "4 of 6 skills", "matched": ["python", "react", "sql", "typescript"], "missing": ["docker", "kafka"], "weight": 35, "earned": 23.3 },
+    { "key": "languages", "label": "Languages", "status": "partial", "summary": "1 of 2 languages", "matched": ["English C1"], "missing": ["German C1 — you have B1"], "weight": 15, "earned": 11.3 }
+  ],
+  "reasons": ["Matches 4 of 6 skills: python, react, sql, typescript", "Also asks for: docker, kafka"]
 }
 ```
 

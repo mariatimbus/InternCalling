@@ -10,13 +10,20 @@ import { Icon, type IconName } from "@/components/ui/icon";
 import { opportunityTypeLabel } from "@/lib/opportunities";
 import { companyLogoUrl as logoFor } from "@/lib/company-logo";
 import { structureDescription } from "@/lib/job-description";
+import { RequirementList } from "@/components/jobs/match-requirements";
 import { isSkillList } from "@/lib/profile-skills";
 import { prepareOpportunityCopilot, type OpportunityCopilotData } from "@/lib/opportunity-copilot";
 import { degreeLabels, safeJobSource, studyYears } from "@/components/jobs/opportunity-details";
 
 type DetailHeadingLevel = "h3" | "h4" | "h5";
 
-function matchExplanation({ score, positiveReasons, components, gaps, note }: NonNullable<OpportunityCopilotData["match"]>, ReasonHeading: DetailHeadingLevel) {
+function matchExplanation({ score, positiveReasons, components, gaps, note, requirements }: NonNullable<OpportunityCopilotData["match"]>, ReasonHeading: DetailHeadingLevel) {
+  if (requirements.length) return <>
+    <p className="card-title text-2xl tabular-nums">{score + "/100"}</p>
+    <p className="metadata-text mt-1">The share of this posting&apos;s requirements your profile meets. Requirements it does not state are not counted.</p>
+    <div className="mt-4"><RequirementList requirements={requirements} Heading={ReasonHeading} /></div>
+    {gaps.length > 0 && <Link href="/profile#profile-skills-title" prefetch={false} className="mt-3 inline-flex min-h-10 items-center text-sm text-accent underline">Have a missing skill? Add it to your profile</Link>}
+  </>;
   return <>
     <p className="card-title text-2xl tabular-nums">{score + "/100"}</p>
     <p className="metadata-text mt-1">Measures how closely this opportunity fits your profile.</p>
@@ -196,8 +203,10 @@ function opportunityDecision(copilot: OpportunityCopilotData, standalone: boolea
   const AssessmentHeading = copilotEnabled ? (standalone ? "h3" : "h4") : SectionHeading;
   const DetailHeading = copilotEnabled && !standalone ? "h5" : AssessmentHeading === "h2" ? "h3" : "h4";
   const ActionHeading = standalone ? "h3" : "h4";
+  // The requirement list needs the full width; eligibility then sits below it.
+  const fullMatch = Boolean(copilot.match?.requirements.length);
   const assessmentCards = <div className="grid items-start gap-4 @sm:grid-cols-2">
-    <section className="min-w-0 border-t border-line pt-5">
+    <section className={`min-w-0 border-t border-line pt-5 ${fullMatch ? "@sm:col-span-2" : ""}`}>
       <AssessmentHeading className="card-title">Match Score</AssessmentHeading>
       <div className="mt-3" aria-live="polite">
         {copilot.loading ? <p className="metadata-text">Loading match score…</p>
