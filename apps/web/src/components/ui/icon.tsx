@@ -1,9 +1,12 @@
 import type { ComponentPropsWithoutRef } from "react";
 
-export type IconName = "jobs" | "profile" | "applications" | "settings" | "arrow" | "external-link" | "bookmark" | "location" | "menu" | "search" | "filter" | "sliders" | "check" | "clock" | "globe" | "chevron" | "grid" | "columns" | "wallet" | "calendar" | "resume" | "plus" | "more";
+export type IconName = "jobs" | "profile" | "applications" | "settings" | "arrow" | "external-link" | "bookmark" | "location" | "menu" | "search" | "filter" | "sliders" | "check" | "clock" | "globe" | "chevron" | "grid" | "columns" | "wallet" | "calendar" | "resume" | "plus" | "more" | "code" | "x" | "award";
 const paths: Record<IconName, string> = {
   resume: "M6 3h9l4 4v14H6z M14 3v5h5 M9 8h2 M9 12h7 M9 16h7",
   plus: "M12 5v14 M5 12h14",
+  code: "M8 7l-5 5 5 5 M16 7l5 5-5 5 M14 4l-4 16",
+  x: "M6 6l12 12 M18 6L6 18",
+  award: "M12 15a6 6 0 1 0 0-12 6 6 0 0 0 0 12 M8.5 13.5L7 22l5-3 5 3-1.5-8.5",
   more: "M5 12h.01 M12 12h.01 M19 12h.01",
   grid: "M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z",
   columns: "M3 4h18v16H3z M12 4v16",

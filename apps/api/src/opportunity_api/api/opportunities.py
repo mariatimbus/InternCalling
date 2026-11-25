@@ -1,5 +1,6 @@
 """Opportunity catalog endpoints: paginated list with filters and detail by id."""
 
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from functools import lru_cache
 from typing import Annotated
@@ -25,7 +26,13 @@ from ..models import (
 )
 from ..schemas import OpportunityResponse, PaginatedOpportunityResponse
 from ..schemas.eligibility import EligibilityResult, StudentInput
-from ..schemas.matching import MatchingOpportunity, MatchingProfile, MatchResult
+from ..schemas.matching import (
+    EvidenceEntry,
+    LanguageSkill,
+    MatchingOpportunity,
+    MatchingProfile,
+    MatchResult,
+)
 from ..schemas.recommendation import Recommendation, RecommendationPage
 from .deps import get_current_user
 
@@ -184,35 +191,87 @@ def _to_student_input(profile: Profile) -> StudentInput:
     )
 
 
-def _profile_evidence(db: Session, user: User) -> tuple[list[str], list[str]]:
-    """Technologies and role titles the student saved in projects and experience."""
-    skills, roles = [], []
+@dataclass
+class _Evidence:
+    skills: list[str] = field(default_factory=list)
+    roles: list[str] = field(default_factory=list)
+    languages: list[LanguageSkill] = field(default_factory=list)
+    certificates: list[str] = field(default_factory=list)
+    entries: list[EvidenceEntry] = field(default_factory=list)
+
+
+def _text_list(value) -> list[str]:
+    if isinstance(value, list):
+        return [item for item in value if isinstance(item, str) and item.strip()]
+    return [value] if isinstance(value, str) and value.strip() else []
+
+
+def _field(values: dict, key: str) -> str:
+    value = values.get(key)
+    return value if isinstance(value, str) else ""
+
+
+def _profile_evidence(db: Session, user: User) -> _Evidence:
+    """What the student saved in Profile collections, as matching evidence."""
+    found = _Evidence()
     entries = db.scalars(
         select(ProfileEntry).where(
-            ProfileEntry.user_id == user.id, ProfileEntry.section.in_(("projects", "experience"))
+            ProfileEntry.user_id == user.id,
+            ProfileEntry.section.in_(("projects", "experience", "languages", "certificates")),
         )
     )
     for entry in entries:
         values = entry.values if isinstance(entry.values, dict) else {}
-        technologies = values.get("technologies")
-        if isinstance(technologies, list):
-            skills += [t for t in technologies if isinstance(t, str) and t.strip()]
-        if isinstance(role := values.get("role"), str) and role.strip():
-            roles.append(role)
-    return skills, roles
+        if entry.section == "languages" and _field(values, "name").strip():
+            found.languages.append(
+                LanguageSkill(
+                    name=_field(values, "name"),
+                    cefr=_field(values, "cefr").upper(),
+                    native=values.get("native") is True,
+                )
+            )
+        elif entry.section == "certificates" and _field(values, "name").strip():
+            found.certificates.append(
+                f"{_field(values, 'name')} {_field(values, 'organization')}".strip()
+            )
+        elif entry.section in ("projects", "experience"):
+            found.skills += _text_list(values.get("technologies"))
+            if _field(values, "role").strip():
+                found.roles.append(_field(values, "role"))
+            if entry.section == "experience":
+                title = " at ".join(
+                    filter(None, [_field(values, "role"), _field(values, "organization")])
+                )
+                body = [_field(values, "description"), *_text_list(values.get("achievements"))]
+            else:
+                title = _field(values, "name") or _field(values, "role")
+                body = [
+                    _field(values, "role"),
+                    _field(values, "description"),
+                    *_text_list(values.get("technologies")),
+                ]
+            if title:
+                kind = "experience" if entry.section == "experience" else "project"
+                found.entries.append(
+                    EvidenceEntry(kind=kind, title=title[:255], text="\n".join(body)[:5000])
+                )
+    return found
 
 
 def _to_matching_profile(user: User, db: Session) -> MatchingProfile:
     profile = user.profile
-    project_skills, roles = _profile_evidence(db, user)
+    evidence = _profile_evidence(db, user)
     return MatchingProfile(
         study_year=_study_year(profile),
         degree_level=profile.degree_level,
         graduation_year=profile.graduation_year,
         location=profile.location,
         field_of_study=profile.field_of_study,
-        skills=list(dict.fromkeys([skill.name for skill in user.skills] + project_skills)),
-        roles=roles,
+        skills=list(dict.fromkeys([skill.name for skill in user.skills] + evidence.skills)),
+        roles=evidence.roles,
+        languages=evidence.languages,
+        certificates=evidence.certificates,
+        evidence=evidence.entries,
         interests=profile.interests or [],
         preferred_tech_domains=profile.preferred_tech_domains or [],
         preferred_locations=profile.preferred_locations or [],
@@ -283,7 +342,14 @@ def recommended_opportunities(
             )
         )
     # Eligibility already weighs on the score; a stronger match ranks higher.
-    ranked.sort(key=lambda item: (-item.match.score, str(item.opportunity.id)))
+    # Equal scores: the more recently posted first, then a stable id order.
+    ranked.sort(
+        key=lambda item: (
+            -item.match.score,
+            -(item.opportunity.posted_at.timestamp() if item.opportunity.posted_at else 0),
+            str(item.opportunity.id),
+        )
+    )
     start = (page - 1) * page_size
     return RecommendationPage(
         items=ranked[start : start + page_size], total=len(ranked), page=page, page_size=page_size

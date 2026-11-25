@@ -18,17 +18,19 @@ const model = await load("../src/lib/opportunity-copilot.ts", {
   "./match-reasons": await load("../src/lib/match-reasons.ts"),
 });
 
-test("Copilot preserves matching v2 fit, gaps, recency and requirement discounts", () => {
+test("Copilot carries the requirement checks, plain-text fit and gaps, and the new components", () => {
   const fit = ["Matches 2 of 4 skills: python, sql", "Software role fits your background", "Posted this week"];
   const gap = "Also asks for: docker";
-  const note = "Some requirements are not stated in the posting";
+  const requirements = [{ key: "skills", label: "Skills", status: "partial", summary: "2 of 4 skills", matched: ["python", "sql"], missing: ["docker"], weight: 35, earned: 17.5 }];
   const { match } = model.prepareOpportunityCopilot({
-    match: { score: 72, reasons: [...fit, gap, note], components: { skills: 20, field_fit: 25, recency: 5, ai: 0 } },
+    match: { score: 72, reasons: [...fit, gap], components: { skills: 18, field_fit: 20, languages: 15, ai: 0 }, requirements },
     eligibility: null,
   }, [], []);
   assert.equal(match.score, 72);
   assert.deepEqual(match.positiveReasons, fit);
   assert.deepEqual(match.gaps, [gap]);
-  assert.equal(match.note, note);
-  assert.deepEqual(match.components, [{ label: "Skills", points: 20 }, { label: "Role fit", points: 25 }, { label: "Recently posted", points: 5 }]);
+  assert.deepEqual(match.requirements, requirements);
+  assert.deepEqual(match.components, [{ label: "Skills", points: 18 }, { label: "Role fit", points: 20 }, { label: "Languages", points: 15 }]);
+  const older = model.prepareOpportunityCopilot({ match: { score: 10, reasons: [], components: {} }, eligibility: null }, [], []);
+  assert.deepEqual(older.match.requirements, []); // older API responses still render
 });

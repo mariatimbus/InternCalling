@@ -4,6 +4,7 @@ import { Icon } from "@/components/ui/icon";
 import { CompanyAvatar } from "./company-avatar";
 import { EligibilityBadge } from "./eligibility-badge";
 import { MatchScore } from "./match-score";
+import { MatchChips } from "./match-requirements";
 import type { JobSummary } from "./job-card";
 import { descriptionSnippet } from "@/lib/job-description";
 
@@ -49,7 +50,9 @@ export function OpportunityCardContent({ job, heading, action, density = "comfor
       {showMatch && job.eligibility !== "unknown" && <EligibilityBadge status={job.eligibility} />}
       {job.skills.slice(0, 3).map((skill) => <Badge key={skill} className="max-w-full [overflow-wrap:anywhere]">{skill}</Badge>)}
     </div>
-    {showMatch && job.matchReason && <p className="flex min-w-0 items-start gap-1.5 text-sm text-foreground [overflow-wrap:anywhere]"><Icon name="check" className="mt-0.5 size-4 shrink-0 text-accent" /><span className="line-clamp-1">{job.matchReason}</span></p>}
+    {showMatch && (job.matchRequirements?.length
+      ? <MatchChips requirements={job.matchRequirements} />
+      : job.matchReason && <p className="flex min-w-0 items-start gap-1.5 text-sm text-foreground [overflow-wrap:anywhere]"><Icon name="check" className="mt-0.5 size-4 shrink-0 text-accent" /><span className="line-clamp-1">{job.matchReason}</span></p>)}
     {descriptionSnippet(job.description) && <p className="reading-text line-clamp-2 [overflow-wrap:anywhere]">{descriptionSnippet(job.description)}</p>}
     {(job.duration || job.compensation || job.workMode) && <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted">
       {job.duration && <span>{job.duration}</span>}
@@ -77,7 +80,9 @@ export function OpportunityCardContent({ job, heading, action, density = "comfor
       </div>
       {descriptionSnippet(job.description) && <p className="reading-text mt-3 line-clamp-2">{descriptionSnippet(job.description)}</p>}
       {(job.skills.length > 0 || applied) && <div className="mt-3 flex flex-wrap gap-1.5">{job.skills.slice(0, 5).map((skill) => <Badge key={skill}>{skill}</Badge>)}{applied && <Badge variant="accent">Applied</Badge>}</div>}
-      {showMatch && job.matchReason && <p className="mt-3 flex items-start gap-1.5 text-sm text-foreground"><Icon name="check" className="mt-0.5 size-4 shrink-0 text-accent" />{job.matchReason}</p>}
+      {showMatch && (job.matchRequirements?.length
+        ? <div className="mt-3"><MatchChips requirements={job.matchRequirements} /></div>
+        : job.matchReason && <p className="mt-3 flex items-start gap-1.5 text-sm text-foreground"><Icon name="check" className="mt-0.5 size-4 shrink-0 text-accent" />{job.matchReason}</p>)}
       {showMatch && <div className="mt-auto flex flex-wrap items-center justify-between gap-3 pt-4"><EligibilityBadge status={job.eligibility} /><MatchScore score={job.matchScore} size="sm" /></div>}
     </>
   );

@@ -6,6 +6,7 @@ component. All of it deterministic — no AI, no embeddings (that is A11/A12).
 """
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -15,14 +16,37 @@ from opportunity_api.schemas.eligibility import EligibilityStatus
 
 
 class ComponentScores(BaseModel):
-    """Points per explainable component. Caps live in ``scoring.py``/``ai.py``."""
+    """Points earned per requirement (see ``requirements.py``) plus the optional AI bonus."""
 
     skills: int = 0
     field_fit: int = 0
-    interests: int = 0
+    languages: int = 0
+    experience: int = 0
+    eligibility: int = 0
     location: int = 0
-    recency: int = 0
     ai: int = 0
+
+
+RequirementKey = Literal[
+    "skills", "field_fit", "languages", "experience", "eligibility", "location"
+]
+
+
+class Requirement(BaseModel):
+    """One thing the posting asks for, checked against the profile.
+
+    Only requirements the posting actually states are listed; the score is the share of
+    their weights the student meets.
+    """
+
+    key: RequirementKey
+    label: str
+    status: Literal["met", "partial", "missing"]
+    summary: str
+    matched: list[str] = Field(default_factory=list)
+    missing: list[str] = Field(default_factory=list)
+    weight: int
+    earned: float
 
 
 class MatchResult(BaseModel):
@@ -32,6 +56,7 @@ class MatchResult(BaseModel):
     eligibility: EligibilityStatus
     components: ComponentScores
     reasons: list[str]
+    requirements: list[Requirement] = Field(default_factory=list)
 
 
 class MatchingProfile(BaseModel):
@@ -51,6 +76,22 @@ class MatchingProfile(BaseModel):
     remote_preferred: bool | None = None
     # Role titles from the student's experience and projects ("Frontend Developer").
     roles: list[str] = Field(default_factory=list)
+    languages: list["LanguageSkill"] = Field(default_factory=list)
+    certificates: list[str] = Field(default_factory=list)
+    # Saved experience and projects, as evidence of relevant experience.
+    evidence: list["EvidenceEntry"] = Field(default_factory=list)
+
+
+class LanguageSkill(BaseModel):
+    name: str
+    cefr: str = ""
+    native: bool = False
+
+
+class EvidenceEntry(BaseModel):
+    kind: Literal["experience", "project"]
+    title: str
+    text: str = ""
 
 
 class MatchingOpportunity(BaseModel):
@@ -65,3 +106,6 @@ class MatchingOpportunity(BaseModel):
     study_year: list[int] | None = None
     skills: list[str] = Field(default_factory=list)
     posted_at: datetime | None = None
+
+
+MatchingProfile.model_rebuild()

@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import type { EligibilityStatus } from "./eligibility-badge";
 import { OpportunityCardContent, opportunityCardClasses, type CardDensity } from "./opportunity-card-content";
+import type { MatchRequirement } from "@/lib/api/types";
 
 /** Presentation model, independent of API response shapes. */
 export type JobSummary = {
@@ -14,6 +15,8 @@ export type JobSummary = {
   companyLogoUrl?: string | null;
   /** The strongest match reason, e.g. "Matches 3 of 6 skills: python, react". */
   matchReason?: string;
+  /** What the posting asks for, checked against the profile. */
+  matchRequirements?: MatchRequirement[];
   deadlineLabel?: string;
   deadlineText?: string;
   category?: string;

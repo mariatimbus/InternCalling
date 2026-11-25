@@ -25,7 +25,7 @@ function summary({ opportunity: job, match, companyLogoUrl }: RankedOpportunity)
   const card = opportunitySummary(job);
   return { ...card, initials: job.organization?.trim() ? card.initials : "–",
     companyLogoUrl: companyLogoUrl ?? logoFor("url" in job ? job.company_domain : null, "source" in job ? job.source : null),
-    matchScore: match?.score ?? null, eligibility: match?.eligibility ?? "unknown", matchReason: topReason(match?.reasons) };
+    matchScore: match?.score ?? null, eligibility: match?.eligibility ?? "unknown", matchReason: topReason(match?.reasons), matchRequirements: match?.requirements };
 }
 function cardMetadata(job: RankedOpportunity["opportunity"]) {
   const deadline = { label: "Deadline", value: opportunityDisplayDate(job.deadline) };

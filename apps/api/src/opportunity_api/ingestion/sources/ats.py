@@ -1,5 +1,6 @@
 """Public ATS parsers. All roles go to C3; no eligibility inference or writes."""
 
+import re
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from urllib.parse import quote, urlencode, urlsplit
@@ -298,6 +299,14 @@ class AshbyAdapter(ATSAdapter):
 ARBEITNOW_PAGES = 10
 
 
+# Arbeitnow appends a link back to its own listings ("Find more English Speaking Jobs in
+# Germany on Arbeitnow"). It is site navigation, not part of the posting.
+ARBEITNOW_FOOTER = re.compile(
+    r"(?:<p>)?\s*Find\s+(?:more\s+)?<a\b[^>]*>[^<]{0,80}</a>\s*on\s+Arbeitnow(?:\s*</a>)?(?:\s*</p>)?",
+    re.I,
+)
+
+
 class ArbeitnowAdapter(ATSAdapter):
     """Public multi-company board (free API; postings link back to Arbeitnow)."""
 
@@ -329,7 +338,7 @@ class ArbeitnowAdapter(ATSAdapter):
             title=raw["title"],
             url=raw["url"],
             location=place or None,
-            description=raw.get("description"),
+            description=ARBEITNOW_FOOTER.sub("", raw.get("description") or "") or None,
             posted=raw.get("created_at"),
         )
         return record.model_copy(update={"organization": text(raw["company_name"])[:255]})

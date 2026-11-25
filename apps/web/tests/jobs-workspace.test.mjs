@@ -39,6 +39,7 @@ const featureFlags = await load("../src/lib/feature-flags.ts");
 const profileSkillsApi = await load("../src/lib/profile-skills.ts");
 const detailView = await load("../src/components/jobs/opportunity-detail-view.tsx", {
   "react/jsx-runtime": runtime, "next/link": { default: "Link" },
+  "@/components/jobs/match-requirements": { RequirementList: "RequirementList", MatchChips: "MatchChips" },
   "@/lib/job-description": await load("../src/lib/job-description.ts"),
   "@/components/jobs/company-avatar": { CompanyAvatar: "CompanyAvatar" },
   "@/components/jobs/eligibility-badge": { EligibilityBadge: "EligibilityBadge" },
@@ -604,6 +605,7 @@ test("company avatars keep a fixed frame, reject unsupported URLs and recover wh
 
 test("compact cards retain long metadata, meaningful eligibility and top-row actions", async () => {
   const { OpportunityCardContent, opportunityCardClasses } = await load("../src/components/jobs/opportunity-card-content.tsx", {
+    "./match-requirements": { MatchChips: "MatchChips" },
     "react/jsx-runtime": runtime, "@/components/ui/badge": { Badge: "Badge" }, "@/components/ui/icon": { Icon: "Icon" },
     "./company-mark": { CompanyMark: "CompanyMark" }, "./company-avatar": { CompanyAvatar: "CompanyAvatar" },
     "./eligibility-badge": { EligibilityBadge: "EligibilityBadge" }, "./match-score": { MatchScore: "MatchScore" },
@@ -973,8 +975,20 @@ test("Match Score uses the final backend value and separates fit, gaps, points a
   assert.ok(capped.some((node) => node.type === "summary" && node.props.children === "Score breakdown"));
   assert.deepEqual(capped.filter((node) => node.type === "li").map((node) => node.props.children), [...positive, gap]);
   assert.deepEqual(capped.filter((node) => node.type === "dd").map((node) => node.props.children),
-    ["30 points", "25 points", "20 points", "0 points"]);
+    ["30 points", "25 points", "0 points"]); // interests no longer count toward the score
   assert.ok(!text(capped, "AI similarity"));
+
+  // Current API: the requirement checks replace the reason lists and the breakdown.
+  const requirements = [
+    { key: "skills", label: "Skills", status: "partial", summary: "2 of 4 skills", matched: ["python", "sql"], missing: ["docker", "kafka"], weight: 35, earned: 17.5 },
+    { key: "languages", label: "Languages", status: "missing", summary: "0 of 1 languages", matched: [], missing: ["German C1"], weight: 15, earned: 0 },
+  ];
+  const checked = render({ score: 35, components: { skills: 18, languages: 0, ai: 0 }, reasons: [gap], requirements });
+  const list = checked.find((node) => node.type === "RequirementList");
+  assert.deepEqual(list.props.requirements, requirements);
+  assert.ok(text(checked, "35/100"));
+  assert.ok(!text(checked, "Why this fits") && !text(checked, "Score breakdown"));
+  assert.ok(checked.some((node) => node.type === "Link" && node.props.href === "/profile#profile-skills-title"));
 
   const sparse = render({ score: 0 });
   assert.ok(text(sparse, "0/100"));

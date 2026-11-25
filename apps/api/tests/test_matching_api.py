@@ -103,17 +103,26 @@ def test_match_returns_explainable_components(client, db_factory, headers):
     assert set(body["components"]) == {
         "skills",
         "field_fit",
-        "interests",
+        "languages",
+        "experience",
+        "eligibility",
         "location",
-        "recency",
         "ai",
     }
-    # possibly_eligible (study_year not on profile) → small discount, no hard cap
-    assert body["eligibility"] == "possibly_eligible"
-    assert body["score"] == round(sum(body["components"].values()) * 0.95)
-    # AI is unconfigured in tests → zero AI component, deterministic reasons only
-    assert body["components"]["ai"] == 0
-    assert any("fits your background" in reason for reason in body["reasons"])
+    # The posting states: skills (python, machine learning), a software role,
+    # degree + study year, and a location. Not languages or prior experience.
+    keys = [r["key"] for r in body["requirements"]]
+    assert keys == ["skills", "field_fit", "eligibility", "location"]
+    by_key = {r["key"]: r for r in body["requirements"]}
+    assert by_key["field_fit"]["status"] == "met"
+    assert by_key["location"]["status"] == "met"  # remote
+    assert by_key["skills"]["status"] == "missing"  # no skills saved yet
+    assert by_key["eligibility"]["status"] == "partial"  # degree ok, study year unknown
+    earned = sum(r["earned"] for r in body["requirements"])
+    possible = sum(r["weight"] for r in body["requirements"])
+    assert body["score"] == round(100 * earned / possible)  # share of stated requirements
+    assert body["components"]["ai"] == 0  # AI is unconfigured in tests
+    assert any("fits your" in reason.lower() for reason in body["reasons"])
 
 
 def test_match_unknown_opportunity_is_404(client, headers):
@@ -146,5 +155,9 @@ def test_profile_preferences_reach_matching(client, db_factory, headers):
     seed(db_factory, job)
     set_profile(client, headers, preferred_tech_domains=["data_science"], remote_preferred=True)
     result = client.get(f"{URL}/{job.id}/match", headers=headers).json()
-    assert result["components"]["field_fit"] == 25  # preferred domain matches the title
-    assert result["components"]["location"] == 15  # remote, as preferred
+    by_key = {r["key"]: r for r in result["requirements"]}
+    assert by_key["field_fit"]["status"] == "met"  # preferred domain matches the title
+    assert by_key["location"]["status"] == "met"  # remote
+    # Both stated requirements are met (30 points), but a posting that names no skills
+    # cannot claim a perfect match: the share is taken over at least 55 points.
+    assert result["score"] == round(100 * 30 / 55)

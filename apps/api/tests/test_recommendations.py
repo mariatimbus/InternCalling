@@ -27,6 +27,9 @@ def headers(client):
         ).status_code
         == 200
     )
+    # Skills are a requirement the score counts; interests are not.
+    skills = client.put("/api/v1/profile/skills", headers=headers, json={"names": ["python"]})
+    assert skills.status_code == 200
     return headers
 
 
@@ -65,9 +68,10 @@ def test_excludes_mismatch_inactive_expired_but_preserves_unknown(client, db_fac
     assert set(item["match"]["components"]) == {
         "skills",
         "field_fit",
-        "interests",
+        "languages",
+        "experience",
+        "eligibility",
         "location",
-        "recency",
         "ai",
     }
 

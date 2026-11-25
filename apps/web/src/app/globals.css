@@ -40,6 +40,10 @@
   --color-danger-surface: #fff1f2;
   --color-danger-border: #be123c;
   --color-danger-foreground: #881337;
+  /* Match explanations only (approved): green = requirement met, danger = missing. */
+  --color-success-surface: #ecfdf3;
+  --color-success-border: #15803d;
+  --color-success-foreground: #14532d;
 }
 
 @layer base {

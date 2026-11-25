@@ -93,7 +93,7 @@ test("confirmed profile/skill writes feed fresh Jobs requests and the real score
     assert.equal(trace.at(-1).field_of_study, "Computing");
     assert.equal(trace.at(-1).location, "Berlin");
     assert.deepEqual(trace.at(-1).skills, ["python"]);
-    assert.equal(after[0].match.components.skills, 13); // 1 of at least 3 counted skills: round(40 / 3)
+    assert.equal(after[0].match.components.skills, 35); // the one skill the posting names is met: full weight
     const listing = calls.filter(c => c.path.startsWith("/api/v1/opportunities/recommended?"));
     assert.equal(listing.length, 2);
     const query = new URL("http://fixture.invalid" + listing.at(-1).path).searchParams;
