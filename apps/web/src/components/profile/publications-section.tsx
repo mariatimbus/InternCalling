@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Field, fieldControl } from "@/components/ui/field";
 import { safeResumeUrl } from "@/lib/resume-link";
+import { monthYear } from "@/lib/organization-logo";
 
 export function PublicationsSection({ service }: { service?: PublicationsService }) {
   const id = useId();
@@ -15,6 +16,7 @@ export function PublicationsSection({ service }: { service?: PublicationsService
   const [deleting, setDeleting] = useState<Publication | null>(null);
   const [errors, setErrors] = useState<Partial<Record<keyof PublicationDraft, string>>>({});
   const [checked, setChecked] = useState(false);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [error, setError] = useState(""), [success, setSuccess] = useState(""), [pending, setPending] = useState(false);
   const busy = useRef(false), form = useRef<HTMLFormElement>(null), heading = useRef<HTMLHeadingElement>(null), confirmation = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -62,16 +64,28 @@ export function PublicationsSection({ service }: { service?: PublicationsService
   const textarea = (key: "authors" | "description", label: string, hint?: string) => <Field id={id + "-" + key} label={label} hint={hint} error={errors[key]}><textarea id={id + "-" + key} name={key} rows={4} value={draft[key]} disabled={pending} maxLength={key === "authors" ? 25600 : 5000} aria-invalid={!!errors[key]} aria-describedby={[hint ? id + "-" + key + "-hint" : "", errors[key] ? id + "-" + key + "-error" : ""].filter(Boolean).join(" ") || undefined} className={fieldControl + " resize-y py-3"} onChange={event => change(key, event.target.value)} /></Field>;
   return <section className="mt-8 rounded-panel bg-card p-6 sm:p-9" aria-labelledby={id + "-title"} aria-busy={pending}>
     <div className="flex flex-wrap items-center justify-between gap-3"><h2 ref={heading} tabIndex={-1} id={id + "-title"} className="section-title">Publications</h2>{!editing && <Button disabled={pending || !!deleting || !!service && state.kind !== "ready"} onClick={() => begin(null)}>{service ? "Add publication" : "Draft publication"}</Button>}</div>
-    <div className="mt-4"><CollectionView state={state} emptyMessage="No publications yet." onRetry={() => { void reload(); }} renderEntry={row => {
+    <div className="mt-4 [&>ul]:space-y-3"><CollectionView state={state} emptyMessage="No publications yet." onRetry={() => { void reload(); }} renderEntry={row => {
       const doi = normalizeDoi(row.doi), url = safeResumeUrl(row.publicationUrl);
-      return <article className="space-y-3 break-words"><h3 className="card-title">{row.title}</h3>
-        {row.authors.length > 0 && <ol aria-label="Authors in publication order" className="list-inside list-decimal space-y-1 text-sm">{row.authors.map((author, index) => <li key={index}>{author}</li>)}</ol>}
-        {row.publisher && <p className="text-sm">{row.publisher}</p>}
-        {row.publicationDate && <p className="text-xs text-muted">Published: {row.publicationDate}</p>}
-        {row.description && <p className="whitespace-pre-wrap text-sm leading-6">{row.description}</p>}
-        {doi.url ? <a href={doi.url} target="_blank" rel="noopener noreferrer" className="inline-block max-w-full rounded-control py-2 text-sm text-accent underline">DOI: {doi.doi}<span className="sr-only"> (opens in a new tab)</span></a> : row.doi ? <p className="text-xs text-muted">An invalid saved DOI is hidden. Edit this publication to correct it.</p> : null}
-        {url ? <a href={url} target="_blank" rel="noopener noreferrer" className="block w-fit max-w-full rounded-control py-2 text-sm text-accent underline">View publication<span className="sr-only"> (opens in a new tab)</span></a> : row.publicationUrl ? <p className="text-xs text-muted">An invalid saved link is hidden. Edit this publication to correct it.</p> : null}
-        <div className="flex flex-wrap gap-2"><Button variant="secondary" disabled={pending || editing || !!deleting} onClick={() => begin(row)}>Edit<span className="sr-only"> {row.title}</span></Button><Button variant="ghost" disabled={pending || editing || !!deleting} onClick={() => { setDeleting(row); setError(""); setSuccess(""); }}>Delete<span className="sr-only"> {row.title}</span></Button></div></article>;
+      const characters = Array.from(row.description), long = characters.length > 280;
+      const description = long && !expanded[row.id] ? characters.slice(0, 280).join("") + "…" : row.description;
+      return <article className="min-w-0 rounded-lg border border-line bg-surface p-4 [overflow-wrap:anywhere] sm:p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0"><h3 className="card-title">{row.title}</h3>{row.publicationDate && <p className="metadata-text mt-1">Published {monthYear(row.publicationDate)}</p>}</div>
+          <Button variant="ghost" size="sm" className="shrink-0 px-2" aria-label={`Edit ${row.title}`} disabled={pending || editing || !!deleting} onClick={() => begin(row)}>
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="size-5"><path d="m15 5 4 4 M4 20l4-1 12-12a2.8 2.8 0 0 0-4-4L4 15z" /></svg>
+          </Button>
+        </div>
+        {row.publisher && <p className="mt-3 text-sm font-medium text-foreground">{row.publisher}</p>}
+        {row.authors.length > 0 && <ol aria-label="Authors in publication order" className="mt-2 flex flex-wrap gap-1.5">{row.authors.map((author, index) => <li key={index} className="rounded-md bg-elevated px-2 py-1 text-xs text-muted">{author}</li>)}</ol>}
+        {row.description && <div className="mt-3"><p id={`${id}-${row.id}-description`} className="max-w-prose whitespace-pre-wrap text-sm leading-6">{description}</p>
+          {long && <Button variant="ghost" size="sm" className="mt-1 px-0 text-accent" aria-label={`${expanded[row.id] ? "Show less" : "Show more"} about ${row.title}`} aria-expanded={!!expanded[row.id]} aria-controls={`${id}-${row.id}-description`} onClick={() => setExpanded(current => ({ ...current, [row.id]: !current[row.id] }))}>{expanded[row.id] ? "Show less" : "Show more"}</Button>}
+        </div>}
+        <div className="mt-3 flex flex-wrap items-start gap-x-5 gap-y-1">
+          {doi.url ? <p className="min-w-0 text-sm leading-6"><span className="font-medium">DOI: </span><a href={doi.url} target="_blank" rel="noopener noreferrer" className="rounded-sm text-accent underline underline-offset-4">{doi.doi}<span className="sr-only"> (opens in a new tab)</span></a></p> : row.doi ? <p className="text-xs text-muted">An invalid saved DOI is hidden. Edit this publication to correct it.</p> : null}
+          {url ? <p className="min-w-0 text-sm leading-6"><span className="font-medium">Link: </span><a href={url} target="_blank" rel="noopener noreferrer" className="rounded-sm text-accent underline underline-offset-4 [overflow-wrap:anywhere]">{url}<span className="sr-only"> (opens in a new tab)</span></a></p> : row.publicationUrl ? <p className="text-xs text-muted">An invalid saved link is hidden. Edit this publication to correct it.</p> : null}
+        </div>
+        <div className="mt-2 flex justify-end"><Button variant="ghost" size="sm" className="text-xs" aria-label={`Delete ${row.title}`} disabled={pending || editing || !!deleting} onClick={() => { setDeleting(row); setError(""); setSuccess(""); }}>Delete</Button></div>
+      </article>;
     }} /></div>
     {editing && <form ref={form} noValidate onSubmit={save} className="mt-6 space-y-4" onKeyDown={event => { if (event.key === "Escape") cancel(); }}>
       {!service && <p role="status" className="text-sm text-muted">Draft only - saving is unavailable. Drafts are lost when you leave or reload.</p>}

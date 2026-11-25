@@ -17,7 +17,7 @@ const jsx = (type, props) => ({ type, props: props ?? {} });
 const runtime = { jsx, jsxs: jsx };
 function nodes(tree) { return !tree || typeof tree !== "object" ? [] : [tree, ...[tree.props?.children].flat(Infinity).flatMap(nodes)]; }
 const find = (tree, type) => nodes(tree).find(n => n.type === type);
-const button = (tree, label) => nodes(tree).find(n => n.type === "Button" && [n.props.children].flat()[0] === label);
+const button = (tree, label) => nodes(tree).find(n => n.type === "Button" && ([n.props.children].flat()[0] === label || String(n.props["aria-label"] ?? "").startsWith(label + " ")));
 async function fixture(service) {
   const values = [], refs = [], effects = []; let cursor = 0, refCursor = 0;
   const react = {
@@ -26,6 +26,9 @@ async function fixture(service) {
     useRef(current) { const index = refCursor++; return refs[index] ??= { current }; },
   };
   const { PublicationsSection } = await load("../src/components/profile/publications-section.tsx", {
+    "@/lib/organization-logo": await load("../src/lib/organization-logo.ts", { "../../../api/src/opportunity_api/ingestion/sources/employers.json": { default: [] }, "./company-logo": { companyLogoUrl: (domain) => domain ? `/company-logos/${domain}.png` : null } }),
+    "./credential-entry": await load("../src/components/profile/credential-entry.tsx", { "react/jsx-runtime": runtime, "@/components/ui/button": { Button: "Button" }, "@/components/ui/icon": { Icon: "Icon" }, "@/components/jobs/company-avatar": { CompanyAvatar: "CompanyAvatar" } }),
+    "@/components/ui/icon": { Icon: "Icon" },
     react, "react/jsx-runtime": runtime, "@/lib/publications": model, "@/lib/resume-link": links,
     "./collection-view": { CollectionView: "CollectionView" }, "@/components/ui/field": { Field: "Field", fieldControl: "" },
     "@/components/ui/input": { Input: "Input" }, "@/components/ui/button": { Button: "Button" },
