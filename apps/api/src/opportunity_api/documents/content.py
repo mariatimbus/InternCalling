@@ -358,8 +358,15 @@ _FILLER = {
 }
 
 
+_SUFFIXES = ("ions", "ion", "ings", "ing", "ed", "es", "s", "e")
+
+
 def _stem(word: str) -> str:
-    return word[:-1] if len(word) > 3 and word.endswith("s") and not word.endswith("ss") else word
+    """automation, automated, automate -> automat; tests, testing -> test."""
+    for suffix in _SUFFIXES:
+        if word.endswith(suffix) and len(word) - len(suffix) >= 4 and not word.endswith("ss"):
+            return word[: -len(suffix)]
+    return word
 
 
 def _words(text: str) -> set[str]:
@@ -382,15 +389,31 @@ def _month(value: str) -> int | None:
 
 
 def _years(entries: list[Entry]) -> float:
-    """Total time in saved jobs; a job without a start date adds nothing."""
+    """Time covered by saved roles; overlapping roles count once."""
     today = date.today().year * 12 + date.today().month - 1
-    months = 0
-    for entry in entries:
-        start = _month(entry.start)
-        end = _month(entry.finish) if entry.finish else today
-        if start is not None and end is not None:
-            months += max(0, end - start)
+    spans = sorted(
+        (start, _month(e.finish) if e.finish else today)
+        for e in entries
+        if (start := _month(e.start)) is not None
+    )
+    months, reach = 0, None
+    for start, end in spans:
+        if end is None:
+            continue
+        start = max(start, reach) if reach is not None else start
+        if end > start:
+            months += end - start
+            reach = end if reach is None else max(reach, end)
     return round(months / 12, 1)
+
+
+def _years_text(years: float, entries: list[Entry]) -> str:
+    if not years:
+        return "No work experience yet"
+    roles = sum(1 for e in entries if _month(e.start) is not None)
+    return (
+        f"{years:g} year{'s' if years != 1 else ''} across {roles} role{'s' if roles != 1 else ''}"
+    )
 
 
 def ats_report(
@@ -405,9 +428,14 @@ def ats_report(
     rows: list[AtsRow] = []
 
     field_fit = checks.get("field_fit")
-    you_title = candidate.headline or next(
-        (e.title for e in candidate.experience if e.title), candidate.education or "Not in profile"
-    )
+    # The saved role closest to this job, else the headline.
+    title_words = _words(opportunity.title) - _FILLER
+    roles = [e for e in candidate.experience + candidate.projects if e.title]
+    best = max(roles, key=lambda e: len(_words(e.text()) & title_words), default=None)
+    if best and _words(best.text()) & title_words:
+        you_title = f"{best.title} · {best.subtitle}" if best.subtitle else best.title
+    else:
+        you_title = candidate.headline or (roles[0].title if roles else "Not in profile")
     rows.append(
         AtsRow(
             key="title",
@@ -436,7 +464,7 @@ def ats_report(
             label="Years of experience",
             status=status,
             job=job_years,
-            you=f"{have:g} years" if have else "No work experience yet",
+            you=_years_text(have, candidate.experience),
             matched=experience.matched if experience else [],
         )
     )

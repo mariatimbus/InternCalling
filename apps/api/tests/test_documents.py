@@ -81,7 +81,7 @@ def test_ats_report_rows_and_added_keywords(monkeypatch):
     report = content.ats_report(candidate, profile, POSTING, [])
     rows = {r.key: r for r in report.rows}
     assert (rows["keywords"].matched, rows["keywords"].missing) == (["Python"], ["Docker"])
-    assert (rows["experience"].job, rows["experience"].you) == ("2+ years", "1 years")
+    assert (rows["experience"].job, rows["experience"].you) == ("2+ years", "1 year across 1 role")
     assert rows["experience"].status == "partial"
     assert rows["education"].status == rows["title"].status == "met"
     # Adding a keyword puts it in the CV, so it counts and the score goes up.
@@ -233,3 +233,25 @@ def test_templates_compile_to_pdf(monkeypatch):
 def test_skills_print_once_with_readable_capitals():
     names = ["python", "docker", "Docker", "sql", "PostgreSQL", "k8s", "kubernetes"]
     assert content._unique(names) == ["Python", "Docker", "SQL", "PostgreSQL", "K8s"]
+
+
+def test_overlapping_roles_count_once():
+    roles = [
+        Entry(id="a", title="Team Leader", start="2021-09", finish="2025-08"),
+        Entry(id="b", title="Research Assistant", start="2023-09", finish="2025-10"),
+        Entry(id="c", title="Mentor", start="2022", finish="2022-06"),
+    ]
+    assert content._years(roles) == 4.1  # Sep 2021 to Oct 2025, not 4 + 2 + 0.4
+
+
+def test_word_forms_match_and_the_closest_role_is_shown(monkeypatch):
+    monkeypatch.setattr(content, "_writer", lambda: None)
+    assert content.has_keyword("Automation", set(), "Built automated deploys")
+    assert content.has_keyword("Regression testing", set(), "Wrote regression tests")
+    candidate, profile = student()
+    candidate.experience.insert(0, Entry(id="x", title="Barista", subtitle="Cafe"))
+    job = MatchingOpportunity(title="Python Developer Intern", description="Python APIs.")
+    title = next(
+        r for r in content.ats_report(candidate, profile, job, []).rows if r.key == "title"
+    )
+    assert title.you == "Developer · Acme"  # the role that shares words with the job title
