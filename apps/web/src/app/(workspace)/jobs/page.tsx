@@ -4,6 +4,7 @@ import type { Application, RecommendationPage } from "@/lib/api/types";
 import type { RankedOpportunity } from "@/components/workspace/recommended-jobs";
 import { RecommendedFeed } from "@/components/workspace/recommended-feed";
 import { JobsSearch } from "@/components/jobs/jobs-search";
+import { SortSelect } from "@/components/jobs/sort-select";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
@@ -27,7 +28,7 @@ export const metadata = { title: "Jobs | InternCalling" };
 export default async function JobsPage({ searchParams }: { searchParams: Promise<JobsQuery> }) {
   const { api } = await requireCompletedAccount();
   const state = readJobsQuery(await searchParams);
-  const { view, search, location, degree, year, page } = state;
+  const { view, search, location, degree, year, workModel, schedule, field, postedWithin, noExperience, sort, page } = state;
   const copilotEnabled = opportunityCopilotEnabled();
 
   function urlParams(target: JobsView, next: number) {
@@ -73,7 +74,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
       <Link href="/profile" className="text-sm text-accent underline underline-offset-4">Your profile</Link>
     </div>
     {view === "recommended" && <div className="mt-6">
-      <JobsSearch search={search} applied={{ location, degree_level: degree, study_year: year }} navigationKey={href(view)} />
+      <JobsSearch search={search} applied={{ location, degree_level: degree, study_year: year, work_model: workModel, schedule, field, posted_within: postedWithin, no_experience: noExperience }} navigationKey={href(view)} />
       <SavedSearches saved={saved} current={{ search, location, degree, year }} action={savedSearchAction} />
     </div>}
     <nav aria-label="Job lists" className={`segmented-track mb-5 ${view === "recommended" ? "" : "mt-6"}`}>
@@ -83,11 +84,12 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
         {views[target].label}
       </Link>)}
     </nav>
-      {!failed && <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+      {!failed && <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
         <p className="text-sm font-semibold tabular-nums text-foreground">
           {result?.total ?? items.length} {(result?.total ?? items.length) === 1 ? "opportunity" : "opportunities"}
         </p>
-        {result && <p className="metadata-text">Ranked across all matching opportunities.</p>}
+        {result && <p className="metadata-text">{sort === "recent" ? "Newest first." : sort === "deadline" ? "Closing soonest first." : sort === "company" ? "By company name." : "Ranked across all matching opportunities."}</p>}
+        {result && <SortSelect sort={sort} params={urlParams(view, 1).toString()} />}
       </div>}
   </>;
   return <div className="mx-auto max-w-7xl px-5 py-7 sm:px-8">

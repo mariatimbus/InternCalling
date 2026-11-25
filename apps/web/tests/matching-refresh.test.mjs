@@ -69,7 +69,7 @@ test("confirmed profile/skill writes feed fresh Jobs requests and the real score
       "@/components/ui/empty-state": { EmptyState: "EmptyState" }, "@/components/ui/error-state": { ErrorState: "ErrorState" },
       "./save-action": { saveOpportunity() {} },
       "./load-more-action": { loadMoreRecommended() {} },
-      "./saved-search-actions": { savedSearchAction() {} }, "@/components/jobs/saved-searches": { SavedSearches: "SavedSearches" },
+      "./saved-search-actions": { savedSearchAction() {} }, "@/components/jobs/saved-searches": { SavedSearches: "SavedSearches" }, "@/components/jobs/sort-select": { SortSelect: "SortSelect" },
       "./assessment-action": { loadOpportunityAssessment() {}, loadOpportunityCatalog() {} },
       "@/lib/feature-flags": { opportunityCopilotEnabled: () => false },
       "@/lib/profile-skills": skillsHelper,

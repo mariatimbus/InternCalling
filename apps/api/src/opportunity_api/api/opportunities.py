@@ -1,9 +1,9 @@
 """Opportunity catalog endpoints: paginated list with filters and detail by id."""
 
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from functools import lru_cache
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
@@ -15,7 +15,9 @@ from ..core.database import get_db
 from ..core.errors import APIError
 from ..eligibility import evaluate as evaluate_eligibility
 from ..matching import AIScorer, OllamaEmbedder, score_match
+from ..matching import filters as job_filters
 from ..matching.engine import to_opportunity_input
+from ..matching.filters import Field, Schedule, WorkModel
 from ..models import (
     Opportunity,
     OpportunityDegreeLevel,
@@ -304,31 +306,62 @@ def recommended_opportunities(
     search: Annotated[str | None, Query(max_length=200)] = None,
     deadline_after: datetime | None = None,
     deadline_before: datetime | None = None,
+    work_model: WorkModel | None = None,
+    schedule: Schedule | None = None,
+    field: Field | None = None,
+    posted_within: Annotated[int | None, Query(ge=1, le=365)] = None,
+    no_experience: bool = False,
+    sort: Literal["match", "recent", "deadline", "company"] = "match",
 ) -> RecommendationPage:
     """Filter all active, unexpired candidates, score, sort, then paginate.
 
-    Missing requirements stay visible. Confirmed mismatches are excluded.
+    Missing requirements stay visible: a degree or study-year filter only hides postings
+    that state a different one. Confirmed mismatches are excluded. Work model, schedule,
+    field and experience are read from the posting's own text (``matching/filters.py``).
     UUID breaks score ties so pagination is deterministic for an unchanged catalog.
     No external model calls are required for this deterministic ranking.
     """
     stmt = _apply_filters(
         select(Opportunity),
         opportunity_type=opportunity_type,
-        degree_level=degree_level,
+        degree_level=None,  # applied below, keeping postings that do not state one
         location=location,
         is_active=True,
         deadline_after=deadline_after,
         deadline_before=deadline_before,
         search=search,
     ).where(or_(Opportunity.deadline.is_(None), Opportunity.deadline >= datetime.now(UTC)))
+    if posted_within is not None:
+        since = datetime.now(UTC) - timedelta(days=posted_within)
+        stmt = stmt.where(Opportunity.posted_at >= since)
     stmt = stmt.options(selectinload(Opportunity.skills))
+    allowed_degrees = (
+        {degree_level}
+        if degree_level is OpportunityDegreeLevel.both
+        else {degree_level, OpportunityDegreeLevel.both}
+        if degree_level is not None
+        else None
+    )
     profile = _to_matching_profile(user, db)
     student = _to_student_input(user.profile)
     ranked = []
     for opportunity in db.scalars(stmt):
-        if study_year is not None and (
-            not opportunity.study_year or study_year not in opportunity.study_year
+        title, text = opportunity.title, opportunity.description
+        if allowed_degrees and opportunity.degree_level not in (None, *allowed_degrees):
+            continue
+        if (
+            study_year is not None
+            and opportunity.study_year
+            and study_year not in opportunity.study_year
         ):
+            continue
+        if work_model and job_filters.work_model(title, opportunity.location, text) != work_model:
+            continue
+        if schedule and job_filters.schedule(title, text) != schedule:
+            continue
+        if field and field not in job_filters.fields(title, text):
+            continue
+        if no_experience and job_filters.asks_experience(title, text):
             continue
         inputs = _to_matching_opportunity(opportunity)
         match = score_match(profile, inputs)
@@ -341,15 +374,36 @@ def recommended_opportunities(
                 eligibility=evaluate_eligibility(student, to_opportunity_input(inputs)),
             )
         )
-    # Eligibility already weighs on the score; a stronger match ranks higher.
-    # Equal scores: the more recently posted first, then a stable id order.
-    ranked.sort(
-        key=lambda item: (
-            -item.match.score,
-            -(item.opportunity.posted_at.timestamp() if item.opportunity.posted_at else 0),
-            str(item.opportunity.id),
+
+    # Ties always fall back to the stronger match, then the newer posting, then a stable id.
+    def stamp(value: datetime | None) -> float:
+        return value.timestamp() if value else 0.0
+
+    def base(item):
+        return (-item.match.score, -stamp(item.opportunity.posted_at), str(item.opportunity.id))
+
+    if sort == "recent":  # newest first; postings without a date last
+        ranked.sort(
+            key=lambda item: (
+                item.opportunity.posted_at is None,
+                -stamp(item.opportunity.posted_at),
+                *base(item),
+            )
         )
-    )
+    elif sort == "deadline":  # closing soonest first; open-ended postings last
+        ranked.sort(
+            key=lambda item: (
+                item.opportunity.deadline is None,
+                stamp(item.opportunity.deadline),
+                *base(item),
+            )
+        )
+    elif sort == "company":
+        ranked.sort(
+            key=lambda item: ((item.opportunity.organization or "~").casefold(), *base(item))
+        )
+    else:
+        ranked.sort(key=base)
     start = (page - 1) * page_size
     return RecommendationPage(
         items=ranked[start : start + page_size], total=len(ranked), page=page, page_size=page_size

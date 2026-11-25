@@ -199,3 +199,10 @@ def test_reasons_mirror_requirements_for_older_clients():
     reasons = score_match(profile, opportunity).reasons
     assert "Matches 1 of 2 skills: python" in reasons
     assert "Also asks for: docker" in reasons
+
+
+def test_field_label_names_the_domain_that_matched():
+    cs = MatchingProfile(field_of_study="Computer Science")  # software and data
+    opportunity = MatchingOpportunity(title="Werkstudent Financial Analytics")  # business, data
+    req = requirements(score_match(cs, opportunity))["field_fit"]
+    assert (req.status, req.label, req.matched) == ("met", "Data role", ["data"])
