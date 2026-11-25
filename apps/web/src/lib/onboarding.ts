@@ -8,20 +8,27 @@ export type OnboardingPayload = { degree_level: DegreeLevel; university: string;
 export type OnboardingCompletionProfile = Pick<Profile, "degree_level" | "university" | "field_of_study" | "graduation_year" | "location">;
 export function isProfileComplete(profile: OnboardingCompletionProfile): boolean {
   return ["bachelor", "master"].includes(profile.degree_level ?? "")
-    && [profile.university, profile.field_of_study, profile.location].every((value) => !!value?.trim() && value.trim().length <= 255)
+    && [profile.university, profile.field_of_study].every((value) => !!value?.trim() && value.trim().length <= 255)
     && Number.isInteger(profile.graduation_year) && Number(profile.graduation_year) >= 1900 && Number(profile.graduation_year) <= 2100;
 }
 
 export function validateOnboarding(draft: OnboardingDraft): OnboardingErrors {
   const errors: OnboardingErrors = {};
   if (!["bachelor", "master"].includes(draft.degree_level)) errors.degree_level = "Choose Bachelor's or Master's.";
-  for (const key of ["university", "field_of_study", "location"] as const) {
+  for (const key of ["university", "field_of_study"] as const) {
     if (!draft[key].trim()) errors[key] = "Enter an answer to continue.";
     else if (draft[key].trim().length > 255) errors[key] = "Use 255 characters or fewer.";
   }
+  if (draft.location.trim().length > 255) errors.location = "Use 255 characters or fewer.";
   const year = Number(draft.graduation_year);
   if (!draft.graduation_year.trim() || !Number.isInteger(year) || year < 1900 || year > 2100) errors.graduation_year = "Enter a whole year between 1900 and 2100.";
   if (draft.skills.length > 100 || draft.skills.some((skill) => !skill.trim() || skill.trim().length > 100)) errors.skills = "Use up to 100 skills, with 100 characters or fewer per skill.";
+  return errors;
+}
+
+export function validateSignupOnboarding(draft: OnboardingDraft): OnboardingErrors {
+  const errors = validateOnboarding(draft);
+  if (!draft.skills.length) errors.skills = "Add at least one skill to continue.";
   return errors;
 }
 

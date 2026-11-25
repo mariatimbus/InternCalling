@@ -8,19 +8,21 @@ async function load(path) {
   const { outputText } = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } });
   return import(`data:text/javascript;base64,${Buffer.from(outputText).toString("base64")}`);
 }
-const { isProfileComplete, readOnboardingForm, validateOnboarding, onboardingPayload } = await load("../src/lib/onboarding.ts");
+const { isProfileComplete, readOnboardingForm, validateOnboarding, validateSignupOnboarding, onboardingPayload } = await load("../src/lib/onboarding.ts");
 const { publicAuthConfig } = await load("../src/lib/auth/config.ts");
 const { isProfile } = await load("../src/lib/api/types.ts");
 const { createApiClient, ApiError } = await load("../src/lib/api/client.ts");
 const draft = { degree_level: "bachelor", university: "Test University", field_of_study: "Computer Science", graduation_year: "2027", location: "Bucharest, Romania", skills: [] };
 const profile = { id: "profile-test", user_id: "user-test", headline: null, bio: null, resume_url: null, created_at: "2026-11-01T00:00:00Z", updated_at: "2026-11-01T00:00:00Z", ...onboardingPayload(draft) };
 
-test("completion requires all five persisted fields but skills are optional", () => {
+test("completion requires studies, while city is optional", () => {
   assert.equal(isProfileComplete(profile), true);
-  for (const key of ["degree_level", "university", "field_of_study", "graduation_year", "location"]) assert.equal(isProfileComplete({ ...profile, [key]: null }), false, key);
+  for (const key of ["degree_level", "university", "field_of_study", "graduation_year"]) assert.equal(isProfileComplete({ ...profile, [key]: null }), false, key);
+  assert.equal(isProfileComplete({ ...profile, location: null }), true);
   assert.equal(isProfileComplete({ ...profile, university: "   " }), false);
   assert.equal(isProfileComplete({ ...profile, graduation_year: 2101 }), false);
-  assert.deepEqual(validateOnboarding(draft), {});
+  assert.equal(validateSignupOnboarding(draft).skills, "Add at least one skill to continue.");
+  assert.deepEqual(validateSignupOnboarding({ ...draft, location: "", skills: ["typescript"] }), {});
 });
 test("runtime profile guard rejects incorrect field types", () => {
   assert.equal(isProfile(profile), true);

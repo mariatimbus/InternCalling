@@ -88,6 +88,33 @@ test("checking a missing blank field explicitly clears it without inventing a bo
 test("onboarding saves only complete new CV entries, never profile fields or skills",async()=>{const {c,service}=await fixture(),result=c.state.result;const changes=model.sectionChanges(result,"onboarding-1");assert.ok(changes);assert.deepEqual(changes.profile,{});assert.deepEqual(changes.skills,{add:[]});assert.ok(changes.collections.length>0&&changes.collections.every(change=>change.operation==="add"));for(const change of changes.collections){const candidate=result.proposed.collections.find(row=>row.key===change.proposalKey);assert.equal(model.alreadySaved(result,candidate),false);}
   const saved=await service.confirm(changes,{signal:new AbortController().signal});assert.ok(saved.snapshot);c.dispose();});
 const onboardingCv=await load("../src/lib/onboarding-cv.ts",{"./resume-review":model});
+test("manual onboarding starts each optional section empty and validates only added entries",()=>{
+  const entry=onboardingCv.newOnboardingEntry("projects","manual-1");
+  assert.equal(entry.section,"projects");assert.equal(entry.include,true);
+  assert.deepEqual(onboardingCv.manualEntryDraft(entry).errors,{name:"Enter 1 to 255 characters."});
+  const edited={...entry,values:{...entry.values,name:"Portfolio",technologies:"React, TypeScript"}};
+  const result=onboardingCv.manualEntryDraft(edited);
+  assert.deepEqual(result.errors,{});assert.deepEqual(result.values.technologies,["React","TypeScript"]);
+});
+test("onboarding shows incomplete CV entries so the student can correct them",async()=>{
+  const {c}=await fixture();
+  const result=structuredClone(c.state.result);
+  result.proposed.collections.push({key:"incomplete-project",section:"projects",values:{name:""},warnings:["Missing title"]});
+  assert.ok(onboardingCv.onboardingEntries(result).some(entry=>entry.key==="incomplete-project"));
+  c.dispose();
+});
+test("CV language names and proficiency are separate, including Native",async()=>{
+  const {c}=await fixture();
+  const result=structuredClone(c.state.result);
+  result.proposed.collections.push({key:"english-level",section:"languages",values:{name:"English C2"},warnings:[]});
+  result.proposed.collections.push({key:"romanian-native",section:"languages",values:{name:"Romanian Native"},warnings:[]});
+  const entries=onboardingCv.onboardingEntries(result);
+  const english=entries.find(entry=>entry.key==="english-level"), romanian=entries.find(entry=>entry.key==="romanian-native");
+  assert.equal(english.values.name,"English");assert.equal(english.values.cefr,"C2");
+  assert.equal(onboardingCv.entryLabel(english),"English");
+  assert.equal(romanian.values.name,"Romanian");assert.equal(romanian.values.native,true);
+  c.dispose();
+});
 test("onboarding lists new CV entries ticked, saves them as edited and only when ticked",async()=>{
   const service=preview.createResumeReviewPreviewService({delayMs:0});const c=new ResumeReviewController(service,service.getSource(),undefined,0);await c.process();const result=c.state.result;
   const entries=onboardingCv.onboardingEntries(result);
