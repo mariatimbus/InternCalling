@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useImperativeHandle, useRef, useState, type FormEvent, type Ref } from "react";
 import type { Profile } from "@/lib/api/types";
-import { changedProfileFields, profileDraft, validateProfileDraft, type ProfileField, type ProfileFieldErrors } from "@/lib/profile-edit";
+import { changedProfileFields, profileDraft, programPosition, studyYears, validateProfileDraft, type ProfileField, type ProfileFieldErrors } from "@/lib/profile-edit";
+
+const ordinal = (n: number) => n + (n === 1 ? "st" : n === 2 ? "nd" : n === 3 ? "rd" : "th");
 import { saveProfile } from "@/app/(workspace)/profile/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +13,7 @@ import { Field, fieldControl } from "@/components/ui/field";
 import { ErrorState } from "@/components/ui/error-state";
 import { Icon } from "@/components/ui/icon";
 
-const labels: Record<ProfileField, string> = { headline: "Headline", bio: "Bio", degree_level: "Degree level", university: "University", field_of_study: "Field of study", graduation_year: "Graduation year", location: "Location" };
+const labels: Record<ProfileField, string> = { headline: "Headline", bio: "Bio", degree_level: "Degree level", university: "University", field_of_study: "Field of study", graduation_year: "Graduation year", location: "Location", study_year: "Year of study" };
 
 export type ProfileEditorHandle = { edit: (field: ProfileField) => void };
 export function ProfileEditor({ initialProfile, persistedProfile, onConfirmed, onUnavailable, ref, contactEmail }: {
@@ -75,6 +77,8 @@ export function ProfileEditor({ initialProfile, persistedProfile, onConfirmed, o
       </Field>
       <div className="grid gap-6 sm:grid-cols-2">
         <Select label="Degree level" name="degree_level" value={draft.degree_level} disabled={saving} error={fields.degree_level} onChange={(event) => update("degree_level", event.target.value)}><option value="">Not provided</option><option value="bachelor">Bachelor&apos;s</option><option value="master">Master&apos;s</option></Select>
+        <Select label="Year of study" name="study_year" value={draft.study_year} disabled={saving} error={fields.study_year} onChange={(event) => update("study_year", event.target.value)}>
+          <option value="">Not provided</option>{studyYears.map((year, index) => <option key={year} value={year}>{ordinal(index + 1)} year</option>)}</Select>
         {input("graduation_year")}{input("university")}{input("field_of_study")}
       </div>
       {input("location")}
@@ -101,6 +105,7 @@ export function ProfileEditor({ initialProfile, persistedProfile, onConfirmed, o
           <p className="reading-text mt-1 [overflow-wrap:anywhere]">{[current.degree_level ? display("degree_level") : "", current.field_of_study?.trim()].filter(Boolean).join(" · ") || "Add your degree and field of study."}</p>
         </div>
         <p className="metadata-text">Graduation year <span className="ml-2 font-medium text-foreground">{display("graduation_year")}</span></p>
+        {programPosition(current.study_year, current.graduation_year) && <p className="metadata-text">Year of study <span className="ml-2 font-medium text-foreground">{programPosition(current.study_year, current.graduation_year)}</span></p>}
       </div>
     </section>
   </>;

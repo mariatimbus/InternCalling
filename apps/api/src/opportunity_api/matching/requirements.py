@@ -29,6 +29,7 @@ What is read from the posting, and what is looked for in the profile:
 import re
 from dataclasses import dataclass, field
 
+from opportunity_api.eligibility.text import graduation_years
 from opportunity_api.schemas.eligibility import EligibilityStatus, RuleResult
 from opportunity_api.schemas.matching import MatchingOpportunity, MatchingProfile, Requirement
 
@@ -332,11 +333,16 @@ def check_eligibility(opportunity: MatchingOpportunity, rules: list[RuleResult])
     stated = {
         "degree_level": opportunity.degree_level is not None,
         "study_year": bool(opportunity.study_year),
+        "graduation_year": graduation_years(_text(opportunity)) is not None,
     }
     relevant = [r for r in rules if stated.get(r.rule)]
     if not relevant:
         return None
-    labels = {"degree_level": "degree level", "study_year": "study year"}
+    labels = {
+        "degree_level": "degree level",
+        "study_year": "study year",
+        "graduation_year": "graduation year",
+    }
     met = [labels[r.rule] for r in relevant if r.status == EligibilityStatus.eligible]
     failed = [labels[r.rule] for r in relevant if r.status == EligibilityStatus.not_eligible]
     unknown = [labels[r.rule] for r in relevant if r.status == EligibilityStatus.unknown]

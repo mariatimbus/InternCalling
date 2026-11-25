@@ -27,9 +27,11 @@ from collections.abc import Sequence
 from opportunity_api.eligibility.engine import evaluate
 from opportunity_api.eligibility.rules import (
     check_degree_level,
+    check_graduation_year,
     check_location,
     check_study_year,
 )
+from opportunity_api.eligibility.text import graduation_years
 from opportunity_api.schemas.eligibility import (
     EligibilityResult,
     EligibilityStatus,
@@ -46,7 +48,7 @@ from opportunity_api.schemas.matching import (
 from .ai import AIScorer
 from .requirements import evaluate_requirements, requirement_score
 
-GATE_RULES = (check_degree_level, check_study_year, check_location)
+GATE_RULES = (check_degree_level, check_study_year, check_graduation_year, check_location)
 
 
 def to_student_input(profile: MatchingProfile) -> StudentInput:
@@ -63,6 +65,7 @@ def to_opportunity_input(opportunity: MatchingOpportunity) -> OpportunityInput:
         degree_level=opportunity.degree_level,
         study_year=opportunity.study_year,
         location=opportunity.location,
+        graduation_years=graduation_years(f"{opportunity.title}\n{opportunity.description or ''}"),
     )
 
 

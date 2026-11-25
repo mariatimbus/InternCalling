@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from ..ai.client import AIInvalidOutput, AIUnavailable, OllamaClient
 from ..core.config import get_settings
+from ..eligibility.text import program_position
 from ..matching import score_match
 from ..matching.requirements import student_skills
 from ..matching.scoring import (
@@ -407,6 +408,11 @@ def _years(entries: list[Entry]) -> float:
     return round(months / 12, 1)
 
 
+def _position(profile: MatchingProfile) -> str:
+    position = program_position(profile.study_year, profile.graduation_year)
+    return f"year {position[0]} of {position[1]}" if position else ""
+
+
 def _years_text(years: float, entries: list[Entry]) -> str:
     if not years:
         return "No work experience yet"
@@ -480,7 +486,9 @@ def ats_report(
             label="Education",
             status=eligibility.status if eligibility else "not_stated",
             job=job_degree,
-            you=" · ".join(filter(None, [candidate.education, candidate.school]))
+            you=" · ".join(
+                filter(None, [candidate.education, candidate.school, _position(profile)])
+            )
             or "Not in profile",
             missing=eligibility.missing if eligibility else [],
         )

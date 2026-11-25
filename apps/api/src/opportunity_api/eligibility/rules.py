@@ -9,6 +9,7 @@ with a human-readable reason. The contract for every rule:
 - ambiguous free text is ``unknown``, never ``not_eligible``.
 """
 
+from opportunity_api.eligibility.text import program_position
 from opportunity_api.schemas.eligibility import (
     EligibilityStatus,
     OpportunityInput,
@@ -75,14 +76,14 @@ def check_study_year(student: StudentInput, opportunity: OpportunityInput) -> Ru
 
 
 def check_graduation_year(student: StudentInput, opportunity: OpportunityInput) -> RuleResult:
-    """Structured graduation constraints only; never inferred from description."""
+    """Graduation years the posting accepts (structured, or stated in its text)."""
     required = opportunity.graduation_years
     actual = student.graduation_year
     if required is None:
         return RuleResult(
             rule="graduation_year",
             status=EligibilityStatus.unknown,
-            reason="No structured graduation restriction available",
+            reason="Opportunity does not state a graduation year",
         )
     if actual is None:
         return RuleResult(
@@ -96,11 +97,13 @@ def check_graduation_year(student: StudentInput, opportunity: OpportunityInput) 
             status=EligibilityStatus.eligible,
             reason=f"Graduation year {actual} is accepted",
         )
-    years = ", ".join(str(year) for year in sorted(required))
+    years = " or ".join(str(year) for year in sorted(required))
+    position = program_position(student.study_year, actual)
+    where = f" (year {position[0]} of {position[1]})" if position else ""
     return RuleResult(
         rule="graduation_year",
         status=EligibilityStatus.not_eligible,
-        reason=f"Opportunity requires graduation in {years}; student graduates {actual}",
+        reason=f"Requires graduating in {years}; you graduate in {actual}{where}",
     )
 
 
