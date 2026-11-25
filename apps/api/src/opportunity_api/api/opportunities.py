@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from functools import lru_cache
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
@@ -311,6 +311,7 @@ def recommended_opportunities(
     field: Field | None = None,
     posted_within: Annotated[int | None, Query(ge=1, le=365)] = None,
     no_experience: bool = False,
+    sort: Literal["match", "recent", "deadline", "company"] = "match",
 ) -> RecommendationPage:
     """Filter all active, unexpired candidates, score, sort, then paginate.
 
@@ -373,15 +374,36 @@ def recommended_opportunities(
                 eligibility=evaluate_eligibility(student, to_opportunity_input(inputs)),
             )
         )
-    # Eligibility already weighs on the score; a stronger match ranks higher.
-    # Equal scores: the more recently posted first, then a stable id order.
-    ranked.sort(
-        key=lambda item: (
-            -item.match.score,
-            -(item.opportunity.posted_at.timestamp() if item.opportunity.posted_at else 0),
-            str(item.opportunity.id),
+
+    # Ties always fall back to the stronger match, then the newer posting, then a stable id.
+    def stamp(value: datetime | None) -> float:
+        return value.timestamp() if value else 0.0
+
+    def base(item):
+        return (-item.match.score, -stamp(item.opportunity.posted_at), str(item.opportunity.id))
+
+    if sort == "recent":  # newest first; postings without a date last
+        ranked.sort(
+            key=lambda item: (
+                item.opportunity.posted_at is None,
+                -stamp(item.opportunity.posted_at),
+                *base(item),
+            )
         )
-    )
+    elif sort == "deadline":  # closing soonest first; open-ended postings last
+        ranked.sort(
+            key=lambda item: (
+                item.opportunity.deadline is None,
+                stamp(item.opportunity.deadline),
+                *base(item),
+            )
+        )
+    elif sort == "company":
+        ranked.sort(
+            key=lambda item: ((item.opportunity.organization or "~").casefold(), *base(item))
+        )
+    else:
+        ranked.sort(key=base)
     start = (page - 1) * page_size
     return RecommendationPage(
         items=ranked[start : start + page_size], total=len(ranked), page=page, page_size=page_size

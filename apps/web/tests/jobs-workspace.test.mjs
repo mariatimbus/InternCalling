@@ -75,7 +75,7 @@ async function fixture(request) {
     "@/components/ui/empty-state": { EmptyState: "Empty" }, "@/components/ui/error-state": { ErrorState: "Error" },
     "./save-action": action,
     "./load-more-action": continuation,
-    "./saved-search-actions": { savedSearchAction() {} }, "@/components/jobs/saved-searches": { SavedSearches: "SavedSearches" },
+    "./saved-search-actions": { savedSearchAction() {} }, "@/components/jobs/saved-searches": { SavedSearches: "SavedSearches" }, "@/components/jobs/sort-select": { SortSelect: "SortSelect" },
     "./assessment-action": { loadOpportunityAssessment() {}, loadOpportunityCatalog() {} },
     "@/lib/feature-flags": featureFlags,
     "@/lib/profile-skills": profileSkillsApi,
@@ -129,6 +129,14 @@ test("every drawer filter reaches the URL and the API; unknown parameters are ig
   assert.deepEqual(search.applied, { ...live, ...extra });
   const request = queryOf(app.calls.find(([path]) => path.includes("opportunities/recommended?"))[0]);
   assert.deepEqual(request, { ...live, ...extra, opportunity_type: "internship", is_active: "true", page: "1", page_size: "12", search: "python" });
+  // Sorting travels the same way, and the selector keeps the other parameters.
+  const sorted = await app.visit({ q: "python", ...live, sort: "recent" });
+  assert.equal(queryOf(app.calls.filter(([path]) => path.includes("opportunities/recommended?")).at(-1)[0]).sort, "recent");
+  const selector = sorted.find((node) => node.type === "SortSelect").props;
+  assert.equal(selector.sort, "recent");
+  assert.deepEqual(Object.fromEntries(new URLSearchParams(selector.params)), { view: "recommended", q: "python", page: "1", ...live, sort: "recent" });
+  const unsorted = await app.visit({ sort: "random" });
+  assert.equal(unsorted.find((node) => node.type === "SortSelect")?.props.sort ?? "", "");
   // Invalid values never reach the API.
   const bad = await app.visit({ work_model: "office", schedule: "weekends", field: "law", posted_within: "2", no_experience: "yes" });
   assert.deepEqual(bad.find((node) => node.type === "JobsSearch").props.applied,

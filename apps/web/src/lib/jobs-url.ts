@@ -6,6 +6,7 @@ export const workModels = ["remote", "hybrid", "onsite"] as const;
 export const schedules = ["full_time", "part_time"] as const;
 export const fields = ["software", "data", "hardware", "security", "product", "mechanical", "business"] as const;
 export const postedWindows = ["1", "3", "7", "30"] as const;
+export const sorts = ["recent", "deadline", "company"] as const; // "match" is the default
 
 export function readJobsQuery(query: JobsQuery) {
   const view: JobsView = query.view === "saved" || query.view === "applied" ? query.view : "recommended";
@@ -20,6 +21,7 @@ export function readJobsQuery(query: JobsQuery) {
   const field = pick(query.field, fields);
   const postedWithin = pick(query.posted_within, postedWindows);
   const noExperience = query.no_experience === "true" ? "true" : "";
+  const sort = pick(query.sort, sorts);
   const filters = new URLSearchParams();
   if (location) filters.set("location", location);
   if (degree) filters.set("degree_level", degree);
@@ -29,7 +31,8 @@ export function readJobsQuery(query: JobsQuery) {
   if (field) filters.set("field", field);
   if (postedWithin) filters.set("posted_within", postedWithin);
   if (noExperience) filters.set("no_experience", noExperience);
-  return { view, search, location, degree, year, workModel, schedule, field, postedWithin, noExperience, page, filters };
+  if (sort) filters.set("sort", sort);
+  return { view, search, location, degree, year, workModel, schedule, field, postedWithin, noExperience, sort, page, filters };
 }
 
 export function jobsParams({ view, search, page, filters }: ReturnType<typeof readJobsQuery>) {

@@ -221,6 +221,7 @@ Besides `location`, `search` and the deadline bounds:
   the role's domain from its title (description when the title has none).
 - `posted_within` (days, 1–365): source publication date within that window.
 - `no_experience=true`: hide postings that ask for prior experience.
+- `sort` = `match` (default) | `recent` (newest `posted_at` first) | `deadline` (closing soonest first) | `company` (A–Z). Ties fall back to the stronger match, then the newer posting.
 
 ### GET /api/v1/opportunities/{id}
 

@@ -143,3 +143,33 @@ def test_text_filters_and_unstated_degree_or_year_stay_visible(client, db_factor
         "Werkstudent Data Analytics",
     ]
     assert client.get(URL, headers=headers, params={"work_model": "office"}).status_code == 422
+
+
+def test_sort_options(client, db_factory, headers):
+    now = datetime.now(UTC)
+    seed(
+        db_factory,
+        make_opportunity(
+            title="Python strong", organization="Zeta", posted_at=now - timedelta(days=5)
+        ),
+        make_opportunity(
+            title="Old",
+            organization="Alpha",
+            posted_at=now - timedelta(days=30),
+            deadline=now + timedelta(days=2),
+        ),
+        make_opportunity(
+            title="New", organization="Mid", posted_at=now, deadline=now + timedelta(days=20)
+        ),
+        make_opportunity(title="Undated", organization=None),
+    )
+
+    def titles(sort):
+        result = client.get(URL, headers=headers, params={"sort": sort}).json()
+        return [item["opportunity"]["title"] for item in result["items"]]
+
+    assert titles("match")[0] == "Python strong"  # the profile has the python skill
+    assert titles("recent") == ["New", "Python strong", "Old", "Undated"]
+    assert titles("deadline")[:2] == ["Old", "New"]  # open-ended postings come last
+    assert titles("company")[:3] == ["Old", "New", "Python strong"]  # Alpha, Mid, Zeta
+    assert client.get(URL, headers=headers, params={"sort": "random"}).status_code == 422

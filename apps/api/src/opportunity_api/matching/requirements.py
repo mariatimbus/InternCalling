@@ -180,11 +180,15 @@ def check_field(profile: MatchingProfile, opportunity: MatchingOpportunity) -> C
     mine = student_domains(profile)
     role = sorted(title or text)[0]
     label = f"{role.capitalize()} role"
+    # A title can name several domains ("Financial Analytics": business, data): label the
+    # role by the one that matched, not by whichever sorts first.
     if title & mine:
         what = sorted(title & mine)[0]
+        label = f"{what.capitalize()} role"
         return Check("field_fit", label, "met", f"Fits your {what} background", [what], [], 1.0)
     if not title and text & mine:
         what = sorted(text & mine)[0]
+        label = f"{what.capitalize()} role"
         return Check("field_fit", label, "met", f"Fits your {what} background", [what], [], 1.0)
     if text & mine:
         what = sorted(text & mine)[0]
