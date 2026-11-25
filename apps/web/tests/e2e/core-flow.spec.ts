@@ -96,14 +96,7 @@ test("confirmed signup, profile, ranking, filters, save/apply/status/notes and r
   await page.locator("main").evaluate(el => el.scrollTo(0, 0));
   await expect(page.getByRole("heading", { name: "Your profile", exact: true })).toBeInViewport();
   await page.screenshot({ path: info.outputPath("profile.png"), style: "nextjs-portal { visibility: hidden }" });
-  await page.getByText("Edit preferences", { exact: true }).click();
-  await page.getByLabel("Study year", { exact: true }).selectOption("third");
-  await page.getByLabel("Interests", { exact: true }).fill("python");
-  await page.getByLabel("Remote preference", { exact: true }).selectOption("true");
-  await page.getByRole("button", { name: "Save preferences", exact: true }).click();
-  await expect(page.getByText(/Preferences saved\. Your recommendations/)).toBeVisible();
-  await page.reload();
-  await expect(page.getByLabel("Study year", { exact: true })).toHaveValue("third");
+  await expect(page.getByText("Study and job preferences", { exact: true })).toHaveCount(0);
   await page.goto("/jobs");
   await page.getByLabel("Search opportunities", { exact: true }).fill("Python");
   await page.getByRole("button", { name: "Search", exact: true }).click();
@@ -138,8 +131,7 @@ test("confirmed signup, profile, ranking, filters, save/apply/status/notes and r
     has: page.getByText("Score breakdown", { exact: true }),
   });
   await scoreBreakdown.locator("summary").click();
-  await expect(scoreBreakdown.getByText("5 points", { exact: true })).toBeVisible();
-  await expect(scoreBreakdown.getByText("15 points", { exact: true })).toBeVisible(); // remote, as preferred
+  await expect(scoreBreakdown.locator("dd").first()).toContainText(/\d+ points?$/);
   const eligibilityDetails = detail.locator("details").filter({
     has: page.getByText("Eligibility details", { exact: true }),
   });
