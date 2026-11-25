@@ -19,6 +19,8 @@ class OllamaClient:
     def __init__(self, base_url: str, *, timeout: float = 30, client=None, api_key: str = ""):
         base_url = base_url.rstrip("/").removesuffix("/api")  # Ollama Cloud URLs end in /api
         parsed = urlsplit(base_url)
+        # ".../v1" is Ollama's OpenAI-compatible API (or a gateway exposing only that).
+        self.openai = parsed.path == "/v1"
         if (
             parsed.scheme not in {"http", "https"}
             or not parsed.hostname
@@ -26,7 +28,7 @@ class OllamaClient:
             or parsed.password
             or parsed.query
             or parsed.fragment
-            or parsed.path not in {"", "/"}
+            or parsed.path not in {"", "/", "/v1"}
         ):
             raise AIUnavailable("Local model service is not configured")
         self.base_url = base_url.rstrip("/")
@@ -110,6 +112,8 @@ class OllamaClient:
         self, model: str, system: str, prompt: str, schema: type[BaseModel], temperature: float = 0
     ) -> BaseModel:
         """One schema-constrained completion, validated before anything uses it."""
+        if self.openai:
+            return self._chat_json(model, system, prompt, schema, temperature)
         result = self._request(
             "/api/generate",
             {
@@ -126,6 +130,37 @@ class OllamaClient:
             raise AIInvalidOutput("Model response is incomplete")
         try:
             return schema.model_validate_json(result["response"], strict=True)
+        except ValidationError as exc:
+            raise AIInvalidOutput("Model response failed schema validation") from exc
+
+    def _chat_json(self, model, system, prompt, schema, temperature) -> BaseModel:
+        result = self._request(
+            "/chat/completions",
+            {
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": prompt},
+                ],
+                "response_format": {
+                    "type": "json_schema",
+                    "json_schema": {"name": schema.__name__, "schema": schema.model_json_schema()},
+                },
+                "reasoning_effort": "none",  # thinking models would spend the budget reasoning
+                "temperature": temperature,
+                "max_tokens": 4096,
+                "stream": False,
+            },
+        )
+        try:
+            choice = result["choices"][0]
+            content = choice["message"]["content"]
+        except (KeyError, IndexError, TypeError) as exc:
+            raise AIInvalidOutput("Model response is incomplete") from exc
+        if choice.get("finish_reason") != "stop" or not isinstance(content, str):
+            raise AIInvalidOutput("Model response is incomplete")
+        try:
+            return schema.model_validate_json(content, strict=True)
         except ValidationError as exc:
             raise AIInvalidOutput("Model response failed schema validation") from exc
 

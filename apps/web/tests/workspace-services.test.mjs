@@ -111,3 +111,34 @@ test("ATS check and tailored PDFs go through the proxy; other document kinds do 
   const essay = ["workspace", "documents", uuid, "essay"];
   assert.equal((await workspaceProxy(proxyRequest(essay.join("/"), "POST", { Origin: origin, "Content-Type": "application/json" }, "{}"), essay, deps(pdf))).status, 404);
 });
+
+test("ATS headline guides the next step and added keywords persist per job", () => {
+  const { atsHeadline, loadKeywords, saveKeywords } = load(new URL("../src/lib/ats.ts", import.meta.url));
+  const report = (score, missing) => ({ score, label: "", rows: [{ key: "keywords", matched: [], missing, label: "", status: "met", job: "", you: "" }] });
+  assert.equal(atsHeadline(null).title, "ATS check");
+  assert.equal(atsHeadline(report(7, ["Docker"])).title, "Your profile is a good match — almost there");
+  assert.match(atsHeadline(report(7, ["Docker"])).hint, /Add the missing keywords/);
+  assert.match(atsHeadline(report(9, [])).hint, /covers every keyword/);
+  const store = new Map();
+  globalThis.localStorage = { getItem: k => store.get(k) ?? null, setItem: (k, v) => store.set(k, v), removeItem: k => store.delete(k) };
+  try {
+    saveKeywords(uuid, ["Kubernetes", "kubernetes"]);
+    assert.deepEqual(loadKeywords(uuid), ["Kubernetes"]);
+    store.set(`ats-keywords:${uuid}`, "not json");
+    assert.deepEqual(loadKeywords(uuid), []);
+    saveKeywords(uuid, []);
+    assert.equal(store.size, 0);
+  } finally { delete globalThis.localStorage; }
+});
+
+test("experience types match the API rules; only jobs and internships are work experience", () => {
+  const { experienceType, experienceGroups } = load(new URL("../src/lib/experience.ts", import.meta.url));
+  const cases = [
+    ["Team Leader", "Quantum Robotics FTC", "extracurricular"], ["Web & Communications Member", "AlphaZ", "extracurricular"],
+    ["Research Assistant", "Faculty of Physics, University of Bucharest", "research"], ["Research Intern", "Google DeepMind", "internship"],
+    ["Software Engineering Intern", "Acme", "internship"], ["Volunteer Tutor", "Code Club", "volunteering"], ["Backend Engineer", "Acme", "job"],
+  ];
+  for (const [role, organization, kind] of cases) assert.equal(experienceType({ role, organization }), kind, role);
+  assert.equal(experienceType({ role: "Team Leader", organization: "Quantum Robotics FTC", type: "job" }), "job");
+  assert.deepEqual(experienceGroups[0].types, ["job", "internship"]);
+});

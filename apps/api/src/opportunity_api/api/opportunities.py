@@ -36,6 +36,7 @@ from ..schemas.matching import (
     MatchResult,
 )
 from ..schemas.recommendation import Recommendation, RecommendationPage
+from ..schemas.workspace import WORK_TYPES, experience_type
 from .deps import get_current_user
 
 router = APIRouter(prefix="/opportunities", tags=["opportunities"])
@@ -253,7 +254,9 @@ def _profile_evidence(db: Session, user: User) -> _Evidence:
                     *_text_list(values.get("technologies")),
                 ]
             if title:
-                kind = "experience" if entry.section == "experience" else "project"
+                # Research, clubs and volunteering show relevant work, not industry experience.
+                industry = entry.section == "experience" and experience_type(values) in WORK_TYPES
+                kind = "experience" if industry else "project"
                 found.entries.append(
                     EvidenceEntry(kind=kind, title=title[:255], text="\n".join(body)[:5000])
                 )

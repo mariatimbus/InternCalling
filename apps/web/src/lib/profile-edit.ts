@@ -1,6 +1,20 @@
 import type { Profile } from "./api/types";
 
-export const editableProfileFields = ["headline", "bio", "degree_level", "university", "field_of_study", "graduation_year", "location"] as const;
+export const editableProfileFields = ["headline", "bio", "degree_level", "study_year", "university", "field_of_study", "graduation_year", "location"] as const;
+export const studyYears = ["first", "second", "third", "fourth", "fifth", "sixth"] as const;
+
+/** Calendar year in which the current academic year (Sep–Aug) ends. */
+export function academicEnd(today = new Date()): number {
+  return today.getMonth() >= 8 ? today.getFullYear() + 1 : today.getFullYear();
+}
+
+/** "Year 2 of 4" from the study year and the graduation year, when both are known. */
+export function programPosition(studyYear: string | null | undefined, graduationYear: number | null | undefined, today = new Date()): string | null {
+  const year = studyYears.indexOf(studyYear as typeof studyYears[number]) + 1;
+  if (!year || !graduationYear) return null;
+  const total = year + graduationYear - academicEnd(today);
+  return total >= year ? `Year ${year} of ${total}` : null;
+}
 export type ProfileField = typeof editableProfileFields[number];
 export type ProfileDraft = Record<ProfileField, string>;
 export type ProfilePatch = Partial<Pick<Profile, ProfileField>>;
@@ -29,6 +43,7 @@ export function validateProfilePatch(value: unknown): { patch?: ProfilePatch; fi
     else {
       const text = raw.trim();
       if (key === "degree_level" && text && text !== "bachelor" && text !== "master") fields[key] = "Choose Bachelor's, Master's or Not provided.";
+      else if (key === "study_year" && text && !studyYears.some(year => year === text)) fields[key] = "Choose your year of study or Not provided.";
       else if (key !== "bio" && text.length > 255) fields[key] = "Use 255 characters or fewer.";
       else patch[key] = text || null;
     }

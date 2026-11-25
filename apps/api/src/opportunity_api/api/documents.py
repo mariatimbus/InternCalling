@@ -28,6 +28,7 @@ def ats_check(job_id: UUID, payload: Keywords, db: Db, user: CurrentUser) -> con
         _to_matching_profile(user, db),
         _to_matching_opportunity(opportunity),
         payload.keywords,
+        opportunity.organization or "",
     )
 
 

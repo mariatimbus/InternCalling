@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
-import { emptyExperience, experienceDraft, validateExperience, type Experience, type ExperienceDraft, type ExperienceService } from "@/lib/experience";
+import { emptyExperience, experienceDraft, experienceGroups, experienceType, experienceTypeLabels, experienceTypes, validateExperience, type Experience, type ExperienceDraft, type ExperienceService, type ExperienceType } from "@/lib/experience";
+import { Select } from "@/components/ui/select";
 import { CollectionView, type CollectionState } from "./collection-view";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -58,12 +59,21 @@ export function ExperienceSection({ service }: { service?: ExperienceService }) 
     finally { busy.current = false; setPending(false); }
   }
   const input = (key: "role" | "organization" | "location" | "startDate" | "endDate", label: string) => <Input label={label} name={key} value={draft[key]} required={key !== "location" && !(key === "endDate" && draft.current)} disabled={pending || key === "endDate" && draft.current} maxLength={key.includes("Date") ? 7 : 255} placeholder={key.includes("Date") ? "YYYY or YYYY-MM" : undefined} error={errors[key]} onChange={event => change(key, event.target.value)} />;
+  const entryView = (row: Experience) => <article className="space-y-2 break-words"><h4 className="card-title">{row.role}</h4><p className="text-sm">{row.organization}{row.location ? " / " + row.location : ""}</p><p className="text-xs text-muted">{row.startDate} to {row.current ? "Present" : row.endDate}</p><p className="whitespace-pre-wrap text-sm leading-6">{row.description}</p>{row.achievements.length > 0 && <ul className="list-disc space-y-1 pl-5 text-sm">{row.achievements.map((bullet, index) => <li key={index}>{bullet}</li>)}</ul>}<div className="flex flex-wrap gap-2"><Button variant="secondary" disabled={pending || editing || !!deleting} onClick={() => begin(row)}><Icon name="pencil" className="size-4" />Edit<span className="sr-only"> {row.role}</span></Button><Button variant="ghost" disabled={pending || editing || !!deleting} onClick={() => { setDeleting(row); setError(""); setSuccess(""); }}>Delete<span className="sr-only"> {row.role}</span></Button></div></article>;
   return <section data-profile-experience className="mt-8 rounded-panel bg-card p-6 sm:p-9" aria-labelledby={id + "-title"} aria-busy={pending}>
     <div className="flex flex-wrap items-center justify-between gap-3"><h2 ref={heading} tabIndex={-1} id={id + "-title"} className="section-title">Experience</h2>{!editing && <Button disabled={pending || !!deleting || !!service && state.kind !== "ready"} onClick={() => begin(null)}>{service ? "Add experience" : "Draft experience"}</Button>}</div>
-    <div className="mt-4"><CollectionView state={state} onRetry={() => { void reload(); }} renderEntry={row => <article className="space-y-2 break-words"><h3 className="card-title">{row.role}</h3><p className="text-sm">{row.organization}{row.location ? " / " + row.location : ""}</p><p className="text-xs text-muted">{row.startDate} to {row.current ? "Present" : row.endDate}</p><p className="whitespace-pre-wrap text-sm leading-6">{row.description}</p>{row.achievements.length > 0 && <ul className="list-disc space-y-1 pl-5 text-sm">{row.achievements.map((bullet, index) => <li key={index}>{bullet}</li>)}</ul>}<div className="flex flex-wrap gap-2"><Button variant="secondary" disabled={pending || editing || !!deleting} onClick={() => begin(row)}><Icon name="pencil" className="size-4" />Edit<span className="sr-only"> {row.role}</span></Button><Button variant="ghost" disabled={pending || editing || !!deleting} onClick={() => { setDeleting(row); setError(""); setSuccess(""); }}>Delete<span className="sr-only"> {row.role}</span></Button></div></article>} /></div>
+    <div className="mt-4">{state.kind === "ready" && state.entries.length > 0
+      ? <div className="space-y-7">{experienceGroups.map(group => {
+        const rows = state.entries.filter(row => group.types.includes(experienceType(row)));
+        return rows.length > 0 && <div key={group.title}><h3 className="mb-3 text-sm font-semibold text-muted">{group.title}</h3>
+          <CollectionView state={{ kind: "ready", entries: rows }} onRetry={() => { void reload(); }} renderEntry={entryView} /></div>;
+      })}</div>
+      : <CollectionView state={state} onRetry={() => { void reload(); }} renderEntry={entryView} />}</div>
     {editing && <form ref={form} noValidate onSubmit={save} className="mt-6 space-y-4" onKeyDown={event => { if (event.key === "Escape") cancel(); }}>
       {!service && <p role="status" className="text-sm text-muted">Draft only - saving is unavailable.</p>}
-      {input("role", "Job title / role (required)")}{input("organization", "Organization (required)")}{input("location", "Location (optional)")}
+      {input("role", "Job title / role (required)")}{input("organization", "Organization (required)")}
+      <Select label="Type" name="type" value={draft.type || experienceType(draft)} disabled={pending} hint="Only jobs and internships count as years of industry experience." onChange={event => change("type", event.target.value as ExperienceType)}>
+        {experienceTypes.map(type => <option key={type} value={type}>{experienceTypeLabels[type]}</option>)}</Select>{input("location", "Location (optional)")}
       <p className="text-xs leading-6 text-muted">Dates accept YYYY or YYYY-MM. No day is assumed. Required fields are labelled.</p>
       <div className="grid gap-4 sm:grid-cols-2">{input("startDate", "Start date (required)")}{input("endDate", draft.current ? "End date (not applicable)" : "End date (required unless current)")}</div>
       <label className="flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" name="current" checked={draft.current} disabled={pending} onChange={event => { const checked = event.target.checked; setDraft(current => ({ ...current, current: checked, endDate: checked ? "" : current.endDate })); setErrors(current => ({ ...current, endDate: undefined })); }} />I currently work here</label>
