@@ -95,7 +95,7 @@ def test_resume_without_a_model_uses_saved_facts(monkeypatch):
     doc, by_model = content.resume_document(candidate, POSTING, "Acme", ["Kubernetes"], profile)
     assert not by_model
     # Matched posting keywords, then the student's own keyword, then other skills.
-    assert doc["skills"][:3] == ["python", "Kubernetes", "React"]
+    assert doc["skills"] == ["Python", "Kubernetes", "React"]  # student's spelling, no repeats
     assert doc["experience"][0]["bullets"] == ["Built Python APIs", "Ran tests in CI"]
     assert "Python" in latex.resume_source(doc)
 
@@ -116,7 +116,7 @@ def test_model_output_cannot_add_entries_or_skills(monkeypatch):
     candidate, profile = student()
     doc, by_model = content.resume_document(candidate, POSTING, "Acme", [], profile)
     assert by_model
-    assert "Rust" not in doc["skills"] and doc["skills"][0] == "python"
+    assert "Rust" not in doc["skills"] and doc["skills"][0] == "Python"
     assert doc["experience"][0]["bullets"] == ["Built and tested Python APIs"]
     assert "CTO at Google" not in str(doc)
 
@@ -182,3 +182,8 @@ def test_templates_compile_to_pdf(monkeypatch):
     letter, _ = content.letter_document(candidate, POSTING, "Acme", [], profile)
     for source in (latex.resume_source(resume), latex.letter_source(letter)):
         assert latex.compile_pdf(source).startswith(b"%PDF")
+
+
+def test_skills_print_once_with_readable_capitals():
+    names = ["python", "docker", "Docker", "sql", "PostgreSQL", "k8s", "kubernetes"]
+    assert content._unique(names) == ["Python", "Docker", "SQL", "PostgreSQL", "K8s"]

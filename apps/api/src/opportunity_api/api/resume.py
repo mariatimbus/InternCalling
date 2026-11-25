@@ -246,9 +246,7 @@ def start_review(
             # Experience, projects, languages, certificates, awards and papers the CV states.
             "collections": propose_sections(text),
         },
-        "warnings": [
-            "Review every value before saving; anything missing can be added in Profile."
-        ]
+        "warnings": ["Review every value before saving; anything missing can be added in Profile."]
         + (
             [
                 "These proposals come from keyword rules, not AI: fields your CV states "

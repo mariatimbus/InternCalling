@@ -420,7 +420,7 @@ and `matched` / `missing` items. Rows the posting does not state are not scored.
 
 `kind` is `resume` or `cover-letter`. Returns `application/pdf` (attachment) compiled from LaTeX
 with Tectonic. Content comes only from the student's saved profile; when `OLLAMA_API_URL` (with
-`OLLAMA_API_KEY` and `OLLAMA_MODEL`) is set, that model rewrites the summary, bullets and letter
+`OLLAMA_API_KEY` and `OLLAMA_MODEL`; a URL ending in `/v1` uses the OpenAI-compatible chat API with thinking off) is set, that model rewrites the summary, bullets and letter
 from those facts, and the API drops any entry or skill it invents. Without a model the saved
 wording and a template letter are used. `503 pdf_renderer_unavailable` when Tectonic cannot be
 fetched or run; `502 pdf_render_failed` when compilation fails.
