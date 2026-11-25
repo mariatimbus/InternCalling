@@ -61,7 +61,7 @@ async function fixture(service) {
   const { ExperienceSection } = await load("../src/components/profile/experience-section.tsx", {
     react, "react/jsx-runtime": runtime, "@/lib/experience": model,
     "./collection-view": { CollectionView: "CollectionView" }, "@/components/ui/input": { Input: "Input" },
-    "@/components/ui/button": { Button: "Button" }, "@/components/ui/icon": { Icon: "Icon" }, "@/components/ui/field": { Field: "Field", fieldControl: "" },
+    "@/components/ui/button": { Button: "Button" }, "@/components/ui/icon": { Icon: "Icon" }, "@/components/ui/field": { Field: "Field", fieldControl: "" }, "@/components/ui/select": { Select: "Select" },
   });
   const render = () => { cursor = 0; refCursor = 0; return ExperienceSection({ service }); };
   const initial = render(); effects[0](); await new Promise(r => setImmediate(r));

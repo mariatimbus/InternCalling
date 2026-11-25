@@ -139,11 +139,12 @@ def test_all_rules_unknown_is_unknown():
     assert all(reason.status == EligibilityStatus.unknown for reason in result.reasons)
 
 
-def test_graduation_rule_never_infers_from_description():
+def test_graduation_rule_is_unknown_when_nothing_is_stated():
+    # Years stated in a posting's text are read in matching.engine (see test_graduation_text).
     result = evaluate(BACHELOR, OpportunityInput(degree_level="both", study_year=[2]))
     graduation = next(r for r in result.reasons if r.rule == "graduation_year")
     assert graduation.status == EligibilityStatus.unknown
-    assert "structured" in graduation.reason
+    assert "does not state" in graduation.reason
 
 
 def test_graduation_with_structured_data():

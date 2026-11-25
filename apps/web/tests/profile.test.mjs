@@ -16,7 +16,7 @@ async function load(path, dependencies = {}) {
 const helpers = await load("../src/lib/profile-edit.ts");
 const types = await load("../src/lib/api/types.ts");
 const { ApiError } = await load("../src/lib/api/client.ts");
-const profile = { id: "synthetic-profile", user_id: "synthetic-user", headline: "Student", bio: "Original bio", resume_url: null, degree_level: "bachelor", university: "Test University", field_of_study: "Computing", graduation_year: 2027, location: "Test City", created_at: "2026-11-01T00:00:00Z", updated_at: "2026-11-01T00:00:00Z" };
+const profile = { id: "synthetic-profile", user_id: "synthetic-user", headline: "Student", bio: "Original bio", resume_url: null, degree_level: "bachelor", study_year: "second", university: "Test University", field_of_study: "Computing", graduation_year: 2027, location: "Test City", created_at: "2026-11-01T00:00:00Z", updated_at: "2026-11-01T00:00:00Z" };
 
 async function action(options = {}) {
   const writes = [], revalidated = [];
@@ -113,4 +113,17 @@ test("invalid inputs, unavailable/guest accounts and mismatched backend owners c
     assert.ok((await state.save({ bio: "Edited" })).error);
     assert.equal(state.revalidated.length, 0);
   }
+});
+
+test("study year is validated and shown relative to the programme length", () => {
+  assert.ok(helpers.validateProfilePatch({ study_year: "seventh" }).fields.study_year);
+  assert.deepEqual(helpers.validateProfilePatch({ study_year: "second" }).patch, { study_year: "second" });
+  const november = new Date("2026-11-25T12:00:00Z");
+  assert.equal(helpers.academicEnd(november), 2027);
+  assert.equal(helpers.academicEnd(new Date("2027-05-01T12:00:00Z")), 2027);
+  assert.equal(helpers.programPosition("second", 2029, november), "Year 2 of 4");
+  assert.equal(helpers.programPosition("second", 2028, november), "Year 2 of 3");
+  assert.equal(helpers.programPosition("third", 2027, november), "Year 3 of 3");
+  assert.equal(helpers.programPosition(null, 2029, november), null);
+  assert.equal(helpers.programPosition("fourth", 2026, november), null);
 });

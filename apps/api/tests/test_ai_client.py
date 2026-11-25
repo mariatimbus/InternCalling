@@ -98,3 +98,45 @@ def test_embed_uses_current_api_contract():
         return httpx.Response(200, json={"embeddings": [[0.1, 0.2]]})
 
     assert client_for(handler).embed("fixture-model", ["one", "two"]) == [[0.1, 0.2], [0.1, 0.2]]
+
+
+def test_v1_urls_use_the_openai_compatible_chat_api_with_a_key():
+    from pydantic import BaseModel
+
+    class Out(BaseModel):
+        summary: str
+
+    seen = {}
+
+    def handler(request):
+        seen.update(
+            url=str(request.url),
+            auth=request.headers.get("authorization"),
+            body=json.loads(request.content),
+        )
+        content = json.dumps({"summary": "ok"})
+        return httpx.Response(
+            200, json={"choices": [{"finish_reason": "stop", "message": {"content": content}}]}
+        )
+
+    model = OllamaClient(
+        "https://gateway.example/v1",
+        api_key="k",
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    assert model.generate_json("m", "system", "prompt", Out).summary == "ok"
+    assert seen["url"] == "https://gateway.example/v1/chat/completions"
+    assert seen["auth"] == "Bearer k"
+    assert seen["body"]["reasoning_effort"] == "none"
+    assert seen["body"]["response_format"]["json_schema"]["schema"]["required"] == ["summary"]
+
+    def cut_off(request):
+        return httpx.Response(
+            200, json={"choices": [{"finish_reason": "length", "message": {"content": '{"summ'}}]}
+        )
+
+    truncated = OllamaClient(
+        "https://gateway.example/v1", client=httpx.Client(transport=httpx.MockTransport(cut_off))
+    )
+    with pytest.raises(AIInvalidOutput):
+        truncated.generate_json("m", "s", "p", Out)

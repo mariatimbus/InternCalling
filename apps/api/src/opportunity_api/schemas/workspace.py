@@ -86,9 +86,42 @@ class Draft(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
 
+EXPERIENCE_TYPES = ("job", "internship", "research", "extracurricular", "volunteering")
+# Industry experience: what "years of experience" in a posting means.
+WORK_TYPES = ("job", "internship")
+_VOLUNTEER = re.compile(r"volunteer|voluntar|bénévol", re.I)
+_INTERN = re.compile(
+    r"\bintern(?:ship)?\b|praktik|werkstudent|working student|stagi|\bstage\b", re.I
+)
+_RESEARCH = re.compile(r"research|\bph\.?d\b|teaching assistant|\blab(?:oratory)?\b|cercet", re.I)
+_ACTIVITY = re.compile(
+    r"\b(?:member|ambassador|captain|president|vice[- ]president|team leader|mentor|club|society|"
+    r"association|asocia|ftc|first robotics|robotics team|hackathon|student|olympiad|scout)\b",
+    re.I,
+)
+
+
+def experience_type(values: dict) -> str:
+    """The saved type, or one read from the role and organization for older entries."""
+    saved = values.get("type")
+    if saved in EXPERIENCE_TYPES:
+        return saved
+    text = f"{values.get('role') or ''} @ {values.get('organization') or ''}"
+    if _VOLUNTEER.search(text):
+        return "volunteering"
+    if _INTERN.search(text):
+        return "internship"
+    if _RESEARCH.search(text):
+        return "research"
+    if _ACTIVITY.search(text):
+        return "extracurricular"
+    return "job"
+
+
 class ExperienceDraft(Draft):
     role: Required
     organization: Required
+    type: Literal["", "job", "internship", "research", "extracurricular", "volunteering"] = ""
     location: Short = ""
     startDate: Short
     endDate: Short = ""
