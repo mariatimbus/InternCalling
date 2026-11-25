@@ -5,6 +5,7 @@ import type { Application } from "@/lib/api/types";
 import { applicationStatuses, type TrackingState } from "@/lib/applications";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
+import { Icon } from "@/components/ui/icon";
 
 const statusLabel = (status: Application["status"]) => status[0].toUpperCase() + status.slice(1);
 
@@ -38,7 +39,7 @@ export function ApplicationControls({ opportunityId, application = null, showSav
       {allowTracking && <Button variant="secondary" size="sm" aria-expanded={open === "status"} aria-controls={statusPanelId}
         onClick={() => toggle("status")}>Status · {current ? statusLabel(current.status) : "Not tracked"}</Button>}
       {allowTracking && current && <Button variant="secondary" size="sm" aria-expanded={open === "notes"} aria-controls={notesPanelId}
-        onClick={() => toggle("notes")}>{current.notes ? "Edit notes" : "Notes"}</Button>}
+        onClick={() => toggle("notes")}>{current.notes && <Icon name="pencil" className="size-4" />}{current.notes ? "Edit notes" : "Notes"}</Button>}
       {tailoring && <Button variant="secondary" size="sm" aria-expanded={open === "tailor"} aria-controls={tailorPanelId}
         onClick={() => toggle("tailor")}>Tailor resume</Button>}
     </div>}

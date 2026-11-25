@@ -8,6 +8,7 @@ import { SkillChip } from "./skill-chip";
 import { GroupedSkillPicker } from "./grouped-skill-picker";
 import { safeResumeUrl } from "@/lib/resume-link";
 import { Field, fieldControl } from "@/components/ui/field";
+import { Icon } from "@/components/ui/icon";
 
 export function ProjectsSection({ service }: { service?: ProjectsService }) {
   const id = useId();
@@ -73,7 +74,7 @@ export function ProjectsSection({ service }: { service?: ProjectsService }) {
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0"><h3 className="card-title">{row.name}</h3><p className="metadata-text mt-1">{projectPeriod(row)}</p></div>
           <Button variant="ghost" size="sm" className="shrink-0 px-2" aria-label={`Edit ${row.name}`} disabled={pending || editing || !!deleting} onClick={() => begin(row)}>
-            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="size-5"><path d="m15 5 4 4 M4 20l4-1 12-12a2.8 2.8 0 0 0-4-4L4 15z" /></svg>
+            <Icon name="pencil" />
           </Button>
         </div>
         {row.role && <p className="mt-3 text-sm font-medium text-foreground">{row.role}</p>}

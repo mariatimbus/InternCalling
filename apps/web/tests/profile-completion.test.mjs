@@ -72,7 +72,7 @@ async function fixture({ profile = empty, skills = [], save = {}, mutate = {}, r
   const { ProfileEditor } = await load("../src/components/profile/profile-editor.tsx", {
     react: editorHooks.react, "react/jsx-runtime": runtime, "@/lib/profile-edit": editing,
     "@/app/(workspace)/profile/actions": { saveProfile: async (fields) => typeof save === "function" ? save(fields) : save },
-    "@/components/ui/drawer": { Drawer: "Drawer" }, "@/components/ui/button": { Button: "Button" }, "@/components/ui/input": { Input: "Input" },
+    "@/components/ui/drawer": { Drawer: "Drawer" }, "@/components/ui/button": { Button: "Button" }, "@/components/ui/icon": { Icon: "Icon" }, "@/components/ui/input": { Input: "Input" },
     "@/components/ui/select": { Select: "Select" }, "@/components/ui/field": { Field: "Field", fieldControl: "" },
     "@/components/ui/error-state": { ErrorState: "ErrorState" },
   });
@@ -82,7 +82,7 @@ async function fixture({ profile = empty, skills = [], save = {}, mutate = {}, r
       addProfileSkill: async () => mutate, removeProfileSkill: async () => mutate,
       getProfileSkills: async () => mutate, getSkillSuggestions: async () => ({ skills: [] }),
     },
-    "@/components/ui/drawer": { Drawer: "Drawer" }, "@/components/ui/button": { Button: "Button" }, "@/components/ui/error-state": { ErrorState: "ErrorState" },
+    "@/components/ui/drawer": { Drawer: "Drawer" }, "@/components/ui/button": { Button: "Button" }, "@/components/ui/icon": { Icon: "Icon" }, "@/components/ui/error-state": { ErrorState: "ErrorState" },
     "./skill-chip": { SkillChip: "SkillChip" }, "./grouped-skill-picker": { GroupedSkillPicker: "Autocomplete" },
   });
   const { ProfileHub } = await load("../src/components/profile/profile-hub.tsx", {
@@ -91,7 +91,7 @@ async function fixture({ profile = empty, skills = [], save = {}, mutate = {}, r
     "@/lib/profile-services": { createProfileServices: () => Object.fromEntries(["experience", "projects", "certificates", "honours", "languages", "publications", "pdf", "review"].map(name => [name, { name }])) },
     "./resume-review-flow": { ResumeReviewFlow: "ReviewFlow" },
     "@/app/(workspace)/profile/completion-actions": { refreshCompletion: async () => refreshed },
-    "@/lib/profile-completion": helper, "@/components/ui/button": { Button: "Button" },
+    "@/lib/profile-completion": helper, "@/components/ui/button": { Button: "Button" }, "@/components/ui/icon": { Icon: "Icon" },
     "./profile-completion": { ProfileCompletion: "Completion" },
     "./profile-editor": { ProfileEditor }, "./profile-skills": { ProfileSkills }, "./profile-social-links": { ProfileSocialLinks: "SocialLinks" }, "./resume-editor": { ResumeEditor: "ResumeEditor" }, "./resume-pdf-section": { ResumePdfSection: "ResumePdfSection" }, "./experience-section": { ExperienceSection: "ExperienceSection" }, "./projects-section": { ProjectsSection: "ProjectsSection" }, "./certificates-section": { CertificatesSection: "CertificatesSection" }, "./honours-section": { HonoursSection: "HonoursSection" }, "./languages-section": { LanguagesSection: "LanguagesSection" }, "./publications-section": { PublicationsSection: "PublicationsSection" }, "./profile-collection-sections": { ProfileCollectionSections: "CollectionSections" },
   });
@@ -104,12 +104,12 @@ async function fixture({ profile = empty, skills = [], save = {}, mutate = {}, r
 
 test("typing and Cancel leave completion unchanged; only a confirmed profile save updates it", async () => {
   const f = await fixture({ save: { profile: { ...empty, headline: "Persisted" } } });
-  find(f.editor(), n => n.type === "Button" && n.props.children === "Edit profile").props.onClick();
+  find(f.editor(), n => n.type === "Button" && [n.props.children].flat().includes("Edit profile")).props.onClick();
   find(f.editor(), n => n.type === "Input" && n.props.name === "headline").props.onChange({ target: { value: "Unsaved" } });
   assert.equal(f.completion().percentage, 0);
   find(f.editor(), n => n.type === "Button" && n.props.children === "Cancel").props.onClick();
   assert.equal(f.completion().percentage, 0);
-  find(f.editor(), n => n.type === "Button" && n.props.children === "Edit profile").props.onClick();
+  find(f.editor(), n => n.type === "Button" && [n.props.children].flat().includes("Edit profile")).props.onClick();
   assert.equal(find(f.editor(), n => n.type === "Input" && n.props.name === "headline").props.value, "");
   find(f.editor(), n => n.type === "Input" && n.props.name === "headline").props.onChange({ target: { value: "Unsaved" } });
   await find(f.editor(), n => n.type === "form").props.onSubmit({ preventDefault() {} });
@@ -122,7 +122,7 @@ test("the document profile separates education and opens the existing editor wit
   assert.ok(find(saved, n => n.props.id === "profile-education"));
   assert.ok(find(saved, n => n.props.children === "Fixture University"));
   assert.ok(find(saved, n => n.props.children === "student@example.invalid"));
-  find(saved, n => n.type === "Button" && n.props.children === "Edit education").props.onClick();
+  find(saved, n => n.type === "Button" && [n.props.children].flat().includes("Edit education")).props.onClick();
   const university = find(f.editor(), n => n.type === "Input" && n.props.name === "university");
   assert.equal(university.props.value, "Fixture University");
   university.props.onChange({ target: { value: "Unsaved university" } });
@@ -133,7 +133,7 @@ test("the document profile separates education and opens the existing editor wit
 
 test("failed profile saves preserve entered values and cannot increase completion", async () => {
   const f = await fixture({ save: { error: "Try again" } });
-  find(f.editor(), n => n.type === "Button" && n.props.children === "Edit profile").props.onClick();
+  find(f.editor(), n => n.type === "Button" && [n.props.children].flat().includes("Edit profile")).props.onClick();
   find(f.editor(), n => n.type === "Input" && n.props.name === "headline").props.onChange({ target: { value: "Retry this draft" } });
   await find(f.editor(), n => n.type === "form").props.onSubmit({ preventDefault() {} });
   assert.equal(f.completion(), null);
@@ -156,7 +156,7 @@ test("confirmed add and remove update completion; failed confirmation makes it u
 test("unknown data hides the percentage; confirmed retry restores it without resetting editor draft", async () => {
   const f = await fixture({ skills: null, refreshed: { profile: full, skills: savedSkills } });
   assert.equal(f.completion(), null);
-  find(f.editor(), n => n.type === "Button" && n.props.children === "Edit profile").props.onClick();
+  find(f.editor(), n => n.type === "Button" && [n.props.children].flat().includes("Edit profile")).props.onClick();
   find(f.editor(), n => n.type === "Input" && n.props.name === "headline").props.onChange({ target: { value: "Keep draft" } });
   find(f.hub(), n => n.type === "Completion").props.onRetry();
   await new Promise(resolve => setImmediate(resolve));
@@ -166,7 +166,7 @@ test("unknown data hides the percentage; confirmed retry restores it without res
 
 test("compact completion has labelled progress and no checklist, formula or matching copy", async () => {
   const { ProfileCompletion } = await load("../src/components/profile/profile-completion.tsx", {
-    "react/jsx-runtime": runtime, "@/lib/profile-completion": helper, "@/components/ui/drawer": { Drawer: "Drawer" }, "@/components/ui/button": { Button: "Button" },
+    "react/jsx-runtime": runtime, "@/lib/profile-completion": helper, "@/components/ui/drawer": { Drawer: "Drawer" }, "@/components/ui/button": { Button: "Button" }, "@/components/ui/icon": { Icon: "Icon" },
   });
   const tree = ProfileCompletion({ profile: full, skills: savedSkills, pending: false, onRetry() {} });
   const progress = find(tree, n => n.type === "progress");
@@ -279,7 +279,7 @@ test("editing after a confirmed refresh compares against the refreshed profile",
   f.editor();
   find(f.hub(), n => n.type === "Completion").props.onRetry();
   await new Promise(resolve => setImmediate(resolve));
-  find(f.editor(), n => n.type === "Button" && n.props.children === "Edit profile").props.onClick();
+  find(f.editor(), n => n.type === "Button" && [n.props.children].flat().includes("Edit profile")).props.onClick();
   find(f.editor(), n => n.type === "Input" && n.props.name === "headline").props.onChange({ target: { value: "" } });
   await find(f.editor(), n => n.type === "form").props.onSubmit({ preventDefault() {} });
   assert.deepEqual(writes, [{ headline: null }]);

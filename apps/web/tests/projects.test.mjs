@@ -54,7 +54,7 @@ async function fixture(service) {
   const { ProjectsSection } = await load("../src/components/profile/projects-section.tsx", {
     react, "react/jsx-runtime": runtime, "@/lib/projects": model, "@/lib/resume-link": links,
     "./collection-view": { CollectionView: "CollectionView" }, "./skill-chip": { SkillChip: "SkillChip" }, "./grouped-skill-picker": { GroupedSkillPicker: "Picker" },
-    "@/components/ui/input": { Input: "Input" }, "@/components/ui/button": { Button: "Button" }, "@/components/ui/field": { Field: "Field", fieldControl: "" },
+    "@/components/ui/input": { Input: "Input" }, "@/components/ui/button": { Button: "Button" }, "@/components/ui/icon": { Icon: "Icon" }, "@/components/ui/field": { Field: "Field", fieldControl: "" },
   });
   const render = () => { cursor = 0; refCursor = 0; return ProjectsSection({ service }); };
   const initial = render(); effects[0](); await new Promise(r => setImmediate(r));
@@ -146,7 +146,7 @@ test("project cards have a pencil edit control and reveal long descriptions with
   const row = { ...valid, id: "synthetic-project", revision: 1, position: 0, description, ongoing: true, endDate: "" };
   let card = f.row(row);
   assert.equal(find(card, "h3").props.children, row.name);
-  assert.ok(find(button(card, "Edit"), "svg"));
+  assert.ok(find(button(card, "Edit"), "Icon"));
   assert.ok(!text(card).includes("The final source sentence."));
   const more = button(card, "Show more"); assert.equal(more.props["aria-expanded"], false); more.props.onClick();
   card = f.row(row); assert.ok(text(card).includes(description));

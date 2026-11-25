@@ -26,7 +26,7 @@ export function CredentialEntry({ title, issuer, logoName, logoUrl, logoIcon, fa
           {facts.filter(Boolean).map(fact => <p key={fact as string} className="mt-0.5 text-sm text-muted">{fact}</p>)}
         </div>
         <Button variant="ghost" size="sm" className="shrink-0 px-2" aria-label={`Edit ${title}`} disabled={disabled} onClick={onEdit}>
-          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="size-5"><path d="m15 5 4 4 M4 20l4-1 12-12a2.8 2.8 0 0 0-4-4L4 15z" /></svg>
+          <Icon name="pencil" />
         </Button>
       </div>
       {children}
