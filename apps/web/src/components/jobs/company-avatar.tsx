@@ -15,7 +15,7 @@ function CompanyLogo({ src, initials, size }: { src: string; initials: string; s
   const pixels = size === "sm" ? 48 : 64;
   if (failed) return <CompanyMark initials={initials} size={size} />;
 
-  return <span aria-hidden="true" className={`inline-flex shrink-0 items-center justify-center overflow-hidden rounded-lg bg-logo-surface p-1 ${size === "sm" ? "size-12" : "size-16"}`}>
+  return <span aria-hidden="true" className={`inline-flex shrink-0 items-center justify-center overflow-hidden rounded-control border border-line bg-logo-surface p-1.5 ${size === "sm" ? "size-12" : "size-16"}`}>
     <Image src={src} alt="" width={pixels} height={pixels} sizes={`${pixels}px`} unoptimized className="size-full object-contain"
       onError={() => setFailed(true)} />
   </span>;

@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import ts from "typescript";
 
 async function load(file, dependencies = {}) {
+  dependencies = { "@/components/ui/icon": { Icon: "Icon" }, ...dependencies };
   const { outputText } = ts.transpileModule(await readFile(new URL(file, import.meta.url), "utf8"), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
   });

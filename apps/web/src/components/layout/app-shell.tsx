@@ -18,15 +18,15 @@ export function AppShell({ children, navigation, notice, account }: AppShellProp
   const [navigationOpen, setNavigationOpen] = useState(false);
   return (
     <div className="flex h-dvh min-h-0 flex-col overflow-hidden lg:flex-row">
-      <aside className="hidden w-56 shrink-0 border-r border-line bg-surface px-4 py-7 lg:block xl:w-60">
+      <aside className="hidden w-56 shrink-0 border-r border-line bg-surface px-3 py-6 lg:block xl:w-60 xl:px-4">
         <Sidebar items={navigation} activePath={pathname} account={account} />
       </aside>
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <header className="relative z-20 flex min-h-16 shrink-0 flex-wrap items-center justify-between gap-2 border-b border-line bg-surface px-4 py-2 lg:px-8">
+        <header className="relative z-20 flex min-h-16 shrink-0 flex-wrap items-center justify-between gap-2 border-b border-line bg-surface px-4 py-2 sm:px-7 xl:px-9">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <Button variant="ghost" className="lg:hidden" aria-expanded={navigationOpen} aria-controls="workspace-navigation" onClick={() => setNavigationOpen(true)}><Icon name="menu" /><span className="sr-only">Menu</span></Button>
+            <Button variant="ghost" className="min-w-11 px-2 lg:hidden" aria-expanded={navigationOpen} aria-controls="workspace-navigation" onClick={() => setNavigationOpen(true)}><Icon name="menu" /><span className="sr-only">Menu</span></Button>
             <span className="lg:hidden"><BrandLogo /></span>
-            <div className="hidden items-center gap-2 text-xs text-muted lg:flex"><span>Workspace</span><Icon name="chevron" className="size-3 opacity-60" /><span className="text-foreground">{active?.label ?? "Components"}</span></div>
+            <div className="hidden items-center gap-3 text-sm text-muted lg:flex"><span>My workspace</span><Icon name="chevron" className="size-3" /><span className="font-semibold text-foreground">{active?.label ?? "Workspace"}</span></div>
           </div>
           {notice && <details className="group">
             <summary aria-label="Workspace information" className="flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-control px-2 text-xs text-muted hover:text-foreground">

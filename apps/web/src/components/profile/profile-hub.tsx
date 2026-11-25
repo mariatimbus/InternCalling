@@ -53,24 +53,24 @@ export function ProfileHub({ initialProfile, initialSkills, insightsEnabled = fa
   const addSkills = insightsEnabled && skillsKnown && skills?.length === 0;
   return <>
     <nav aria-label="Profile sections" className="my-6 flex flex-wrap gap-x-5 gap-y-1 border-b border-line pb-3 text-sm text-muted">
-      {[["profile-overview", "Overview"], ["profile-education", "Education"], ["profile-experience", "Experience"], ["profile-skills", "Skills"]].map(([id, label]) =>
-        <a key={id} href={"#" + id} className="inline-flex min-h-11 items-center rounded-sm hover:text-foreground">{label}</a>)}
+      {[["profile-overview", "Overview"], ["profile-education", "Education"], ["profile-experience", "Experience"], ["profile-skills", "Skills"], ["profile-projects", "Projects"]].map(([id, label]) =>
+        <a key={id} href={"#" + id} className="inline-flex min-h-11 items-center rounded-control px-2 font-medium hover:bg-surface hover:text-accent">{label}</a>)}
     </nav>
     <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_19rem] xl:gap-12">
     <div data-profile-document className="min-w-0">
       <ProfileEditor ref={editor} initialProfile={initialProfile} persistedProfile={profile} contactEmail={contactEmail} onConfirmed={(saved) => { revision.current++; setProfile(saved); setProfileKnown(true); }} onUnavailable={() => { revision.current++; setProfileKnown(false); }} />
       <div id="profile-experience" data-profile-group><ExperienceSection service={services.experience} /></div>
       <div id="profile-skills" data-profile-group ref={skillsSection}><ProfileSkills initialSkills={initialSkills} persistedSkills={skills} onConfirmed={(saved) => { revision.current++; setSkills(saved); setSkillsKnown(true); }} onUnavailable={() => { revision.current++; setSkillsKnown(false); }} /></div>
-      <ProjectsSection service={services.projects} />
+      <div id="profile-projects" data-profile-group><ProjectsSection service={services.projects} /></div>
       <CertificatesSection service={services.certificates} />
       <HonoursSection service={services.honours} />
       <LanguagesSection service={services.languages} />
       <PublicationsSection service={services.publications} />
     </div>
-    <aside aria-label="Profile completion" data-profile-sidebar className="min-w-0 space-y-5">
+    <aside aria-label="Profile completion" data-profile-sidebar className="min-w-0 space-y-5 lg:sticky lg:top-6">
       <ProfileCompletion profile={profileKnown ? profile : null} skills={skillsKnown ? skills : null} pending={pending} onRetry={() => { void retry(); }} />
       <ProfileSocialLinks initialLinks={socialLinks} />
-      {insightsEnabled && (fields.length > 0 || addSkills) && <section className="rounded-xl border border-line p-5" aria-labelledby="profile-insights-title">
+      {insightsEnabled && (fields.length > 0 || addSkills) && <section className="rounded-xl border border-line bg-surface p-5" aria-labelledby="profile-insights-title">
         <h2 id="profile-insights-title" className="section-title">Profile Insights</h2>
         <ul className="mt-4 space-y-2">
           {fields.map(({ key, label }) => key !== "skills" && <li key={key}>

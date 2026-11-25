@@ -20,12 +20,12 @@
 
 /* Semantic roles: use these tokens for application UI. */
 @theme inline {
-  --color-background: color-mix(in srgb, var(--color-warm-white) 78%, var(--color-pale-blue));
+  --color-background: color-mix(in srgb, var(--color-warm-white) 65%, var(--color-pale-blue));
   --color-surface: var(--color-warm-white);
   --color-elevated: color-mix(in srgb, var(--color-warm-white) 88%, var(--color-pale-blue));
   --color-card: var(--color-warm-white);
   --color-nav-track: color-mix(in srgb, var(--color-warm-white) 72%, var(--color-pale-blue));
-  --color-line: color-mix(in srgb, var(--color-lavender-blue) 45%, var(--color-warm-white));
+  --color-line: color-mix(in srgb, var(--color-lavender-blue) 36%, var(--color-warm-white));
   --color-foreground: var(--color-navy);
   --color-body-copy: var(--color-navy);
   --color-muted: var(--color-violet);
@@ -51,6 +51,7 @@
     @apply relative isolate bg-background font-sans text-body-copy antialiased;
     color-scheme: light;
     font-feature-settings: "cv11", "ss01";
+    line-height: 1.5;
   }
 
   html {
@@ -104,8 +105,8 @@
 
 @utility page-title {
   @apply font-sans font-bold text-foreground;
-  font-size: clamp(1.75rem, 1.4rem + 1vw, 2.25rem);
-  line-height: 1.2;
+  font-size: 1.75rem;
+  line-height: 1.25;
   letter-spacing: -0.03em;
   overflow-wrap: anywhere;
 }
@@ -124,9 +125,9 @@
 }
 
 @utility section-title {
-  @apply text-lg font-bold text-foreground sm:text-xl;
-  line-height: 1.24;
-  letter-spacing: -0.026em;
+  @apply text-lg font-semibold text-foreground;
+  line-height: 1.4;
+  letter-spacing: -0.02em;
   overflow-wrap: anywhere;
 }
 
@@ -146,13 +147,21 @@
 }
 
 @utility segmented-track {
-  @apply grid w-full min-w-0 grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)_minmax(0,1fr)] gap-1 rounded-control bg-nav-track p-1 sm:w-fit sm:min-w-96 sm:grid-cols-3;
+  @apply grid w-full min-w-0 grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)_minmax(0,1fr)] gap-1 rounded-control border border-line bg-surface p-1 sm:w-fit sm:min-w-96 sm:grid-cols-3;
 }
 
 @utility segmented-link {
   @apply inline-flex min-h-11 min-w-0 items-center justify-center rounded-control px-1 text-center text-xs font-medium whitespace-nowrap text-muted motion-safe:transition-colors motion-safe:duration-150 sm:px-4 sm:text-sm;
   &:hover { @apply bg-elevated text-foreground; }
   &:focus-visible { outline-offset: 1px; }
-  &[aria-current="page"] { @apply bg-surface font-semibold text-accent; }
-  &[aria-current="page"]:hover { @apply bg-surface; }
+  &[aria-current="page"] { @apply bg-primary/10 font-semibold text-accent; }
+  &[aria-current="page"]:hover { @apply bg-primary/10; }
+}
+
+@utility workspace-page {
+  @apply mx-auto w-full max-w-7xl px-4 py-6 sm:px-7 sm:py-8 xl:px-9;
+}
+
+@utility page-description {
+  @apply mt-2 max-w-2xl text-[0.9375rem] leading-relaxed text-muted;
 }

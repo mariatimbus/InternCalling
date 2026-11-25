@@ -5,6 +5,7 @@ import type { Profile } from "@/lib/api/types";
 import { changedProfileFields, profileDraft, validateProfileDraft, type ProfileField, type ProfileFieldErrors } from "@/lib/profile-edit";
 import { saveProfile } from "@/app/(workspace)/profile/actions";
 import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Field, fieldControl } from "@/components/ui/field";
@@ -64,7 +65,7 @@ export function ProfileEditor({ initialProfile, persistedProfile, onConfirmed, o
 
   return <>
     <section id="profile-overview" className="py-7" aria-labelledby="profile-details-title">
-    <div className="flex flex-wrap items-center justify-between gap-4"><h2 ref={sectionTitle} id="profile-details-title" tabIndex={-1} className="section-title">Profile details</h2>{!editing && <Button variant="ghost" size="sm" onClick={() => beginEdit("headline")}>Edit profile</Button>}</div>
+    <div className="flex flex-wrap items-center justify-between gap-4"><h2 ref={sectionTitle} id="profile-details-title" tabIndex={-1} className="section-title flex items-center gap-2.5"><Icon name="profile" className="size-5 text-accent" />Profile details</h2>{!editing && <Button variant="ghost" size="sm" onClick={() => beginEdit("headline")}>Edit profile</Button>}</div>
     {success && <p role="status" className="mt-5 text-sm leading-6">{success}</p>}
     {editing ? <form ref={form} onSubmit={submit} noValidate aria-busy={saving} className="mt-6 space-y-6">
       <p className="text-sm leading-6 text-muted">Leave a field blank to clear it. Clearing study or location details may require onboarding again before opening Jobs.</p>
@@ -81,17 +82,17 @@ export function ProfileEditor({ initialProfile, persistedProfile, onConfirmed, o
       {saving && <p role="status" className="text-sm text-muted">Saving your profile…</p>}
       <div className="flex flex-wrap gap-3"><Button type="submit" disabled={saving}>{saving ? "Saving…" : "Save"}</Button><Button variant="secondary" disabled={saving} onClick={close}>Cancel</Button></div>
     </form> : <div className="mt-5 space-y-4">
-      <p className="text-xl font-semibold text-foreground [overflow-wrap:anywhere]">{current.headline?.trim() || "Add a headline to introduce yourself."}</p>
+      <p className={current.headline?.trim() ? "text-xl font-semibold text-foreground [overflow-wrap:anywhere]" : "reading-text text-muted"}>{current.headline?.trim() || "Add a headline to introduce yourself."}</p>
       {current.bio?.trim() && <p className="reading-text max-w-prose whitespace-pre-wrap [overflow-wrap:anywhere]">{current.bio}</p>}
       <div className="flex flex-wrap gap-2 text-sm text-muted">
-        {current.location?.trim() && <span className="inline-flex max-w-full items-center gap-2 rounded-full bg-elevated px-3 py-1.5 [overflow-wrap:anywhere]"><span className="font-medium">Location</span>{current.location}</span>}
-        {contactEmail && <span className="inline-flex max-w-full flex-wrap items-center gap-x-2 rounded-full bg-elevated px-3 py-1.5 [overflow-wrap:anywhere]"><span className="font-medium">Email</span><span>{contactEmail}</span></span>}
+        {current.location?.trim() && <span className="inline-flex max-w-full items-start gap-2 rounded-control bg-elevated px-3 py-2 [overflow-wrap:anywhere]"><Icon name="location" className="mt-0.5 size-4" /><span>{current.location}</span></span>}
+        {contactEmail && <span className="inline-flex max-w-full flex-wrap items-center gap-x-2 gap-y-1 rounded-control bg-elevated px-3 py-2 [overflow-wrap:anywhere]"><span className="font-medium">Email</span><span>{contactEmail}</span></span>}
       </div>
     </div>}
     </section>
     <section id="profile-education" aria-labelledby="profile-education-title" className="border-t border-line py-7">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id="profile-education-title" className="section-title">Education</h2>
+        <h2 id="profile-education-title" className="section-title flex items-center gap-2.5"><Icon name="calendar" className="size-5 text-accent" />Education</h2>
         <Button variant="ghost" size="sm" disabled={saving} onClick={() => beginEdit("university")}>Edit education</Button>
       </div>
       <div className="mt-5 flex flex-wrap items-start justify-between gap-4">

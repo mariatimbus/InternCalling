@@ -85,6 +85,9 @@ async function applicationsRoute(api) {
     "next/link": { default: "Link" },
     "@/lib/auth/account": account,
     "@/components/ui/empty-state": { EmptyState: "EmptyState" },
+    "@/components/ui/page-heading": { PageHeading: "PageHeading" },
+    "@/components/jobs/company-avatar": { CompanyAvatar: "CompanyAvatar" },
+    "@/lib/organization-logo": { organizationLogo: () => null },
     "@/components/applications/application-controls": { ApplicationControls: "Controls" },
   });
   const { updateTracking } = await loadRoute("actions.ts", {

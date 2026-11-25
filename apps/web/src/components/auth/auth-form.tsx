@@ -15,9 +15,9 @@ export function AuthForm({ mode, configured, notice }: { mode: "sign-in" | "sign
   const [socialState, socialAction, socialPending] = useActionState(signInWithProvider, {} as ActionState);
   const busy = pending || socialPending;
   const [activeProvider, setActiveProvider] = useState<VisibleSocialProvider | null>(null);
-  return <section className="mx-auto w-full max-w-md rounded-panel bg-card p-6 sm:p-10">
+  return <section className="mx-auto w-full max-w-md rounded-panel border border-line bg-card p-6 sm:p-8">
     <h1 className="page-title">{signingUp ? "Your next chapter starts here." : "Welcome back."}</h1>
-    <p className="reading-text mt-3">{signingUp ? "Create your InternCalling account to find internships that fit your studies and skills." : "Sign in to your internship workspace."}</p>
+    <p className="page-description">{signingUp ? "Create your InternCalling account to find internships that fit your studies and skills." : "Sign in to your internship workspace."}</p>
     {!configured && <p role="alert" className="mt-6 rounded-control border border-border p-4 text-sm">Sign-in is not configured yet. Set the public Supabase project URL and publishable key to enable authentication.</p>}
     {notice && <p role="status" className="reading-text mt-5">{notice}</p>}
     {state.success ? <div className="mt-6 space-y-6"><p role="status" className="text-sm leading-6">{state.success}</p><Link className="text-accent underline" href="/sign-in">Back to sign in</Link></div> : <>

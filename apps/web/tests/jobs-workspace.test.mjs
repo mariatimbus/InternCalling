@@ -5,6 +5,7 @@ import ts from "typescript";
 const employers = JSON.parse(await readFile(new URL("../../api/src/opportunity_api/ingestion/sources/employers.json", import.meta.url), "utf8"));
 
 async function load(file, dependencies = {}) {
+  dependencies = { "@/components/ui/icon": { Icon: "Icon" }, ...dependencies };
   const { outputText } = ts.transpileModule(await readFile(new URL(file, import.meta.url), "utf8"), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
   });
@@ -716,10 +717,10 @@ test("the detail overview preserves a zero match and distinguishes unavailable f
     return nodes(tree.find((node) => node.props["aria-label"] === "Match overview"));
   };
   const zero = overview({ match: { score: 0, reasons: [] }, eligibility: null });
-  assert.equal(zero.find((node) => node.props.className?.includes("text-4xl")).props.children[0], 0);
+  assert.equal(zero.find((node) => node.props.className?.includes("tabular-nums")).props.children[0], 0);
   const missing = overview({ match: null, eligibility: null });
   assert.ok(missing.some((node) => node.props.children === "Match score unavailable"));
-  assert.ok(!missing.some((node) => node.props.className?.includes("text-4xl")));
+  assert.ok(!missing.some((node) => node.props.className?.includes("tabular-nums")));
   assert.ok(overview(null).some((node) => node.props.children === "Loading match score…"));
 });
 

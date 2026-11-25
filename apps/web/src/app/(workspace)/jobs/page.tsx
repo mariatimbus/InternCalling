@@ -6,6 +6,7 @@ import { RecommendedFeed } from "@/components/workspace/recommended-feed";
 import { JobsSearch } from "@/components/jobs/jobs-search";
 import { SortSelect } from "@/components/jobs/sort-select";
 import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icon";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { jobsParams, readJobsQuery, recommendationParams, type JobsQuery, type JobsView } from "@/lib/jobs-url";
@@ -69,15 +70,15 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
     <div className="flex flex-wrap items-end justify-between gap-5">
       <div>
         <h1 className="page-title">Find your next step.</h1>
-        <p className="reading-text mt-3">Find internships and track your applications.</p>
+        <p className="page-description">Find internships and track your applications.</p>
       </div>
-      <Link href="/profile" className="text-sm text-accent underline underline-offset-4">Your profile</Link>
+      <Link href="/profile" className="hidden min-h-11 items-center gap-2 rounded-control text-sm font-medium text-accent hover:underline sm:inline-flex"><Icon name="profile" className="size-4" />Your profile</Link>
     </div>
     {view === "recommended" && <div className="mt-6">
       <JobsSearch search={search} applied={{ location, degree_level: degree, study_year: year, work_model: workModel, schedule, field, posted_within: postedWithin, no_experience: noExperience }} navigationKey={href(view)} />
       <SavedSearches saved={saved} current={{ search, location, degree, year }} action={savedSearchAction} />
     </div>}
-    <nav aria-label="Job lists" className={`segmented-track mb-5 ${view === "recommended" ? "" : "mt-6"}`}>
+    <nav aria-label="Job lists" className="segmented-track mt-5 mb-4">
       {(Object.keys(views) as JobsView[]).map((target) => <Link key={target} href={href(target)} prefetch={false}
         aria-current={target === view ? "page" : undefined}
         className="segmented-link">
@@ -88,11 +89,11 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
         <p className="text-sm font-semibold tabular-nums text-foreground">
           {result?.total ?? items.length} {(result?.total ?? items.length) === 1 ? "opportunity" : "opportunities"}
         </p>
-        {result && <p className="metadata-text">{sort === "recent" ? "Newest first." : sort === "deadline" ? "Closing soonest first." : sort === "company" ? "By company name." : "Ranked across all matching opportunities."}</p>}
+        {result && <p className="sr-only">{sort === "recent" ? "Newest first." : sort === "deadline" ? "Closing soonest first." : sort === "company" ? "By company name." : "Ranked across all matching opportunities."}</p>}
         {result && <SortSelect sort={sort} params={urlParams(view, 1).toString()} />}
       </div>}
   </>;
-  return <div className="mx-auto max-w-7xl px-5 py-7 sm:px-8">
+  return <div className="workspace-page">
     {failed ? <>{listHeader}<ErrorState title={copy.error} action={<form action="/jobs">
       {Array.from(urlParams(view, page), ([name, value]) => <input key={name} type="hidden" name={name} value={value} />)}
       <Button type="submit">Try again</Button>

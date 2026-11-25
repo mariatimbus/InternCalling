@@ -13,7 +13,7 @@ export type CardDensity = "comfortable" | "compact";
 /** Shared opportunity row. Compact density is intended for the split-view list. */
 export function opportunityCardClasses(selected = false, density: CardDensity = "comfortable") {
   if (density === "compact") {
-    return `group relative flex min-w-0 flex-col gap-3 rounded-card border p-4 motion-safe:transition-colors ${selected ? "border-primary bg-primary/5" : "border-line bg-card hover:border-border"}`;
+    return `group relative flex min-w-0 flex-col gap-3 rounded-card border p-4 motion-safe:transition-colors sm:p-5 ${selected ? "border-primary bg-card" : "border-line bg-card hover:border-accent/60"}`;
   }
   return `group relative flex h-full min-w-0 flex-col rounded-card border p-4 motion-safe:transition-colors sm:p-5 ${selected ? "border-primary bg-primary/5" : "border-line bg-card hover:border-border"}`;
 }
@@ -48,7 +48,7 @@ export function OpportunityCardContent({ job, heading, action, density = "comfor
       <Badge variant="accent">{job.category ?? "Internship"}</Badge>
       {applied && <Badge variant="accent">Applied</Badge>}
       {showMatch && job.eligibility !== "unknown" && <EligibilityBadge status={job.eligibility} />}
-      {job.skills.slice(0, 3).map((skill) => <Badge key={skill} className="max-w-full [overflow-wrap:anywhere]">{skill}</Badge>)}
+      {!job.matchRequirements?.length && job.skills.slice(0, 3).map((skill) => <Badge key={skill} className="max-w-full [overflow-wrap:anywhere]">{skill}</Badge>)}
     </div>
     {showMatch && (job.matchRequirements?.length
       ? <MatchChips requirements={job.matchRequirements} />

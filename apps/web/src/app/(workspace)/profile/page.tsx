@@ -8,10 +8,10 @@ export const metadata = { title: "Your profile | InternCalling" };
 export default async function ProfilePage() {
   const { profile, api, user } = await requireAccount();
   const selected = await api.request<unknown>("/api/v1/profile/skills").catch(() => null);
-  return <div className={`mx-auto max-w-7xl px-5 py-7 sm:px-8 ${styles.workspace}`}>
+  return <div className={`workspace-page ${styles.workspace}`}>
     <div>
       <h1 className="page-title">Your profile</h1>
-      <p className="reading-text mt-3">Your experience, studies and skills, in one place.</p>
+      <p className="page-description">Your experience, studies and skills, in one place.</p>
     </div>
     <ProfileHub initialProfile={profile} initialSkills={isSkillList(selected) ? selected : null} insightsEnabled={profileInsightsEnabled()}
       socialLinks={user.socialLinks}

@@ -3,7 +3,7 @@ export function MatchScore({ score, size = "md" }: { score: number | null; size?
   const value = score !== null && Number.isFinite(score) ? Math.round(Math.max(0, Math.min(100, score))) : null;
   const compact = size === "sm";
   return (
-    <span className="inline-flex shrink-0 items-center gap-2" aria-label={value === null ? "Match score unavailable" : `${value}% match`}>
+    <span role="img" className="inline-flex shrink-0 items-center gap-2" aria-label={value === null ? "Match score unavailable" : `${value}% match`}>
       <span className={`relative inline-flex items-center justify-center ${compact ? "size-9" : "size-12"}`}>
         <svg aria-hidden="true" viewBox="0 0 44 44" className="absolute inset-0 size-full -rotate-90">
           <circle cx="22" cy="22" r="18" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-accent/15" />

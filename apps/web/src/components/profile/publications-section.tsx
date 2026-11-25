@@ -4,6 +4,7 @@ import { emptyPublication, publicationDraft, validatePublication, normalizeDoi, 
 import { CollectionView, type CollectionState } from "./collection-view";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icon";
 import { Field, fieldControl } from "@/components/ui/field";
 import { safeResumeUrl } from "@/lib/resume-link";
 import { monthYear } from "@/lib/organization-logo";
@@ -63,7 +64,7 @@ export function PublicationsSection({ service }: { service?: PublicationsService
   const input = (key: "title" | "publisher" | "publicationDate" | "doi" | "publicationUrl", label: string) => <Input label={label} name={key} value={draft[key]} required={key === "title"} disabled={pending} maxLength={key === "publicationDate" ? 7 : key === "doi" || key === "publicationUrl" ? 512 : 255} placeholder={key === "publicationDate" ? "YYYY or YYYY-MM" : undefined} error={errors[key]} onChange={event => change(key, event.target.value)} />;
   const textarea = (key: "authors" | "description", label: string, hint?: string) => <Field id={id + "-" + key} label={label} hint={hint} error={errors[key]}><textarea id={id + "-" + key} name={key} rows={4} value={draft[key]} disabled={pending} maxLength={key === "authors" ? 25600 : 5000} aria-invalid={!!errors[key]} aria-describedby={[hint ? id + "-" + key + "-hint" : "", errors[key] ? id + "-" + key + "-error" : ""].filter(Boolean).join(" ") || undefined} className={fieldControl + " resize-y py-3"} onChange={event => change(key, event.target.value)} /></Field>;
   return <section className="mt-8 rounded-panel bg-card p-6 sm:p-9" aria-labelledby={id + "-title"} aria-busy={pending}>
-    <div className="flex flex-wrap items-center justify-between gap-3"><h2 ref={heading} tabIndex={-1} id={id + "-title"} className="section-title">Publications</h2>{!editing && <Button disabled={pending || !!deleting || !!service && state.kind !== "ready"} onClick={() => begin(null)}>{service ? "Add publication" : "Draft publication"}</Button>}</div>
+    <div className="flex flex-wrap items-center justify-between gap-3"><h2 ref={heading} tabIndex={-1} id={id + "-title"} className="section-title flex items-center gap-2.5"><Icon name="resume" className="size-5 text-accent" />Publications</h2>{!editing && <Button variant="secondary" size="sm" disabled={pending || !!deleting || !!service && state.kind !== "ready"} onClick={() => begin(null)}>{service ? "Add publication" : "Draft publication"}<Icon name="plus" className="size-4" /></Button>}</div>
     <div className="mt-4 [&>ul]:space-y-3"><CollectionView state={state} emptyMessage="No publications yet." onRetry={() => { void reload(); }} renderEntry={row => {
       const doi = normalizeDoi(row.doi), url = safeResumeUrl(row.publicationUrl);
       const characters = Array.from(row.description), long = characters.length > 280;

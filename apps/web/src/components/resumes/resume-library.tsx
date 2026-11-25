@@ -48,10 +48,10 @@ export function ResumeLibrary() {
 
   return <>
     <header className="mb-7 flex flex-wrap items-start justify-between gap-4">
-      <div><h1 ref={heading} tabIndex={-1} className="page-title">Resumes</h1><p className="reading-text mt-3">Keep your resume ready for your next opportunity.</p></div>
+      <div><h1 ref={heading} tabIndex={-1} className="page-title">Resumes</h1><p className="page-description">Keep your resume ready for your next opportunity.</p></div>
       <Button disabled={mutationDisabled || !capabilities?.upload} onClick={openUpload}><Icon name="plus" />{saved ? "Replace resume" : "Add resume"}</Button>
     </header>
-    <p role="status" className="mb-4 flex items-center gap-2 text-sm font-medium text-foreground">
+    <p role="status" className="mb-4 flex items-center gap-2 rounded-control border border-line bg-surface px-4 py-3 text-sm font-medium text-foreground">
       <Icon name="resume" className="text-accent" />
       {known ? `You have ${saved ? "1 resume" : "0 resumes"} saved.` : state.status === "loading" ? "Loading your resumes…" : "Saved resume status could not be loaded."}
     </p>

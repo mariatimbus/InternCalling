@@ -11,10 +11,10 @@ colors:
   violet: "#4a3f74"
   navy: "#29263b"
   warm-white: "#fffbf0"
-  background: "color-mix(in srgb, var(--color-warm-white) 78%, var(--color-pale-blue))"
+  background: "color-mix(in srgb, var(--color-warm-white) 65%, var(--color-pale-blue))"
   elevated: "color-mix(in srgb, var(--color-warm-white) 88%, var(--color-pale-blue))"
   nav-track: "color-mix(in srgb, var(--color-warm-white) 72%, var(--color-pale-blue))"
-  line: "color-mix(in srgb, var(--color-lavender-blue) 45%, var(--color-warm-white))"
+  line: "color-mix(in srgb, var(--color-lavender-blue) 36%, var(--color-warm-white))"
   danger-surface: "#fff1f2"
   danger-border: "#be123c"
   danger-foreground: "#881337"
@@ -27,16 +27,16 @@ typography:
     letterSpacing: "-0.04em"
   headline:
     fontFamily: "\"Segoe UI\", \"Helvetica Neue\", Arial, sans-serif"
-    fontSize: "clamp(1.75rem, 1.4rem + 1vw, 2.25rem)"
+    fontSize: "1.75rem"
     fontWeight: 700
-    lineHeight: 1.2
+    lineHeight: 1.25
     letterSpacing: "-0.03em"
   section:
     fontFamily: "\"Segoe UI\", \"Helvetica Neue\", Arial, sans-serif"
     fontSize: "1.125rem"
-    fontWeight: 700
-    lineHeight: 1.24
-    letterSpacing: "-0.026em"
+    fontWeight: 600
+    lineHeight: 1.4
+    letterSpacing: "-0.02em"
   card:
     fontFamily: "\"Segoe UI\", \"Helvetica Neue\", Arial, sans-serif"
     fontSize: "1.0625rem"
@@ -54,7 +54,7 @@ typography:
   control:
     fontFamily: "\"Segoe UI\", \"Helvetica Neue\", Arial, sans-serif"
     fontSize: "0.875rem"
-    fontWeight: 500
+    fontWeight: 600
     lineHeight: 1.4285714286
   label:
     fontFamily: "\"Segoe UI\", \"Helvetica Neue\", Arial, sans-serif"
@@ -103,7 +103,7 @@ components:
   field:
     textColor: "{colors.navy}"
     rounded: "{rounded.control}"
-    padding: "0.5rem 0.75rem"
+    padding: "0.625rem 0.75rem"
   badge-neutral:
     backgroundColor: "{colors.elevated}"
     textColor: "{colors.violet}"
@@ -140,7 +140,7 @@ The interface favors comparison and editing: clear titles, recognizable organiza
 **Key Characteristics:**
 - Light document surfaces and flat borders.
 - Consistent logo, title, company and fact hierarchy.
-- Compact controls with visible keyboard focus.
+- Consistent controls with visible keyboard focus and clear error text.
 - Responsive lists, detail drawers and profile sections.
 
 ## Colors
@@ -171,8 +171,8 @@ A restrained blue identity supports warm document surfaces and legible dark text
 One sans-serif stack serves interface headings, reading text and labels. The existing logo remains separate artwork. Frontmatter records the shared utility sizes at their base breakpoint; these are interface roles, not a requirement for a new editorial display face.
 
 - **Display:** large introductory utility; fluid size and tight spacing from the display token.
-- **Headline:** fluid page title utility.
-- **Section:** section headings increase to `1.25rem` at `640px`; the profile document and its sidebar explicitly use `1.125rem` with `1.5` line height.
+- **Headline:** fixed `1.75rem` page title with `1.25` line height; consistent across workspace and account screens.
+- **Section:** `1.125rem`, semibold, with `1.4` line height; profile sections pair this role with the existing outline icon family. The profile document and its sidebar use `1.5` line height.
 - **Card:** opportunity titles increase to `1.125rem` at `640px`.
 - **Body:** reading copy uses the body role; extended profile biography is constrained with `max-width: 65ch`.
 - **Metadata / control / label:** compact supporting facts, buttons and chips. Inputs use `1rem` on small screens and `0.875rem` from `640px`.
@@ -181,7 +181,7 @@ The body enables font features `cv11` and `ss01`. Preserve natural sentence case
 
 ## Layout
 
-The public frame centers a maximum `80rem` container with horizontal padding of `1.5rem`, `2.5rem` from `640px`, and `3.5rem` from `1024px`. Opportunity listings use full-width rows. The workspace occupies the dynamic viewport height, with a fixed frame and independently scrolling main region. Its persistent navigation appears at `1024px`, measuring `14rem`, then `15rem` from `1280px`. The header has a minimum height of `4rem`.
+The public frame centers a maximum `80rem` container with horizontal padding of `1.5rem`, `2.5rem` from `640px`, and `3.5rem` from `1024px`. Opportunity listings use full-width rows. The workspace occupies the dynamic viewport height, with a fixed frame and independently scrolling main region. Shared workspace pages use a maximum `80rem` container with `1rem` side padding, increasing to `1.75rem` from `640px` and `2.25rem` from `1280px`; vertical padding is `1.5rem`, increasing to `2rem` from `640px`. Page descriptions use subdued violet text beneath the title. Its persistent navigation appears at `1024px`, measuring `14rem`, then `15rem` from `1280px`. The header has a minimum height of `4rem`.
 
 Use the quarter-rem spacing rhythm in frontmatter. Cards use `1rem` padding, increasing to `1.25rem` in comfortable layouts at `640px`. Profile content centers within `80rem`; the CV document has `1.5rem` padding, increasing to `2rem` at `640px`. Its sections use separators and `1.75rem` vertical padding rather than nested cards. At `1024px`, profile tools occupy a `19rem` sidebar beside the document; the column gap grows from `2rem` to `3rem` at `1280px`.
 
@@ -203,7 +203,7 @@ Controls have modest curves; opportunity cards are gently rounded, and drawers u
 
 ### Buttons
 
-Clear text actions with three levels of emphasis: primary uses electric blue and warm-white text, secondary uses a warm surface and a light border, ghost uses transparent fill with violet text. All share the control radius and medium label weight. Default controls have a `2.75rem` minimum height; small controls use `2.5rem`. Primary hover darkens to royal blue; secondary and ghost hover use elevated fill. Disabled controls use half opacity and a blocked cursor. The shared button does not add motion automatically.
+Clear text actions with three levels of emphasis: primary uses electric blue and warm-white text, secondary uses a warm surface and a light border, ghost uses transparent fill with violet text. All share the control radius and semibold label weight. Default controls have a `2.75rem` minimum height; small controls use `2.5rem`. Primary hover darkens to royal blue; secondary and ghost hover use elevated fill. Disabled controls use half opacity and a blocked cursor. Buttons use a short color transition only when motion is allowed.
 
 Global keyboard focus is a cobalt outline (`2px`, offset `4px`). Preserve native button semantics and a visible accessible name for icon-only actions.
 
@@ -213,15 +213,15 @@ Non-interactive factual labels use elevated fill and violet text. Accent labels 
 
 ### Cards / Containers
 
-Opportunity cards use warm-white fill, a fine mixed line border and the card radius. Hover strengthens the border. Selection uses the primary border and five-percent primary fill. Comfortable cards group the organization mark and heading above a separated fact row; compact cards keep the logo/title/company grouping while wrapping facts and actions. Description snippets are clamped to preserve scanning. Full detail sections remain readable rather than adopting the snippet clamp.
+Opportunity cards use warm-white fill, a fine mixed line border and the card radius. Hover strengthens the border. Selection uses the primary border; compact split-view cards retain their warm-white fill, while comfortable cards use a five-percent primary tint. Comfortable cards group the organization mark and heading above a separated fact row; compact cards keep the logo/title/company grouping while wrapping facts and actions. Description snippets are clamped to preserve scanning. Full detail sections remain readable rather than adopting the snippet clamp.
 
 ### Inputs / Fields
 
-Controls use the control radius, lavender border, sixty-percent background fill and a minimum `2.75rem` height. Supporting labels use the metadata role. Hover strengthens the border; focus uses cobalt. Field errors combine a message and invalid border state; destructive error panels can use the danger palette. Disabled inputs use half opacity. Keep labels and hint/error associations when composing fields.
+Controls use the control radius, a lightly blended lavender border, warm-white surface fill and a minimum `2.75rem` height. Supporting labels use `0.875rem` navy text with medium weight. Hover strengthens the border; focus uses cobalt. Field errors combine danger-colored text and an invalid border state. Disabled inputs use an elevated fill and sixty-percent opacity. Keep labels and hint/error associations when composing fields.
 
 ### Navigation
 
-The desktop sidebar pairs outline icons with sentence-case text. Active destinations use a ten-percent primary tint, royal-blue text and a semibold label. Inactive navigation uses violet; hover uses elevated fill and navy. Use `aria-current="page"` for the active destination. Segmented navigation uses a mixed track, warm-white active surface and a `2.75rem` minimum hit area; its focus outline sits closer to the control (`1px` offset).
+The desktop sidebar pairs outline icons with sentence-case text. Active destinations use electric-blue fill, warm-white text, a semibold label and a trailing chevron. Inactive navigation uses violet; hover uses elevated fill and navy. Use `aria-current="page"` for the active destination. Segmented navigation uses a warm-white bordered track, ten-percent primary active fill and a `2.75rem` minimum hit area; its focus outline sits closer to the control (`1px` offset).
 
 Mobile navigation opens in the existing native dialog drawer, preserving Escape handling and focus restoration. Public navigation retains the logo and essential links, with secondary desktop links hidden on smaller screens.
 
@@ -229,9 +229,17 @@ Mobile navigation opens in the existing native dialog drawer, preserving Escape 
 
 The desktop reader uses the panel radius, warm-white surface and fine separator border. Keep its scrollable body separate from the non-shrinking action footer: source requirements and longer descriptions scroll while apply/save actions stay available. Align the reader with the start of the list column, including its heading and controls, rather than starting below the search interface. The same detail content opens in a drawer below the split-view breakpoint.
 
+### Workspace Navigation and Search
+
+Desktop navigation uses the warm surface; the selected route has electric-blue fill, warm-white text and a trailing chevron. Opportunity detail routes keep Jobs selected. The account area is a quieter bounded footer region; mobile retains the labeled navigation drawer. Jobs search groups the keyword field, Search and Filters inside one surface. Applied filters retain removal and clear actions. List tabs use a light selected tint, keeping the primary blue for actions and workspace location.
+
+The compact job title wraps unbroken source tokens. Repeated skill chips are omitted when the same information is already in requirement chips. A full border identifies the selected card. Detail readers use `1rem` padding on mobile and `1.5rem` on wider screens; the match overview is a compact, secondary information strip. Match rings expose their complete score through a labeled image role.
+
+Public entry groups the existing primary action with its introductory copy and presents the existing three-step guidance alongside it on desktop. Authentication uses a two-column introduction/form layout at desktop widths and a single form column on mobile. Forms use surface-colored inputs, navy labels and danger-colored validation errors.
+
 ### CV Document
 
-The profile document is one warm-white bordered surface. Section headings and thin separators establish the CV structure. Experience entries use a fine vertical timeline and outlined circular nodes; completion and profile insights remain separate sidebar panels. PDF management belongs to the dedicated Resumes page. Retain edit, loading, empty and failure states without filling missing personal information with sample facts.
+The profile document is one warm-white bordered surface. Section headings and thin separators establish the CV structure. Experience entries use a fine vertical timeline and outlined circular nodes; completion, social links and profile insights remain separate surface panels in a sticky desktop sidebar. Section add actions use secondary buttons; contact facts wrap in modestly rounded labels instead of long pills. PDF management belongs to the dedicated Resumes page. Retain edit, loading, empty and failure states without filling missing personal information with sample facts.
 
 ### Resume Library
 

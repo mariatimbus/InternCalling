@@ -273,7 +273,7 @@ export function OpportunityDetailView({ opportunity: job, assessment, status, co
   const copilot = prepareOpportunityCopilot(assessment, listedSkills, profileSkills);
   return <article className="@container flex min-h-0 min-w-0 flex-1 flex-col">
     <div role="region" aria-label="Opportunity information" tabIndex={0}
-      className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain p-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus sm:p-4">
+      className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain p-4 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus sm:p-6">
       <header className="border-b border-line pb-6">
         {(tracking || listing || saveControl) && <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
           {(tracking || listing) && <div className="min-w-0 flex-1">
@@ -284,7 +284,7 @@ export function OpportunityDetailView({ opportunity: job, assessment, status, co
           </div>}
           {saveControl && <div className="ml-auto shrink-0">{saveControl}</div>}
         </div>}
-        <div className="grid items-start gap-5 @lg:grid-cols-[minmax(0,1fr)_11rem]">
+        <div className="grid items-start gap-5 @2xl:grid-cols-[minmax(0,1fr)_10rem]">
         <div className="min-w-0">
         <div className="flex items-center gap-3">
           <CompanyAvatar companyName={company} initials={monogram} logoUrl={companyLogoUrl ?? logoFor(listing?.company_domain, listing?.source)} />
@@ -302,16 +302,15 @@ export function OpportunityDetailView({ opportunity: job, assessment, status, co
           </div>
         </div>
         </div>
-        <section aria-label="Match overview" className="rounded-xl border border-accent/25 bg-primary/10 p-4">
-          <p className="metadata-text font-semibold">Profile match</p>
-          <div className="mt-2" aria-live="polite">
-            <div className="flex flex-wrap items-center justify-between gap-3 @lg:block">
+        <section aria-label="Match overview" className="rounded-control bg-elevated p-3.5">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 @2xl:block" aria-live="polite">
+            <p className="text-sm font-medium text-muted">Profile match</p>
+            <div className="flex flex-wrap items-center gap-3 @2xl:mt-2 @2xl:block">
             {copilot.match ?
-              <p className="text-4xl font-bold tracking-tight tabular-nums text-foreground">{copilot.match.score}<span className="ml-1 text-base font-normal text-muted">/100</span></p>
+              <p className="text-2xl font-bold tracking-tight tabular-nums text-foreground">{copilot.match.score}<span className="ml-1 text-sm font-normal text-muted">/100</span></p>
               : <p className="metadata-text">{copilot.loading ? "Loading match score…" : "Match score unavailable"}</p>}
-            {copilot.eligibility && <p className="text-sm font-medium text-foreground @lg:mt-3">{eligibilityVerdicts[copilot.eligibility.status]}</p>}
+            {copilot.eligibility && <p className="text-sm font-medium text-foreground @2xl:mt-2">{eligibilityVerdicts[copilot.eligibility.status]}</p>}
             </div>
-            {copilot.match && <p className="metadata-text mt-2">Based on your profile</p>}
           </div>
         </section>
         </div>
@@ -339,7 +338,7 @@ export function OpportunityDetailView({ opportunity: job, assessment, status, co
         {listedSkills.map((skill) => <li key={skill.id} className="max-w-full [overflow-wrap:anywhere]"><Badge className="!text-foreground">{skill.name}</Badge></li>)}
       </ul>}
         {!standalone && <Link href={"/opportunities/" + encodeURIComponent(job.id) + (detailContext ? "?" + detailContext : "")}
-          prefetch={false} className="inline-flex min-h-11 items-center rounded-full border border-border px-4 py-2 text-sm font-medium text-accent hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">
+          prefetch={false} className="inline-flex min-h-11 items-center gap-2 rounded-control border border-border px-4 py-2 text-sm font-semibold text-accent hover:bg-elevated focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">
           View full details
         </Link>}
       {description && <section>
@@ -354,7 +353,7 @@ export function OpportunityDetailView({ opportunity: job, assessment, status, co
     </div>
     {(officialUrl || sourceNotice) && <footer aria-label="Opportunity actions" className="flex shrink-0 flex-wrap items-center gap-2 border-t border-line bg-surface p-3">
       {officialUrl && <a href={officialUrl} target="_blank" rel="noopener noreferrer"
-        className="inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">
+        className="inline-flex min-h-11 items-center gap-2 rounded-control bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">
         {listing?.is_active ? "Apply on official site" : "View official listing"} <Icon name="external-link" className="size-4" /><span className="sr-only"> (opens in a new tab)</span>
       </a>}
       {sourceNotice && <p role="status" className="metadata-text">{sourceNotice}</p>}

@@ -117,13 +117,14 @@ export function JobsSearch({ search, applied, navigationKey }: { search: string;
     }
   }
 
-  return <div className="mb-7 space-y-3">
-    <div className="flex flex-wrap items-end gap-2.5">
-      <form action="/jobs" className="flex min-w-0 flex-[1_1_17rem] flex-wrap items-end gap-2.5"
+  return <div className="space-y-3 rounded-card border border-line bg-surface p-4">
+    <div className="grid grid-cols-2 items-end gap-2.5 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+      <form action="/jobs" className="contents"
         onSubmit={(event) => { event.preventDefault(); searchFor(keyword); }}>
-        <div className="relative min-w-0 flex-[1_1_9rem]">
+        <div className="relative col-span-2 min-w-0 sm:col-span-1">
           <Input label="Search opportunities" name="q" role="combobox" autoComplete="off" maxLength={200}
-            className="bg-elevated! focus-visible:border-focus focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+            placeholder="Job title, company or skill"
+            className="focus-visible:border-focus focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
             aria-autocomplete="list" aria-expanded={visible} aria-controls={visible ? listId : undefined}
             aria-activedescendant={visible && activeIndex >= 0 ? listId + "-" + activeIndex : undefined}
             value={keyword} onFocus={() => setShowSuggestions(true)}
@@ -137,7 +138,7 @@ export function JobsSearch({ search, applied, navigationKey }: { search: string;
               className={`cursor-pointer rounded-control px-3 py-2 hover:bg-elevated ${activeIndex === index ? "bg-elevated" : ""}`}>{label}</li>)}
           </ul>}
         </div>
-        <Button type="submit">Search</Button>
+        <Button type="submit"><Icon name="search" className="size-4" />Search</Button>
       </form>
       <Button variant="secondary" aria-haspopup="dialog" aria-controls={drawerId} aria-expanded={filtersOpen}
         onClick={() => { setDraft(applied); setFiltersOpen(true); }}>

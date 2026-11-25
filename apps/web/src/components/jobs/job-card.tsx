@@ -38,10 +38,10 @@ export function JobCard({ job, selected = false, saved = false, applied = false,
   return (
     <article className={opportunityCardClasses(selected, density)}>
       <OpportunityCardContent job={job} density={density} applied={applied} showMatch={showMatch}
-        heading={<h3><button type="button" disabled={disabled} onClick={onSelect} aria-pressed={selected} className={`min-h-11 w-full rounded-control py-0.5 text-left text-lg font-semibold leading-snug tracking-tight after:absolute after:inset-0 after:rounded-card hover:text-accent sm:text-xl ${compact ? "card-title focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-focus" : ""}`}>{job.title}<span className="sr-only"> at {job.company}. View details</span></button></h3>}
+        heading={<h3><button type="button" disabled={disabled} onClick={onSelect} aria-pressed={selected} className={`min-h-11 w-full rounded-control py-0.5 text-left font-semibold leading-snug [overflow-wrap:anywhere] tracking-tight after:absolute after:inset-0 after:rounded-card hover:text-accent ${compact ? "text-base sm:text-lg focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-focus" : "text-lg sm:text-xl"}`}>{job.title}<span className="sr-only"> at {job.company}. View details</span></button></h3>}
         action={action ?? (onToggleSave ? <Button variant="ghost" size="sm" className="relative z-10 min-w-11 px-2" aria-label={`${saved ? "Unsave" : "Save"} ${job.title} at ${job.company}`} aria-pressed={saved} onClick={onToggleSave}><Icon name="bookmark" className={saved ? "fill-accent/20 text-accent" : "size-[1.125rem]"} /></Button> : undefined)}
       />
-      {((metadata && metadata.length > 0) || officialUrl) && <div className={compact ? "flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1" : "contents"}>
+      {((metadata && metadata.length > 0) || officialUrl) && <div className={compact ? "flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-line pt-2" : "contents"}>
         {metadata && metadata.length > 0 && <dl className={`metadata-text flex min-w-0 flex-wrap ${compact ? "gap-x-3 gap-y-1" : "mt-4 gap-x-4 gap-y-2"}`}>
           {metadata.map(({ label, value }) => <div key={label} className="flex flex-wrap gap-x-1">
             <dt>{label}</dt><dd className="text-foreground">{value}</dd>

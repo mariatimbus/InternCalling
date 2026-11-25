@@ -4,6 +4,7 @@ import { emptyProject, projectDraft, projectPeriod, validateProject, ProjectConf
 import { CollectionView, type CollectionState } from "./collection-view";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icon";
 import { SkillChip } from "./skill-chip";
 import { GroupedSkillPicker } from "./grouped-skill-picker";
 import { safeResumeUrl } from "@/lib/resume-link";
@@ -62,7 +63,7 @@ export function ProjectsSection({ service }: { service?: ProjectsService }) {
   }
   const input = (key: "name" | "role" | "startDate" | "endDate" | "repositoryUrl" | "demoUrl", label: string) => <Input label={label} name={key} type={key.endsWith("Url") ? "url" : "text"} value={draft[key]} required={key === "name"} disabled={pending || key === "endDate" && draft.ongoing} maxLength={key.includes("Date") ? 7 : key.endsWith("Url") ? 512 : 255} placeholder={key.includes("Date") ? "YYYY or YYYY-MM" : key === "repositoryUrl" ? "https://github.com/username/repository" : undefined} error={errors[key]} onChange={event => change(key, event.target.value)} />;
   return <section className="mt-8 rounded-panel bg-card p-6 sm:p-9" aria-labelledby={id + "-title"} aria-busy={pending}>
-    <div className="flex flex-wrap items-center justify-between gap-3"><h2 ref={heading} tabIndex={-1} id={id + "-title"} className="section-title">Projects</h2>{!editing && <Button variant="ghost" size="sm" className="min-w-11 px-2" aria-label={service ? "Add project" : "Draft project"} disabled={pending || !!deleting || !!service && state.kind !== "ready"} onClick={() => begin(null)}>
+    <div className="flex flex-wrap items-center justify-between gap-3"><h2 ref={heading} tabIndex={-1} id={id + "-title"} className="section-title flex items-center gap-2.5"><Icon name="code" className="size-5 text-accent" />Projects</h2>{!editing && <Button variant="ghost" size="sm" className="min-w-11 px-2" aria-label={service ? "Add project" : "Draft project"} disabled={pending || !!deleting || !!service && state.kind !== "ready"} onClick={() => begin(null)}>
       <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" className="size-5"><path d="M12 5v14 M5 12h14" /></svg>
     </Button>}</div>
     <div className="mt-4 [&>ul]:space-y-3"><CollectionView state={state} emptyMessage="No projects yet." onRetry={() => { void reload(); }} renderEntry={row => {

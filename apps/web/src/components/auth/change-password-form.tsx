@@ -5,14 +5,15 @@ import type { ActionState } from "@/lib/auth/action-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ErrorState } from "@/components/ui/error-state";
+import { Icon } from "@/components/ui/icon";
 
 /** Change the password, or set one for accounts that only sign in with Google. */
 export function ChangePasswordForm({ hasPassword, email }: { hasPassword: boolean; email: string }) {
   const [state, action, pending] = useActionState(changePassword, {} as ActionState);
   return <section aria-labelledby="password-title" className="space-y-5 rounded-panel border border-line bg-card p-5 sm:p-7">
     <div>
-      <h2 id="password-title" className="section-title">{hasPassword ? "Change password" : "Set a password"}</h2>
-      <p className="reading-text mt-2 text-sm">{hasPassword
+      <h2 id="password-title" className="section-title flex items-center gap-2.5"><Icon name="settings" className="text-accent" />{hasPassword ? "Change password" : "Set a password"}</h2>
+      <p className="page-description text-sm">{hasPassword
         ? "Enter your current password, then choose a new one."
         : "You sign in with Google. Setting a password also lets you sign in with your email address."}</p>
     </div>

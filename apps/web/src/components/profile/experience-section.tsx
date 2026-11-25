@@ -4,6 +4,7 @@ import { emptyExperience, experienceDraft, validateExperience, type Experience, 
 import { CollectionView, type CollectionState } from "./collection-view";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icon";
 import { Field, fieldControl } from "@/components/ui/field";
 
 export function ExperienceSection({ service }: { service?: ExperienceService }) {
@@ -58,7 +59,7 @@ export function ExperienceSection({ service }: { service?: ExperienceService }) 
   }
   const input = (key: "role" | "organization" | "location" | "startDate" | "endDate", label: string) => <Input label={label} name={key} value={draft[key]} required={key !== "location" && !(key === "endDate" && draft.current)} disabled={pending || key === "endDate" && draft.current} maxLength={key.includes("Date") ? 7 : 255} placeholder={key.includes("Date") ? "YYYY or YYYY-MM" : undefined} error={errors[key]} onChange={event => change(key, event.target.value)} />;
   return <section data-profile-experience className="mt-8 rounded-panel bg-card p-6 sm:p-9" aria-labelledby={id + "-title"} aria-busy={pending}>
-    <div className="flex flex-wrap items-center justify-between gap-3"><h2 ref={heading} tabIndex={-1} id={id + "-title"} className="section-title">Experience</h2>{!editing && <Button disabled={pending || !!deleting || !!service && state.kind !== "ready"} onClick={() => begin(null)}>{service ? "Add experience" : "Draft experience"}</Button>}</div>
+    <div className="flex flex-wrap items-center justify-between gap-3"><h2 ref={heading} tabIndex={-1} id={id + "-title"} className="section-title flex items-center gap-2.5"><Icon name="jobs" className="size-5 text-accent" />Experience</h2>{!editing && <Button variant="secondary" size="sm" disabled={pending || !!deleting || !!service && state.kind !== "ready"} onClick={() => begin(null)}>{service ? "Add experience" : "Draft experience"}<Icon name="plus" className="size-4" /></Button>}</div>
     <div className="mt-4"><CollectionView state={state} onRetry={() => { void reload(); }} renderEntry={row => <article className="space-y-2 break-words"><h3 className="card-title">{row.role}</h3><p className="text-sm">{row.organization}{row.location ? " / " + row.location : ""}</p><p className="text-xs text-muted">{row.startDate} to {row.current ? "Present" : row.endDate}</p><p className="whitespace-pre-wrap text-sm leading-6">{row.description}</p>{row.achievements.length > 0 && <ul className="list-disc space-y-1 pl-5 text-sm">{row.achievements.map((bullet, index) => <li key={index}>{bullet}</li>)}</ul>}<div className="flex flex-wrap gap-2"><Button variant="secondary" disabled={pending || editing || !!deleting} onClick={() => begin(row)}>Edit<span className="sr-only"> {row.role}</span></Button><Button variant="ghost" disabled={pending || editing || !!deleting} onClick={() => { setDeleting(row); setError(""); setSuccess(""); }}>Delete<span className="sr-only"> {row.role}</span></Button></div></article>} /></div>
     {editing && <form ref={form} noValidate onSubmit={save} className="mt-6 space-y-4" onKeyDown={event => { if (event.key === "Escape") cancel(); }}>
       {!service && <p role="status" className="text-sm text-muted">Draft only - saving is unavailable.</p>}

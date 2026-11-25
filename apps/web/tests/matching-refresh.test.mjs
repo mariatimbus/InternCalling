@@ -9,6 +9,7 @@ import ts from "typescript";
 const employers = JSON.parse(await readFile(new URL("../../api/src/opportunity_api/ingestion/sources/employers.json", import.meta.url), "utf8"));
 
 async function load(file, dependencies = {}) {
+  dependencies = { "@/components/ui/icon": { Icon: "Icon" }, ...dependencies };
   const { outputText } = ts.transpileModule(await readFile(new URL(file, import.meta.url), "utf8"), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
   });

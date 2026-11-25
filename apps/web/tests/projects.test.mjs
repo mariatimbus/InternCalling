@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import ts from "typescript";
 async function load(file, deps = {}) {
+  deps = { "@/components/ui/icon": { Icon: "Icon" }, ...deps };
   const { outputText } = ts.transpileModule(await readFile(new URL(file, import.meta.url), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } });
   const exports = {};
   new Function("require", "exports", outputText)(name => { assert.ok(name in deps, name); return deps[name]; }, exports);

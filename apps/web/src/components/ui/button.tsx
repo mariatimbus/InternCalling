@@ -10,7 +10,7 @@ export type ButtonProps = ComponentPropsWithRef<"button"> & {
 
 const variants = {
   primary: "border-transparent bg-primary text-on-primary enabled:hover:bg-primary-hover",
-  secondary: "border-border/60 bg-surface text-foreground enabled:hover:border-accent/70 enabled:hover:bg-elevated",
+  secondary: "border-border/70 bg-surface text-foreground enabled:hover:border-accent/70 enabled:hover:bg-elevated",
   ghost: "border-transparent bg-transparent text-muted enabled:hover:bg-elevated enabled:hover:text-foreground",
 };
 
@@ -40,7 +40,7 @@ export function Button({
       {...props}
       type={type}
       className={[
-        "inline-flex items-center justify-center gap-2 rounded-control border py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50",
+        "inline-flex items-center justify-center gap-2 rounded-control border py-2 text-sm font-semibold motion-safe:transition-colors motion-safe:duration-150 disabled:cursor-not-allowed disabled:opacity-50",
         variants[variant],
         sizes[size],
         className,
