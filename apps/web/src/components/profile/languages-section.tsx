@@ -6,6 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { safeResumeUrl } from "@/lib/resume-link";
+import { CredentialEntry } from "./credential-entry";
+import { organizationLogo } from "@/lib/organization-logo";
+import { Icon } from "@/components/ui/icon";
+
+const cefrNames: Record<string, string> = { A1: "Beginner", A2: "Elementary", B1: "Intermediate", B2: "Upper intermediate", C1: "Advanced", C2: "Proficient" };
 
 export function LanguagesSection({ service }: { service?: LanguagesService }) {
   const id = useId();
@@ -62,11 +67,7 @@ export function LanguagesSection({ service }: { service?: LanguagesService }) {
   return <section className="mt-8 rounded-panel bg-card p-6 sm:p-9" aria-labelledby={id + "-title"} aria-busy={pending}>
     <div className="flex flex-wrap items-center justify-between gap-3"><h2 ref={heading} tabIndex={-1} id={id + "-title"} className="section-title">Languages</h2>{!editing && <Button disabled={pending || !!deleting || !!service && state.kind !== "ready"} onClick={() => begin(null)}>{service ? "Add language" : "Draft language"}</Button>}</div>
     <p className="mt-3 text-xs leading-6 text-muted">Proficiency is self-reported. References do not verify or certify it.</p>
-    <div className="mt-4"><CollectionView state={state} emptyMessage="No languages yet." onRetry={() => { void reload(); }} renderEntry={row => <article className="space-y-3 break-words"><h3 className="card-title">{row.name}</h3>
-      <p className="text-sm">{row.native ? "Native language" : row.cefr ? "CEFR " + row.cefr : "Proficiency not specified"}</p>
-      {row.referenceName && <p className="text-sm">Reference: {row.referenceName}</p>}
-      {safeResumeUrl(row.referenceUrl) ? <a href={safeResumeUrl(row.referenceUrl)!} target="_blank" rel="noopener noreferrer" className="inline-block rounded-control py-2 text-sm text-accent underline">View reference<span className="sr-only"> (opens in a new tab)</span></a> : row.referenceUrl ? <p className="text-xs text-muted">An invalid saved link is hidden. Edit this language to correct it.</p> : null}
-      <div className="flex flex-wrap gap-2"><Button variant="secondary" disabled={pending || editing || !!deleting} onClick={() => begin(row)}>Edit<span className="sr-only"> {row.name}</span></Button><Button variant="ghost" disabled={pending || editing || !!deleting} onClick={() => { setDeleting(row); setError(""); setSuccess(""); }}>Delete<span className="sr-only"> {row.name}</span></Button></div></article>} /></div>
+    <div className="mt-4"><CollectionView state={state} emptyMessage="No languages yet." onRetry={() => { void reload(); }} renderEntry={row => CredentialEntry({ title: row.name, issuer: row.native ? "Native or bilingual" : row.cefr ? `${row.cefr} · ${cefrNames[row.cefr] ?? "Proficiency"}` : "Proficiency not specified", logoName: row.referenceName || row.name, logoUrl: row.referenceName || row.referenceUrl ? organizationLogo(row.referenceName, row.referenceUrl) : null, logoIcon: <Icon name="globe" className="size-6" />, facts: [row.referenceName && `Certificate: ${row.referenceName}`], link: safeResumeUrl(row.referenceUrl), disabled: pending || editing || !!deleting, onEdit: () => begin(row), onDelete: () => { setDeleting(row); setError(""); setSuccess(""); } })} /></div>
     {editing && <form ref={form} noValidate onSubmit={save} className="mt-6 space-y-4" onKeyDown={event => { if (event.key === "Escape") cancel(); }}>
       {!service && <p role="status" className="text-sm text-muted">Draft only - saving is unavailable. Drafts are lost when you leave or reload.</p>}
       {input("name", "Language name (required)")}

@@ -16,7 +16,7 @@ const jsx = (type, props) => ({ type, props: props ?? {} });
 const runtime = { jsx, jsxs: jsx };
 function nodes(tree) { return !tree || typeof tree !== "object" ? [] : [tree, ...[tree.props?.children].flat(Infinity).flatMap(nodes)]; }
 const find = (tree, type) => nodes(tree).find(n => n.type === type);
-const button = (tree, label) => nodes(tree).find(n => n.type === "Button" && [n.props.children].flat()[0] === label);
+const button = (tree, label) => nodes(tree).find(n => n.type === "Button" && ([n.props.children].flat()[0] === label || String(n.props["aria-label"] ?? "").startsWith(label + " ")));
 async function fixture(service) {
   const values = [], refs = [], effects = []; let cursor = 0, refCursor = 0;
   const react = {
@@ -25,6 +25,9 @@ async function fixture(service) {
     useRef(current) { const index = refCursor++; return refs[index] ??= { current }; },
   };
   const { LanguagesSection } = await load("../src/components/profile/languages-section.tsx", {
+    "@/lib/organization-logo": await load("../src/lib/organization-logo.ts", { "../../../api/src/opportunity_api/ingestion/sources/employers.json": { default: [] }, "./company-logo": { companyLogoUrl: (domain) => domain ? `/company-logos/${domain}.png` : null } }),
+    "./credential-entry": await load("../src/components/profile/credential-entry.tsx", { "react/jsx-runtime": runtime, "@/components/ui/button": { Button: "Button" }, "@/components/ui/icon": { Icon: "Icon" }, "@/components/jobs/company-avatar": { CompanyAvatar: "CompanyAvatar" } }),
+    "@/components/ui/icon": { Icon: "Icon" },
     react, "react/jsx-runtime": runtime, "@/lib/languages": model, "@/lib/resume-link": links,
     "./collection-view": { CollectionView: "CollectionView" }, "@/components/ui/select": { Select: "Select" },
     "@/components/ui/input": { Input: "Input" }, "@/components/ui/button": { Button: "Button" },
@@ -168,11 +171,11 @@ test("rendering distinguishes native, CEFR and unspecified without claiming veri
   const rendered = f.row(row), anchors = nodes(rendered).filter(n => n.type === "a");
   assert.equal(anchors.length, 1); assert.equal(anchors[0].props.rel, "noopener noreferrer"); assert.equal(anchors[0].props.target, "_blank");
   assert.match(JSON.stringify(rendered), /Proficiency not specified/);
-  assert.match(JSON.stringify(f.row({ ...row, cefr: "C2" })), /CEFR C2/);
-  const native = JSON.stringify(f.row({ ...row, native: true })); assert.match(native, /Native language/); assert.doesNotMatch(native, /C2/);
+  assert.match(JSON.stringify(f.row({ ...row, cefr: "C2" })), /C2 · Proficient/);
+  const native = JSON.stringify(f.row({ ...row, native: true })); assert.match(native, /Native or bilingual/); assert.doesNotMatch(native, /C2/);
   assert.equal(nodes(f.row({ ...row, referenceUrl: "javascript:alert(1)" })).filter(n => n.type === "a").length, 0);
   const minimal = JSON.stringify(f.row({ ...row, referenceName: "", referenceUrl: "" }));
-  assert.doesNotMatch(minimal, /View reference|Reference:/);
+  assert.doesNotMatch(minimal, /Show credential|Certificate:/);
 });
 test("preview rejects production/test and renders only in development", async () => {
   const { default: Page } = await load("../src/app/dev/languages/page.tsx", { "next/navigation": { notFound() { throw new Error("404"); } }, "@/components/dev/languages-preview": { LanguagesPreview: "Preview" }, "react/jsx-runtime": runtime });

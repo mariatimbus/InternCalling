@@ -12,6 +12,7 @@ import { degreeLabels, safeJobSource, studyYears } from "@/components/jobs/oppor
 import { OpportunityDetailView, opportunityDisplayDate } from "@/components/jobs/opportunity-detail-view";
 import type { OpportunityAssessment } from "@/lib/api/opportunity-assessment";
 import { companyLogoUrl as logoFor } from "@/lib/company-logo";
+import { organizationLogo } from "@/lib/organization-logo";
 import { topReason } from "@/lib/match-reasons";
 
 export type RankedOpportunity = {
@@ -24,7 +25,7 @@ export type RankedOpportunity = {
 function summary({ opportunity: job, match, companyLogoUrl }: RankedOpportunity): JobSummary {
   const card = opportunitySummary(job);
   return { ...card, initials: job.organization?.trim() ? card.initials : "–",
-    companyLogoUrl: companyLogoUrl ?? logoFor("url" in job ? job.company_domain : null, "source" in job ? job.source : null),
+    companyLogoUrl: companyLogoUrl ?? logoFor("url" in job ? job.company_domain : null, "source" in job ? job.source : null) ?? organizationLogo(job.organization),
     matchScore: match?.score ?? null, eligibility: match?.eligibility ?? "unknown", matchReason: topReason(match?.reasons), matchRequirements: match?.requirements };
 }
 function cardMetadata(job: RankedOpportunity["opportunity"]) {

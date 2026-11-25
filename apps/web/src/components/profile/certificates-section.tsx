@@ -5,6 +5,8 @@ import { CollectionView, type CollectionState } from "./collection-view";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { safeResumeUrl } from "@/lib/resume-link";
+import { CredentialEntry } from "./credential-entry";
+import { monthYear, organizationLogo } from "@/lib/organization-logo";
 
 export function CertificatesSection({ service }: { service?: CertificatesService }) {
   const id = useId();
@@ -59,12 +61,7 @@ export function CertificatesSection({ service }: { service?: CertificatesService
   const input = (key: "name" | "organization" | "issueDate" | "expirationDate" | "credentialId" | "credentialUrl", label: string) => <Input label={label} name={key} value={draft[key]} required={key === "name" || key === "organization"} disabled={pending || key === "expirationDate" && draft.doesNotExpire} maxLength={key.includes("Date") ? 7 : key.endsWith("Url") ? 512 : 255} placeholder={key.includes("Date") ? "YYYY or YYYY-MM" : undefined} error={errors[key]} onChange={event => change(key, event.target.value)} />;
   return <section className="mt-8 rounded-panel bg-card p-6 sm:p-9" aria-labelledby={id + "-title"} aria-busy={pending}>
     <div className="flex flex-wrap items-center justify-between gap-3"><h2 ref={heading} tabIndex={-1} id={id + "-title"} className="section-title">Certificates</h2>{!editing && <Button disabled={pending || !!deleting || !!service && state.kind !== "ready"} onClick={() => begin(null)}>{service ? "Add certificate" : "Draft certificate"}</Button>}</div>
-    <div className="mt-4"><CollectionView state={state} emptyMessage="No certificates yet." onRetry={() => { void reload(); }} renderEntry={row => <article className="space-y-3 break-words"><h3 className="card-title">{row.name}</h3><p className="text-sm">{row.organization}</p>
-      {row.issueDate && <p className="text-xs text-muted">Issued: {row.issueDate}</p>}
-      {row.doesNotExpire ? <p className="text-xs text-muted">Does not expire</p> : row.expirationDate ? <p className="text-xs text-muted">Expires: {row.expirationDate}</p> : null}
-      {row.credentialId && <p className="text-sm">Credential ID: {row.credentialId}</p>}
-      {safeResumeUrl(row.credentialUrl) ? <a href={safeResumeUrl(row.credentialUrl)!} target="_blank" rel="noopener noreferrer" className="inline-block rounded-control py-2 text-sm text-accent underline">View credential<span className="sr-only"> (opens in a new tab)</span></a> : row.credentialUrl ? <p className="text-xs text-muted">An invalid saved link is hidden. Edit this certificate to correct it.</p> : null}
-      <div className="flex flex-wrap gap-2"><Button variant="secondary" disabled={pending || editing || !!deleting} onClick={() => begin(row)}>Edit<span className="sr-only"> {row.name}</span></Button><Button variant="ghost" disabled={pending || editing || !!deleting} onClick={() => { setDeleting(row); setError(""); setSuccess(""); }}>Delete<span className="sr-only"> {row.name}</span></Button></div></article>} /></div>
+    <div className="mt-4"><CollectionView state={state} emptyMessage="No certificates yet." onRetry={() => { void reload(); }} renderEntry={row => CredentialEntry({ title: row.name, issuer: row.organization, logoName: row.organization, logoUrl: organizationLogo(row.organization, row.credentialUrl), facts: [[row.issueDate && `Issued ${monthYear(row.issueDate)}`, row.doesNotExpire ? "No expiration date" : row.expirationDate && `Expires ${monthYear(row.expirationDate)}`].filter(Boolean).join(" · "), row.credentialId && `Credential ID ${row.credentialId}`], link: safeResumeUrl(row.credentialUrl), disabled: pending || editing || !!deleting, onEdit: () => begin(row), onDelete: () => { setDeleting(row); setError(""); setSuccess(""); }, children: <>{!safeResumeUrl(row.credentialUrl) && row.credentialUrl && <p className="mt-2 text-xs text-muted">An invalid saved link is hidden. Edit this certificate to correct it.</p>}</> })} /></div>
     {editing && <div onKeyDown={event => { if (event.key === "Escape") cancel(); }}><form id={id + "-form"} ref={form} noValidate onSubmit={save} className="mt-6 space-y-4" onKeyDown={event => { if (event.key === "Escape") cancel(); }}>
       {!service && <p role="status" className="text-sm text-muted">Draft only - saving is unavailable.</p>}
       {input("name", "Certificate name (required)")}{input("organization", "Issuing organization (required)")}
