@@ -16,8 +16,8 @@ FastAPI application with disposable SQLite fixtures on 8302, and Next.js on 3102
 Nothing connects to hosted Supabase or sends email. Test signing keys are public
 synthetic fixture values, never usable with a hosted account. Ports must be free.
 
-Desktop and mobile tests cover signup/confirmation protocol, onboarding, profile
-preferences, recommendation filters/explanations, save, statuses, notes, refresh,
+Desktop and mobile tests cover signup/confirmation protocol, onboarding, profile,
+recommendation filters/explanations, save, statuses, notes, refresh,
 removal, two-user API denial, axe checks, and horizontal overflow. Screenshots
 and failure traces are saved in `test-results/` and uploaded by the E2E workflow.
 

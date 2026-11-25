@@ -1,12 +1,14 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { createProfileServices } from "@/lib/profile-services";
 import type { Profile, Skill } from "@/lib/api/types";
 import { completionItems, isProfileFieldComplete } from "@/lib/profile-completion";
 import { refreshCompletion } from "@/app/(workspace)/profile/completion-actions";
 import { Button } from "@/components/ui/button";
 import { ProfileCompletion } from "./profile-completion";
+import { ProfileSocialLinks } from "./profile-social-links";
+import type { SocialLinks } from "@/lib/profile-social-links";
 import { ProfileEditor, type ProfileEditorHandle } from "./profile-editor";
 import { ProfileSkills } from "./profile-skills";
 import { PublicationsSection } from "./publications-section";
@@ -16,8 +18,8 @@ import { CertificatesSection } from "./certificates-section";
 import { ProjectsSection } from "./projects-section";
 import { ExperienceSection } from "./experience-section";
 
-export function ProfileHub({ initialProfile, initialSkills, preferences, insightsEnabled = false, contactEmail }: {
-  initialProfile: Profile; initialSkills: Skill[] | null; preferences?: ReactNode; insightsEnabled?: boolean; contactEmail?: string;
+export function ProfileHub({ initialProfile, initialSkills, insightsEnabled = false, contactEmail, socialLinks }: {
+  initialProfile: Profile; initialSkills: Skill[] | null; insightsEnabled?: boolean; contactEmail?: string; socialLinks: SocialLinks;
 }) {
   const [profile, setProfile] = useState(initialProfile);
   const [skills, setSkills] = useState(initialSkills);
@@ -64,10 +66,10 @@ export function ProfileHub({ initialProfile, initialSkills, preferences, insight
       <HonoursSection service={services.honours} />
       <LanguagesSection service={services.languages} />
       <PublicationsSection service={services.publications} />
-      {preferences}
     </div>
     <aside aria-label="Profile completion" data-profile-sidebar className="min-w-0 space-y-5">
       <ProfileCompletion profile={profileKnown ? profile : null} skills={skillsKnown ? skills : null} pending={pending} onRetry={() => { void retry(); }} />
+      <ProfileSocialLinks initialLinks={socialLinks} />
       {insightsEnabled && (fields.length > 0 || addSkills) && <section className="rounded-xl border border-line p-5" aria-labelledby="profile-insights-title">
         <h2 id="profile-insights-title" className="section-title">Profile Insights</h2>
         <ul className="mt-4 space-y-2">
