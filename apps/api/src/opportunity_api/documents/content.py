@@ -33,6 +33,7 @@ from ..matching.scoring import (
 from ..models.user import User
 from ..models.workspace import ProfileEntry
 from ..schemas.matching import MatchingOpportunity, MatchingProfile
+from ..schemas.workspace import WORK_TYPES, experience_type
 from .latex import month_year, span
 
 log = logging.getLogger(__name__)
@@ -44,6 +45,7 @@ DEGREES = {"bachelor": "Bachelor's", "master": "Master's"}
 class Entry:
     id: str
     title: str
+    kind: str = ""
     subtitle: str = ""
     where: str = ""
     when: str = ""  # LaTeX, see latex.span
@@ -68,6 +70,8 @@ class Candidate:
     skills: list[str] = field(default_factory=list)
     experience: list[Entry] = field(default_factory=list)
     projects: list[Entry] = field(default_factory=list)
+    # Research, clubs, teams and volunteering: shown on the CV, not industry experience.
+    activities: list[Entry] = field(default_factory=list)
     certificates: list[str] = field(default_factory=list)
     languages: list[str] = field(default_factory=list)
     honours: list[str] = field(default_factory=list)
@@ -75,7 +79,7 @@ class Candidate:
     def text(self) -> str:
         parts = [self.headline, self.bio, self.education, *self.skills, *self.certificates]
         parts += [*self.languages, *self.honours]
-        parts += [e.text() for e in self.experience + self.projects]
+        parts += [e.text() for e in self.experience + self.projects + self.activities]
         return "\n".join(parts)
 
 
@@ -161,8 +165,11 @@ def load_candidate(db: Session, user: User) -> Candidate:
     for row in rows:
         v = row.values if isinstance(row.values, dict) else {}
         if row.section == "experience":
-            candidate.experience.append(
+            kind = experience_type(v)
+            target = candidate.experience if kind in WORK_TYPES else candidate.activities
+            target.append(
                 Entry(
+                    kind=kind,
                     id=str(row.id),
                     title=_s(v, "role"),
                     subtitle=_s(v, "organization"),
@@ -207,7 +214,7 @@ def load_candidate(db: Session, user: User) -> Candidate:
                 ", ".join(filter(None, [_s(v, "title"), _s(v, "organization")]))
             )
     candidate.skills = _unique(s.strip() for s in candidate.skills if s.strip())
-    for entries in (candidate.experience, candidate.projects):
+    for entries in (candidate.experience, candidate.projects, candidate.activities):
         entries.sort(key=lambda e: e.finish or "9999", reverse=True)
     return candidate
 
@@ -413,13 +420,21 @@ def _position(profile: MatchingProfile) -> str:
     return f"year {position[0]} of {position[1]}" if position else ""
 
 
-def _years_text(years: float, entries: list[Entry]) -> str:
-    if not years:
-        return "No work experience yet"
-    roles = sum(1 for e in entries if _month(e.start) is not None)
-    return (
-        f"{years:g} year{'s' if years != 1 else ''} across {roles} role{'s' if roles != 1 else ''}"
+def _plural(count: float, word: str) -> str:
+    return f"{count:g} {word}{'' if count == 1 else 's'}"
+
+
+def _years_text(years: float, work: list[Entry], activities: list[Entry]) -> str:
+    """Industry years only; research and activities are named, not counted."""
+    roles = sum(1 for e in work if _month(e.start) is not None)
+    text = (
+        f"{_plural(years, 'year')} of industry experience ({_plural(roles, 'role')})"
+        if years
+        else "No industry experience yet"
     )
+    if activities:
+        text += f" · {_plural(len(activities), 'research or activity role')}"
+    return text
 
 
 def ats_report(
@@ -436,7 +451,7 @@ def ats_report(
     field_fit = checks.get("field_fit")
     # The saved role closest to this job, else the headline.
     title_words = _words(opportunity.title) - _FILLER
-    roles = [e for e in candidate.experience + candidate.projects if e.title]
+    roles = [e for e in candidate.experience + candidate.activities + candidate.projects if e.title]
     best = max(roles, key=lambda e: len(_words(e.text()) & title_words), default=None)
     if best and _words(best.text()) & title_words:
         you_title = f"{best.title} · {best.subtitle}" if best.subtitle else best.title
@@ -470,7 +485,7 @@ def ats_report(
             label="Years of experience",
             status=status,
             job=job_years,
-            you=_years_text(have, candidate.experience),
+            you=_years_text(have, candidate.experience, candidate.activities),
             matched=experience.matched if experience else [],
         )
     )
@@ -609,6 +624,7 @@ def _facts(candidate: Candidate) -> str:
                 for kind, group in (
                     ("experience", candidate.experience),
                     ("project", candidate.projects),
+                    ("research or extracurricular activity", candidate.activities),
                 )
                 for e in group
             ],
@@ -661,7 +677,7 @@ def resume_document(
     found = [k for k in wanted if has_keyword(k, mine, corpus) or canonical(k) in added]
     skills = _unique(spelling.get(canonical(k), k) for k in [*found, *candidate.skills])
     projects = sorted(candidate.projects, key=lambda e: -_relevance(e, wanted))[:4]
-    entries = candidate.experience + projects
+    entries = candidate.experience + projects + candidate.activities
     bullets = {e.id: e.lines[:4] for e in entries}
     summary = candidate.bio if len(candidate.bio) <= 450 else candidate.headline
     used_ai = False
@@ -716,6 +732,8 @@ def resume_document(
         else [],
         "experience": [shown(e) for e in candidate.experience],
         "projects": [shown(e) for e in projects],
+        "research": [shown(e) for e in candidate.activities if e.kind == "research"],
+        "activities": [shown(e) for e in candidate.activities if e.kind != "research"],
         "skills": skills[:24],
         "extras": [
             ("Certificates", candidate.certificates),
@@ -735,7 +753,10 @@ def letter_document(
     wanted = keyword_list(opportunity, keywords, organization)
     mine, corpus = student_skills(profile), candidate.text()
     strengths = [k for k in wanted if has_keyword(k, mine, corpus)][:5] or candidate.skills[:5]
-    best = sorted(candidate.experience + candidate.projects, key=lambda e: -_relevance(e, wanted))
+    best = sorted(
+        candidate.experience + candidate.projects + candidate.activities,
+        key=lambda e: -_relevance(e, wanted),
+    )
     company = organization or "your team"
     study = (
         f"a {candidate.education} student at {candidate.school}"

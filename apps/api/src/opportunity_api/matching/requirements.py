@@ -320,7 +320,7 @@ def check_experience(profile: MatchingProfile, opportunity: MatchingOpportunity)
     if jobs:
         return Check("experience", "Experience", "met", "Relevant experience", jobs[:3], [], 1.0)
     if projects:
-        summary = "Relevant projects, no work experience yet"
+        summary = "Relevant projects or activities, no work experience yet"
         return Check("experience", "Experience", "partial", summary, projects[:3], [], 0.5)
     summary = "Asks for prior experience"
     return Check("experience", "Experience", "missing", summary, [], ["relevant experience"], 0.0)

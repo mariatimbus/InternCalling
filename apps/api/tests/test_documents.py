@@ -81,7 +81,10 @@ def test_ats_report_rows_and_added_keywords(monkeypatch):
     report = content.ats_report(candidate, profile, POSTING, [])
     rows = {r.key: r for r in report.rows}
     assert (rows["keywords"].matched, rows["keywords"].missing) == (["Python"], ["Docker"])
-    assert (rows["experience"].job, rows["experience"].you) == ("2+ years", "1 year across 1 role")
+    assert (rows["experience"].job, rows["experience"].you) == (
+        "2+ years",
+        "1 year of industry experience (1 role)",
+    )
     assert rows["experience"].status == "partial"
     assert rows["education"].status == rows["title"].status == "met"
     # Adding a keyword puts it in the CV, so it counts and the score goes up.
@@ -224,6 +227,10 @@ def test_templates_compile_to_pdf(monkeypatch):
     monkeypatch.setattr(content, "_writer", lambda: None)
     candidate, profile = student()
     candidate.languages, candidate.certificates = ["Română (Native)"], ["AWS & Co, 50% off"]
+    candidate.activities = [
+        Entry(id="r", kind="research", title="Research Assistant", lines=["Built a 1D-CNN"]),
+        Entry(id="t", kind="extracurricular", title="Team Leader", subtitle="Robotics & Co"),
+    ]
     resume, _ = content.resume_document(candidate, POSTING, "Acme", [], profile)
     letter, _ = content.letter_document(candidate, POSTING, "Acme", [], profile)
     for source in (latex.resume_source(resume), latex.letter_source(letter)):
@@ -255,3 +262,51 @@ def test_word_forms_match_and_the_closest_role_is_shown(monkeypatch):
         r for r in content.ats_report(candidate, profile, job, []).rows if r.key == "title"
     )
     assert title.you == "Developer · Acme"  # the role that shares words with the job title
+
+
+@pytest.mark.parametrize(
+    "role,organization,kind",
+    [
+        ("Team Leader", "Quantum Robotics FTC", "extracurricular"),
+        ("Web & Communications Member", "AlphaZ", "extracurricular"),
+        ("Research Assistant", "Faculty of Physics, University of Bucharest", "research"),
+        ("Research Intern", "Google DeepMind", "internship"),
+        ("Software Engineering Intern", "Acme", "internship"),
+        ("Volunteer Tutor", "Code Club", "volunteering"),
+        ("Backend Engineer", "Acme", "job"),
+    ],
+)
+def test_experience_type_is_read_from_role_and_organization(role, organization, kind):
+    from opportunity_api.schemas.workspace import experience_type
+
+    assert experience_type({"role": role, "organization": organization}) == kind
+    assert experience_type({"role": role, "organization": organization, "type": "job"}) == "job"
+
+
+def test_research_and_activities_are_not_industry_years(monkeypatch):
+    monkeypatch.setattr(content, "_writer", lambda: None)
+    candidate, profile = student()
+    candidate.experience = []
+    candidate.activities = [
+        Entry(
+            id="r", kind="research", title="Research Assistant", start="2023-09", finish="2025-10"
+        ),
+        Entry(
+            id="t",
+            kind="extracurricular",
+            title="Team Leader",
+            subtitle="Robotics FTC",
+            start="2021-09",
+            finish="2025-08",
+            lines=["Led 15 students"],
+        ),
+    ]
+    row = next(
+        r for r in content.ats_report(candidate, profile, POSTING, []).rows if r.key == "experience"
+    )
+    assert row.you == "No industry experience yet · 2 research or activity roles"
+    doc, _ = content.resume_document(candidate, POSTING, "Acme", [], profile)
+    assert doc["experience"] == [] and doc["research"][0]["title"] == "Research Assistant"
+    assert doc["activities"][0]["bullets"] == ["Led 15 students"]
+    source = latex.resume_source(doc)
+    assert "Research}" in source and "Leadership \\& Activities" in source

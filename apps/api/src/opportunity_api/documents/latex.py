@@ -141,9 +141,15 @@ def resume_source(doc: dict) -> str:
         parts.append(r"\cvsection{Education}")
         for e in doc["education"]:
             parts.append(_entry(e["school"], tex(e["when"]), e["degree"]))
-    for title, key in (("Experience", "experience"), ("Projects", "projects")):
+    sections = (
+        ("Experience", "experience"),
+        ("Research", "research"),
+        ("Projects", "projects"),
+        ("Leadership & Activities", "activities"),
+    )
+    for title, key in sections:
         if doc.get(key):
-            parts.append(_cmd("cvsection", title))
+            parts.append(_cmd("cvsection", tex(title)))
             for e in doc[key]:
                 parts.append(_entry(e["title"], e["when"], e["subtitle"], e["where"]))
                 parts.append(_items(e["bullets"]))
