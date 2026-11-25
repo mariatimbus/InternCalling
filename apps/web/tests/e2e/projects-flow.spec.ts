@@ -11,9 +11,14 @@ test("Projects persist GitHub links, show readable dates and retain saved text a
   await expect(page.getByText(/Check your email to confirm/)).toBeVisible();
   const control = await (await request.get("http://127.0.0.1:8300/__test")).json();
   await page.goto(`/auth/callback?code=${encodeURIComponent(control.confirmationCode)}`);
+  await page.getByRole("button", { name: "Continue without CV", exact: true }).click();
   await page.getByLabel("Bachelor's", { exact: true }).check();
-  for (const [label, value] of [["University", "Fixture University"], ["Field of study", "Computer Science"], ["Graduation year", "2027"], ["City", "Berlin, Germany"]]) await page.getByLabel(label, { exact: true }).fill(value);
-  await page.getByRole("button", { name: "Show my internships", exact: true }).click();
+  for (const [label, value] of [["University", "Fixture University"], ["Field of study", "Computer Science"], ["Graduation year", "2027"], ["City (optional)", "Berlin, Germany"]]) await page.getByLabel(label, { exact: true }).fill(value);
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await page.getByLabel("Skills", { exact: true }).fill("Python");
+  await page.getByRole("button", { name: "Add skill", exact: true }).click();
+  for (let step = 0; step < 6; step++) await page.getByRole("button", { name: "Next", exact: true }).click();
+  await page.getByRole("button", { name: "Finish and see jobs", exact: true }).click();
   await expect(page).toHaveURL(/\/jobs/);
   await page.goto("/profile");
   await page.getByRole("button", { name: "Add project", exact: true }).click();
