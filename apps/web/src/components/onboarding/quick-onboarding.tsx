@@ -15,6 +15,7 @@ import type { CertificateDraft } from "@/lib/certificates";
 import type { HonourDraft } from "@/lib/honours";
 import { cefrLevels, type LanguageDraft } from "@/lib/languages";
 import type { PublicationDraft } from "@/lib/publications";
+import { Icon } from "@/components/ui/icon";
 
 const sleep = (ms: number, signal: AbortSignal) => new Promise<void>((resolve, reject) => {
   const timer = setTimeout(resolve, ms);
@@ -170,7 +171,7 @@ export function QuickOnboarding({ initial, suggestions }: { initial: OnboardingD
                 <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 text-sm [&::-webkit-details-marker]:hidden">
                   <span className={`min-w-0 flex-1 truncate ${entry.include ? "text-foreground" : "text-muted line-through"}`}>{entryLabel(entry)}</span>
                   <span className="shrink-0 text-xs text-muted">{sectionLabels[entry.section]}</span>
-                  <span className="shrink-0 text-xs text-accent underline">Edit</span>
+                  <span className="inline-flex shrink-0 items-center gap-1 text-xs text-accent"><Icon name="pencil" className="size-3.5" /><span className="underline">Edit</span></span>
                 </summary>
                 <div className="grid gap-3 pb-3 pt-1 sm:grid-cols-2">
                   {entryFields[entry.section].map(field => {

@@ -5,6 +5,7 @@ import type { ActionState } from "@/lib/auth/action-state";
 import { validateOnboarding, type OnboardingDraft } from "@/lib/onboarding";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Icon } from "@/components/ui/icon";
 
 const steps = [
   { key: "degree_level", title: "What are you studying towards?", help: "We will check opportunities against your degree level.", label: "Degree level" },
@@ -45,7 +46,7 @@ export function OnboardingFlow({ initial, suggestions, submitAction = finishOnbo
       <h1 ref={title} tabIndex={-1} className="display-title outline-none">{summary ? (demo?"Confirm your sample answers":"Ready to find your matches?") : current.title}</h1>
       <p className="mt-4 max-w-lg text-sm leading-7 text-muted">{summary ? (demo?"Review these demonstration answers. Confirmation updates demo memory only, never your real account.":"Review your details. We will save this profile and use it to match you with internships.") : current.help}</p>
       {summary ? <form action={action} onSubmit={()=>onPendingChange?.(true)} className="mt-7 space-y-6">
-        {steps.map(({ key, label }, index) => <div key={key} className="flex items-start justify-between gap-4 border-b border-line pb-4"><input type="hidden" name={key} value={key === "skills" ? JSON.stringify(draft.skills) : draft[key]} /><div className="min-w-0"><p className="metadata-text">{label}</p><p className="mt-1 break-words text-sm">{key === "skills" ? draft.skills.join(", ") || "No skills added" : key === "degree_level" ? (draft[key] === "bachelor" ? "Bachelor's" : "Master's") : draft[key]}</p>{state.fields?.[key] && <p className="mt-2 text-sm" role="alert">{state.fields[key]}</p>}</div><Button variant="ghost" size="sm" disabled={pending} onClick={() => go(index)} aria-label={`Edit ${label.toLowerCase()}`}>Edit</Button></div>)}
+        {steps.map(({ key, label }, index) => <div key={key} className="flex items-start justify-between gap-4 border-b border-line pb-4"><input type="hidden" name={key} value={key === "skills" ? JSON.stringify(draft.skills) : draft[key]} /><div className="min-w-0"><p className="metadata-text">{label}</p><p className="mt-1 break-words text-sm">{key === "skills" ? draft.skills.join(", ") || "No skills added" : key === "degree_level" ? (draft[key] === "bachelor" ? "Bachelor's" : "Master's") : draft[key]}</p>{state.fields?.[key] && <p className="mt-2 text-sm" role="alert">{state.fields[key]}</p>}</div><Button variant="ghost" size="sm" disabled={pending} onClick={() => go(index)} aria-label={`Edit ${label.toLowerCase()}`}><Icon name="pencil" className="size-4" />Edit</Button></div>)}
         {state.error && <p role="alert" className="text-sm leading-6">{state.error}</p>}
         <div className="flex flex-wrap justify-between gap-3"><Button variant="ghost" disabled={pending} onClick={() => go(step - 1)}>Back</Button><Button type="submit" disabled={pending}>{pending ? (demo?"Confirming sample answers...":"Saving your profile…") : demo?"Confirm sample answers":"Find my matches"}</Button></div>
       </form> : <form className="mt-8 space-y-6" noValidate onSubmit={(event) => { event.preventDefault(); if (current.key === "skills" && query.trim()) addSkill(query); else advance(); }}>

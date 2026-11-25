@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Field, fieldControl } from "@/components/ui/field";
 import { ErrorState } from "@/components/ui/error-state";
+import { Icon } from "@/components/ui/icon";
 
 const labels: Record<ProfileField, string> = { headline: "Headline", bio: "Bio", degree_level: "Degree level", university: "University", field_of_study: "Field of study", graduation_year: "Graduation year", location: "Location" };
 
@@ -64,7 +65,7 @@ export function ProfileEditor({ initialProfile, persistedProfile, onConfirmed, o
 
   return <>
     <section id="profile-overview" className="py-7" aria-labelledby="profile-details-title">
-    <div className="flex flex-wrap items-center justify-between gap-4"><h2 ref={sectionTitle} id="profile-details-title" tabIndex={-1} className="section-title">Profile details</h2>{!editing && <Button variant="ghost" size="sm" onClick={() => beginEdit("headline")}>Edit profile</Button>}</div>
+    <div className="flex flex-wrap items-center justify-between gap-4"><h2 ref={sectionTitle} id="profile-details-title" tabIndex={-1} className="section-title">Profile details</h2>{!editing && <Button variant="ghost" size="sm" onClick={() => beginEdit("headline")}><Icon name="pencil" className="size-4" />Edit profile</Button>}</div>
     {success && <p role="status" className="mt-5 text-sm leading-6">{success}</p>}
     {editing ? <form ref={form} onSubmit={submit} noValidate aria-busy={saving} className="mt-6 space-y-6">
       <p className="text-sm leading-6 text-muted">Leave a field blank to clear it. Clearing study or location details may require onboarding again before opening Jobs.</p>
@@ -92,7 +93,7 @@ export function ProfileEditor({ initialProfile, persistedProfile, onConfirmed, o
     <section id="profile-education" aria-labelledby="profile-education-title" className="border-t border-line py-7">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 id="profile-education-title" className="section-title">Education</h2>
-        <Button variant="ghost" size="sm" disabled={saving} onClick={() => beginEdit("university")}>Edit education</Button>
+        <Button variant="ghost" size="sm" disabled={saving} onClick={() => beginEdit("university")}><Icon name="pencil" className="size-4" />Edit education</Button>
       </div>
       <div className="mt-5 flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 flex-[1_1_14rem]">

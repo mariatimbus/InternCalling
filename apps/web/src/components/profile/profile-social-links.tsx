@@ -5,6 +5,7 @@ import { saveSocialLinks } from "@/app/(workspace)/profile/social-actions";
 import { validSocialLink, type SocialLinks } from "@/lib/profile-social-links";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Icon } from "@/components/ui/icon";
 
 const services = ["linkedin", "github"] as const;
 const names = { linkedin: "LinkedIn", github: "GitHub" };
@@ -36,7 +37,7 @@ export function ProfileSocialLinks({ initialLinks }: { initialLinks: SocialLinks
   }
 
   return <section className="rounded-card bg-card px-5 py-5 sm:px-6" aria-labelledby="profile-social-title">
-    <div className="flex items-center justify-between gap-3"><h2 id="profile-social-title" className="card-title">Social links</h2>{!editing && <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>Edit</Button>}</div>
+    <div className="flex items-center justify-between gap-3"><h2 id="profile-social-title" className="card-title">Social links</h2>{!editing && <Button variant="ghost" size="sm" onClick={() => setEditing(true)}><Icon name="pencil" className="size-4" />Edit</Button>}</div>
     {editing ? <form onSubmit={submit} className="mt-5 space-y-4" noValidate>
       {services.map((service) => <Input key={service} label={names[service]} type="url" value={draft[service]} maxLength={512} placeholder={`https://${service === "linkedin" ? "www.linkedin.com/in" : "github.com"}/your-name`} disabled={saving} error={draft[service] && !validSocialLink(draft[service].trim(), service) ? "Enter a valid profile URL." : undefined} onChange={(event) => setDraft({ ...draft, [service]: event.target.value })} />)}
       {error && <p role="alert" className="text-sm text-danger-foreground">{error}</p>}

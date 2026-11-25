@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Field, fieldControl } from "@/components/ui/field";
 import { safeResumeUrl } from "@/lib/resume-link";
 import { monthYear } from "@/lib/organization-logo";
+import { Icon } from "@/components/ui/icon";
 
 export function PublicationsSection({ service }: { service?: PublicationsService }) {
   const id = useId();
@@ -72,7 +73,7 @@ export function PublicationsSection({ service }: { service?: PublicationsService
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0"><h3 className="card-title">{row.title}</h3>{row.publicationDate && <p className="metadata-text mt-1">Published {monthYear(row.publicationDate)}</p>}</div>
           <Button variant="ghost" size="sm" className="shrink-0 px-2" aria-label={`Edit ${row.title}`} disabled={pending || editing || !!deleting} onClick={() => begin(row)}>
-            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="size-5"><path d="m15 5 4 4 M4 20l4-1 12-12a2.8 2.8 0 0 0-4-4L4 15z" /></svg>
+            <Icon name="pencil" />
           </Button>
         </div>
         {row.publisher && <p className="mt-3 text-sm font-medium text-foreground">{row.publisher}</p>}
