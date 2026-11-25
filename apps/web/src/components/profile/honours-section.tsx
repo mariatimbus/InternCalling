@@ -6,6 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Field, fieldControl } from "@/components/ui/field";
 import { safeResumeUrl } from "@/lib/resume-link";
+import { CredentialEntry } from "./credential-entry";
+import { monthYear, organizationLogo } from "@/lib/organization-logo";
+import { Icon } from "@/components/ui/icon";
 
 export function HonoursSection({ service }: { service?: HonoursService }) {
   const id = useId();
@@ -61,12 +64,7 @@ export function HonoursSection({ service }: { service?: HonoursService }) {
   const input = (key: "title" | "organization" | "receivedDate" | "referenceUrl", label: string) => <Input label={label} name={key} value={draft[key]} required={key === "title"} disabled={pending} maxLength={key === "receivedDate" ? 7 : key === "referenceUrl" ? 512 : 255} placeholder={key === "receivedDate" ? "YYYY or YYYY-MM" : undefined} error={errors[key]} onChange={event => change(key, event.target.value)} />;
   return <section className="mt-8 rounded-panel bg-card p-6 sm:p-9" aria-labelledby={id + "-title"} aria-busy={pending}>
     <div className="flex flex-wrap items-center justify-between gap-3"><h2 ref={heading} tabIndex={-1} id={id + "-title"} className="section-title">Honours &amp; Awards</h2>{!editing && <Button disabled={pending || !!deleting || !!service && state.kind !== "ready"} onClick={() => begin(null)}>{service ? "Add award" : "Draft award"}</Button>}</div>
-    <div className="mt-4"><CollectionView state={state} emptyMessage="No honours or awards yet." onRetry={() => { void reload(); }} renderEntry={row => <article className="space-y-3 break-words"><h3 className="card-title">{row.title}</h3>
-      {row.organization && <p className="text-sm">{row.organization}</p>}
-      {row.receivedDate && <p className="text-xs text-muted">Received: {row.receivedDate}</p>}
-      {row.description && <p className="whitespace-pre-wrap text-sm leading-6">{row.description}</p>}
-      {safeResumeUrl(row.referenceUrl) ? <a href={safeResumeUrl(row.referenceUrl)!} target="_blank" rel="noopener noreferrer" className="inline-block rounded-control py-2 text-sm text-accent underline">View reference<span className="sr-only"> (opens in a new tab)</span></a> : row.referenceUrl ? <p className="text-xs text-muted">An invalid saved link is hidden. Edit this award to correct it.</p> : null}
-      <div className="flex flex-wrap gap-2"><Button variant="secondary" disabled={pending || editing || !!deleting} onClick={() => begin(row)}>Edit<span className="sr-only"> {row.title}</span></Button><Button variant="ghost" disabled={pending || editing || !!deleting} onClick={() => { setDeleting(row); setError(""); setSuccess(""); }}>Delete<span className="sr-only"> {row.title}</span></Button></div></article>} /></div>
+    <div className="mt-4"><CollectionView state={state} emptyMessage="No honours or awards yet." onRetry={() => { void reload(); }} renderEntry={row => CredentialEntry({ title: row.title, issuer: row.organization, logoName: row.organization || row.title, logoUrl: organizationLogo(row.organization, row.referenceUrl), logoIcon: !row.organization ? <Icon name="award" className="size-6" /> : undefined, facts: [row.receivedDate && `Issued ${monthYear(row.receivedDate)}`], link: safeResumeUrl(row.referenceUrl), linkLabel: "Show reference", disabled: pending || editing || !!deleting, onEdit: () => begin(row), onDelete: () => { setDeleting(row); setError(""); setSuccess(""); }, children: <>{row.description && <p className="mt-2 max-w-prose whitespace-pre-wrap text-sm leading-6 text-foreground">{row.description}</p>}</> })} /></div>
     {editing && <form ref={form} noValidate onSubmit={save} className="mt-6 space-y-4" onKeyDown={event => { if (event.key === "Escape") cancel(); }}>
       {!service && <p role="status" className="text-sm text-muted">Draft only - saving is unavailable. Drafts are lost when you leave or reload.</p>}
       {input("title", "Award / distinction title (required)")}{input("organization", "Issuing organization (optional)")}

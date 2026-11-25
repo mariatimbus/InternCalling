@@ -47,7 +47,7 @@ const detailView = await load("../src/components/jobs/opportunity-detail-view.ts
   "@/components/jobs/tailoring-entry-point": { TailoringEntryPoint: "TailoringEntryPoint" },
   "@/components/applications/application-controls": { ApplicationControls: "ApplicationControls" },
   "@/components/ui/badge": { Badge: "Badge" }, "@/components/ui/icon": { Icon: "Icon" },
-  "@/lib/company-logo": await load("../src/lib/company-logo.ts"), "@/lib/match-reasons": await load("../src/lib/match-reasons.ts"), "@/lib/opportunities": { opportunityTypeLabel: (type) => type },
+  "@/lib/company-logo": await load("../src/lib/company-logo.ts"), "@/lib/organization-logo": { organizationLogo: () => null }, "@/lib/match-reasons": await load("../src/lib/match-reasons.ts"), "@/lib/opportunities": { opportunityTypeLabel: (type) => type },
   "@/lib/profile-skills": profileSkillsApi,
   "@/lib/opportunity-copilot": copilotModel,
   "@/components/jobs/opportunity-details": detailUi,
@@ -75,7 +75,7 @@ async function fixture(request) {
     "@/components/ui/empty-state": { EmptyState: "Empty" }, "@/components/ui/error-state": { ErrorState: "Error" },
     "./save-action": action,
     "./load-more-action": continuation,
-    "./saved-search-actions": { savedSearchAction() {} }, "@/components/jobs/saved-searches": { SavedSearches: "SavedSearches" },
+    "./saved-search-actions": { savedSearchAction() {} }, "@/components/jobs/saved-searches": { SavedSearches: "SavedSearches" }, "@/components/jobs/sort-select": { SortSelect: "SortSelect" },
     "./assessment-action": { loadOpportunityAssessment() {}, loadOpportunityCatalog() {} },
     "@/lib/feature-flags": featureFlags,
     "@/lib/profile-skills": profileSkillsApi,
@@ -120,53 +120,46 @@ const submit = { preventDefault() {} };
 const keyEvent = (key) => ({ ...submit, key, nativeEvent: { isComposing: false } });
 const change = (value) => ({ target: { value } });
 
-test("unavailable drawer sections are disabled and cannot enter Jobs requests or filter state", async () => {
+test("every drawer filter reaches the URL and the API; unknown parameters are ignored", async () => {
   const app = await fixture((path) => path.endsWith("/applications") ? { items: [] } : { items: [], page_size: 12, total: 0 });
   const live = { location: "Berlin", degree_level: "master", study_year: "1" };
-  const unknown = {
-    schedule: "part_time", work_model: "remote", posted_after: "2026-11-01",
-    industry_id: "unknown", required_experience: "1",
-  };
-  const page = await app.visit({ q: "python", ...live, ...unknown });
+  const extra = { work_model: "remote", schedule: "part_time", field: "data", posted_within: "7", no_experience: "true" };
+  const page = await app.visit({ q: "python", ...live, ...extra, posted_after: "2026-11-01", industry_id: "unknown", work_model_legacy: "x" });
   const search = page.find((node) => node.type === "JobsSearch").props;
-  assert.deepEqual(search.applied, live);
-  assert.deepEqual(queryOf(tab(page, "Saved").props.href), { view: "saved", q: "python", page: "1", ...live });
-  const box = await searchFixture(search);
+  assert.deepEqual(search.applied, { ...live, ...extra });
+  const request = queryOf(app.calls.find(([path]) => path.includes("opportunities/recommended?"))[0]);
+  assert.deepEqual(request, { ...live, ...extra, opportunity_type: "internship", is_active: "true", page: "1", page_size: "12", search: "python" });
+  // Sorting travels the same way, and the selector keeps the other parameters.
+  const sorted = await app.visit({ q: "python", ...live, sort: "recent" });
+  assert.equal(queryOf(app.calls.filter(([path]) => path.includes("opportunities/recommended?")).at(-1)[0]).sort, "recent");
+  const selector = sorted.find((node) => node.type === "SortSelect").props;
+  assert.equal(selector.sort, "recent");
+  assert.deepEqual(Object.fromEntries(new URLSearchParams(selector.params)), { view: "recommended", q: "python", page: "1", ...live, sort: "recent" });
+  const unsorted = await app.visit({ sort: "random" });
+  assert.equal(unsorted.find((node) => node.type === "SortSelect")?.props.sort ?? "", "");
+  // Invalid values never reach the API.
+  const bad = await app.visit({ work_model: "office", schedule: "weekends", field: "law", posted_within: "2", no_experience: "yes" });
+  assert.deepEqual(bad.find((node) => node.type === "JobsSearch").props.applied,
+    { location: "", degree_level: "", study_year: "", work_model: "", schedule: "", field: "", posted_within: "", no_experience: "" });
+
+  const box = await searchFixture({ ...search, applied: { location: "", degree_level: "", study_year: "", work_model: "", schedule: "", field: "", posted_within: "", no_experience: "" } });
   const trigger = () => box.render().find((node) => node.props["aria-haspopup"] === "dialog");
-  assert.ok(trigger().props.children.flat().includes(" (2)"));
   trigger().props.onClick();
-  const form = box.render().find((node) => node.type === "Drawer").props.children;
-  const sections = nodes(form).filter((node) => node.type === "fieldset");
-  assert.deepEqual(sections.map((section) => {
-    assert.equal(section.props.disabled, true);
-    const children = nodes(section);
-    assert.ok(children.some((node) => node.props.children === "Not available yet"));
-    const controls = children.filter((node) => node.type === "input" || node.type === "Input");
-    assert.ok(controls.every((node) => !node.props.name && !node.props.onChange));
-    return [
-      children.find((node) => node.type === "legend").props.children,
-      children.filter((node) => node.type === "label").map((node) => node.props.children.at(-1)),
-    ];
-  }), [
-    ["Schedule", ["Full-time", "Part-time"]],
-    ["Work Model", ["Remote", "Hybrid", "On-site"]],
-    ["Date Posted", ["Past 24 hours", "Past 3 days", "Past week", "Past month"]],
-    ["Industry", []],
-  ]);
-  const industry = nodes(sections.at(-1)).find((node) => node.type === "Input");
-  assert.equal(industry.props.disabled, true);
-  assert.equal(industry.props.type, "search");
-  const experience = nodes(form).find((node) => node.type === "section");
-  assert.deepEqual(nodes(experience).slice(1).map((node) => node.props.children), ["Required Experience", "Not available yet"]);
-  form.props.onSubmit(submit);
-  const appliedUrl = queryOf(box.history.at(-1));
-  assert.deepEqual(appliedUrl, { q: "python", ...live });
-  await app.visit(appliedUrl);
-  const requests = app.calls.filter(([path]) => path.includes("opportunities/recommended?")).map(([path]) => queryOf(path));
-  assert.deepEqual(requests, Array(2).fill({
-    ...live, opportunity_type: "internship", is_active: "true", page: "1", page_size: "12", search: "python",
-  }));
+  const drawer = () => box.render().find((node) => node.type === "Drawer").props.children;
+  const radio = (name, value) => nodes(drawer()).find((node) => node.type === "input" && node.props.name === name && node.props.value === value);
+  radio("work_model", "hybrid").props.onChange();
+  radio("schedule", "full_time").props.onChange();
+  radio("posted_within", "30").props.onChange();
+  nodes(drawer()).find((node) => node.type === "Select" && node.props.label === "Industry").props.onChange(change("software"));
+  nodes(drawer()).find((node) => node.type === "input" && node.props.type === "checkbox").props.onChange({ target: { checked: true } });
+  drawer().props.onSubmit(submit);
+  assert.deepEqual(queryOf(box.history.at(-1)), { q: "python", work_model: "hybrid", schedule: "full_time", field: "software", posted_within: "30", no_experience: "true" });
+  const chips = await searchFixture({ ...search, applied: { ...live, ...extra } });
+  assert.ok(chips.render().find((node) => node.props["aria-haspopup"] === "dialog").props.children.flat().includes(" (7)"));
+  chips.render().find((node) => node.props["aria-label"] === "Remove filter: Remote").props.onClick();
+  assert.equal(queryOf(chips.history.at(-1)).work_model, undefined);
 });
+
 
 test("suggestions are case-insensitive, prioritize prefixes, and only search on selection or submit", async () => {
   const applied = { location: "Berlin", degree_level: "master", study_year: "1" };
@@ -289,7 +282,7 @@ test("Jobs links preserve q/page across views and Recommended ignores legacy typ
     opportunity_type: "internship", is_active: "true", page: "3", page_size: "12", search: "C++ & Python", ...filters,
   });
   const discovery = recommended.find((node) => node.type === "JobsSearch").props;
-  assert.deepEqual(discovery.applied, filters);
+  assert.deepEqual(discovery.applied, { ...filters, work_model: "", schedule: "", field: "", posted_within: "", no_experience: "" });
   assert.equal(discovery.search, search);
   app.calls.length = 0;
   const savedQuery = queryOf(tab(recommended, "Saved").props.href);
@@ -423,7 +416,7 @@ test("the card shows pending, blocks repeated clicks, and only displays the conf
       useRef: () => lock,
       useEffect: () => {},
     },
-    "@/lib/company-logo": await load("../src/lib/company-logo.ts"), "@/lib/match-reasons": await load("../src/lib/match-reasons.ts"), "react/jsx-runtime": runtime, "@/lib/opportunities": { opportunitySummary: () => ({}) },
+    "@/lib/company-logo": await load("../src/lib/company-logo.ts"), "@/lib/organization-logo": { organizationLogo: () => null }, "@/lib/match-reasons": await load("../src/lib/match-reasons.ts"), "react/jsx-runtime": runtime, "@/lib/opportunities": { opportunitySummary: () => ({}) },
     "@/components/applications/application-controls": { ApplicationControls: "ApplicationControls" },
     "@/components/jobs/job-card": { JobCard: "JobCard" }, "@/components/jobs/match-score": { MatchScore: "MatchScore" },
     "@/components/jobs/eligibility-badge": { EligibilityBadge: "EligibilityBadge" }, "@/components/ui/badge": { Badge: "Badge" },
@@ -491,7 +484,7 @@ test("Recommended preserves API ranking even when a later card has a higher scor
 test("cards omit unknown metadata and keep official links, selection and Save independent", async () => {
   const { RecommendedJobs } = await load("../src/components/workspace/recommended-jobs.tsx", {
     react: { useSyncExternalStore: (_subscribe, snapshot) => snapshot(), useState: (value) => [value, () => {}], useEffect: () => {}, useRef: (current) => ({ current }) },
-    "@/lib/company-logo": await load("../src/lib/company-logo.ts"), "@/lib/match-reasons": await load("../src/lib/match-reasons.ts"), "react/jsx-runtime": runtime, "@/lib/opportunities": {
+    "@/lib/company-logo": await load("../src/lib/company-logo.ts"), "@/lib/organization-logo": { organizationLogo: () => null }, "@/lib/match-reasons": await load("../src/lib/match-reasons.ts"), "react/jsx-runtime": runtime, "@/lib/opportunities": {
       opportunitySummary: (job) => ({ title: job.title, company: "Fixture" }), opportunityTypeLabel: (type) => type,
     },
     "@/components/applications/application-controls": { ApplicationControls: "ApplicationControls" },
@@ -777,7 +770,7 @@ test("a late catalog response never replaces the selected Saved or Applied listi
         }
       },
     },
-    "@/lib/company-logo": await load("../src/lib/company-logo.ts"), "@/lib/match-reasons": await load("../src/lib/match-reasons.ts"),
+    "@/lib/company-logo": await load("../src/lib/company-logo.ts"), "@/lib/organization-logo": { organizationLogo: () => null }, "@/lib/match-reasons": await load("../src/lib/match-reasons.ts"),
     "react/jsx-runtime": runtime, "@/lib/opportunities": { opportunitySummary: (job) => ({ id: job.id }) },
     "@/components/jobs/job-card": { JobCard: "JobCard" }, "@/components/ui/badge": { Badge: "Badge" },
     "@/components/ui/drawer": { Drawer: "Drawer" }, "@/components/ui/button": { Button: "Button" }, "@/components/ui/icon": { Icon: "Icon" },
@@ -1067,7 +1060,7 @@ test("switching cards scopes both Copilot surfaces and ignores the earlier in-fl
         }
       },
     },
-    "@/lib/company-logo": await load("../src/lib/company-logo.ts"), "@/lib/match-reasons": await load("../src/lib/match-reasons.ts"), "react/jsx-runtime": runtime, "@/lib/opportunities": { opportunitySummary: (job) => ({ id: job.id }) },
+    "@/lib/company-logo": await load("../src/lib/company-logo.ts"), "@/lib/organization-logo": { organizationLogo: () => null }, "@/lib/match-reasons": await load("../src/lib/match-reasons.ts"), "react/jsx-runtime": runtime, "@/lib/opportunities": { opportunitySummary: (job) => ({ id: job.id }) },
     "@/components/applications/application-controls": { ApplicationControls: "ApplicationControls" },
     "@/components/jobs/job-card": { JobCard: "JobCard" }, "@/components/ui/badge": { Badge: "Badge" },
     "@/components/ui/drawer": { Drawer: "Drawer" }, "@/components/ui/button": { Button: "Button" }, "@/components/ui/icon": { Icon: "Icon" },

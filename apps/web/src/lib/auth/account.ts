@@ -9,6 +9,11 @@ import { createServerSupabaseClient } from "./supabase-server";
 import { isAuthNetworkError } from "./config";
 import { socialLinksFromMetadata } from "@/lib/profile-social-links";
 
+/** Accounts created with email and password (Google-only accounts have none yet). */
+function hasEmailPassword(metadata: Record<string, unknown> | undefined) {
+  return Array.isArray(metadata?.providers) ? metadata.providers.includes("email") : metadata?.provider === "email";
+}
+
 /** Only the server key can set app_metadata, so this flag is not self-granted; the API checks it again. */
 function isReviewer(metadata: Record<string, unknown> | undefined) {
   return Array.isArray(metadata?.roles) && metadata.roles.includes("reviewer");
@@ -23,7 +28,7 @@ export const getVerifiedAuth = cache(async () => {
     const { data, error } = await client.auth.getUser();
     if (isAuthNetworkError(error)) return { kind: "unavailable" as const };
     if (!data.user || error) return { kind: "guest" as const };
-    return { kind: "signed-in" as const, config, client, user: { id: data.user.id, email: data.user.email ?? "Your account", reviewer: isReviewer(data.user.app_metadata), socialLinks: socialLinksFromMetadata(data.user.user_metadata) } };
+    return { kind: "signed-in" as const, config, client, user: { id: data.user.id, email: data.user.email ?? "Your account", reviewer: isReviewer(data.user.app_metadata), hasPassword: hasEmailPassword(data.user.app_metadata), socialLinks: socialLinksFromMetadata(data.user.user_metadata) } };
   } catch { return { kind: "unavailable" as const }; }
 });
 

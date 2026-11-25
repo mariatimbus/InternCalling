@@ -46,7 +46,7 @@ test("Jobs briefs keep source and detail links independent and place tailoring i
     "@/components/jobs/match-score": { MatchScore: "MatchScore" }, "@/components/jobs/company-avatar": { CompanyAvatar: "CompanyAvatar" },
     "@/components/jobs/eligibility-badge": { EligibilityBadge: "EligibilityBadge" }, "@/components/ui/badge": badge,
     "@/components/ui/drawer": { Drawer: "Drawer" }, "@/components/ui/button": { Button: "Button" },
-    "@/lib/company-logo": await load("../src/lib/company-logo.ts"), "@/lib/match-reasons": await load("../src/lib/match-reasons.ts"), "@/components/ui/icon": { Icon: "Icon" }, "@/lib/opportunities": await load("../src/lib/opportunities.ts"),
+    "@/lib/company-logo": await load("../src/lib/company-logo.ts"), "@/lib/organization-logo": { organizationLogo: () => null }, "@/lib/match-reasons": await load("../src/lib/match-reasons.ts"), "@/components/ui/icon": { Icon: "Icon" }, "@/lib/opportunities": await load("../src/lib/opportunities.ts"),
     "@/lib/profile-skills": await load("../src/lib/profile-skills.ts"),
     "@/lib/opportunity-copilot": await load("../src/lib/opportunity-copilot.ts", { "./match-reasons": await load("../src/lib/match-reasons.ts") }),
     "@/components/jobs/tailoring-entry-point": { TailoringEntryPoint: "Entry" },
