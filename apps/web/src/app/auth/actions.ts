@@ -11,7 +11,7 @@ import { getAccountState } from "@/lib/auth/account";
 import type { ActionState } from "@/lib/auth/action-state";
 import { ApiError } from "@/lib/api/client";
 import { isProfile } from "@/lib/api/types";
-import { isProfileComplete, readOnboardingForm, validateOnboarding, onboardingPayload } from "@/lib/onboarding";
+import { isProfileComplete, readOnboardingForm, validateSignupOnboarding, onboardingPayload } from "@/lib/onboarding";
 
 async function authenticate(mode: "sign-in" | "sign-up", form: FormData): Promise<ActionState> {
   const email = String(form.get("email") ?? "").trim();
@@ -92,10 +92,10 @@ export async function finishOnboarding(_previous: ActionState, form: FormData): 
   if (account.kind !== "ready") return { error: "We could not load your account. Reload and try again. Your answers have not been submitted." };
   const draft = readOnboardingForm(form);
   if (!draft) return { error: "The profile could not be read. Review your answers and try again." };
-  const fields = validateOnboarding(draft);
+  const fields = validateSignupOnboarding(draft);
   if (Object.keys(fields).length) return { error: "Review the highlighted details before continuing.", fields };
   try {
-    // Store optional skills first. Completion becomes durable only when the final profile write succeeds.
+    // Store required skills first. Completion becomes durable only when the final profile write succeeds.
     await account.api.request("/api/v1/profile/skills", { method: "PUT", body: { names: draft.skills } });
     const profile = await account.api.request<unknown>("/api/v1/profile", { method: "PATCH", body: onboardingPayload(draft) });
     if (!isProfile(profile) || profile.user_id !== account.user.id || !isProfileComplete(profile)) throw new ApiError(502, "invalid_profile");

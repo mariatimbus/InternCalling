@@ -1,32 +1,53 @@
 import {
-  buildReviewChanges, createReviewDraft, providedReviewValue, selectProposals,
+  alreadySaved, buildReviewChanges, createReviewDraft, providedReviewValue,
+  reviewCollectionErrors, reviewDefaults,
   type ParsingResult, type ReviewChanges, type ReviewSection, type ReviewValues,
 } from "./resume-review";
 
 /** One entry found in the CV, editable on the onboarding screen before it is saved. */
 export type OnboardingEntry = { key: string; section: ReviewSection; include: boolean; values: ReviewValues };
-export type EntryField = { key: string; label: string; kind?: "long" | "list" | "check"; hint?: string };
+export type EntryField = { key: string; label: string; kind?: "long" | "list" | "check" | "level"; hint?: string };
 
 const date = "YYYY or YYYY-MM";
 /** The fields a student is likely to fix; everything else is edited later in Profile. */
 export const entryFields: Record<ReviewSection, EntryField[]> = {
   experience: [{ key: "role", label: "Role" }, { key: "organization", label: "Organization" }, { key: "startDate", label: "Start", hint: date }, { key: "endDate", label: "End", hint: date }, { key: "current", label: "I still work here", kind: "check" }, { key: "achievements", label: "What you did", kind: "long" }],
   projects: [{ key: "name", label: "Name" }, { key: "role", label: "Your role" }, { key: "technologies", label: "Technologies", kind: "list", hint: "Comma-separated" }, { key: "description", label: "Description", kind: "long" }],
-  languages: [{ key: "name", label: "Language" }, { key: "cefr", label: "Level", hint: "A1 to C2" }, { key: "native", label: "Native", kind: "check" }],
+  languages: [{ key: "name", label: "Language" }, { key: "cefr", label: "Level", kind: "level" }],
   certificates: [{ key: "name", label: "Certificate" }, { key: "organization", label: "Issued by" }, { key: "issueDate", label: "Issued", hint: date }],
   honours: [{ key: "title", label: "Award" }, { key: "receivedDate", label: "Received", hint: date }, { key: "description", label: "Details", kind: "long" }],
   publications: [{ key: "title", label: "Title" }, { key: "publisher", label: "Publisher" }, { key: "publicationDate", label: "Published", hint: date }],
 };
 export const sectionLabels: Record<ReviewSection, string> = { experience: "Experience", projects: "Project", languages: "Language", certificates: "Certificate", honours: "Award", publications: "Publication" };
 
-/** Complete entries the student does not already have, all ticked. */
+export function newOnboardingEntry(section: ReviewSection, key: string): OnboardingEntry {
+  return { key, section, include: true, values: structuredClone(reviewDefaults[section]) as ReviewValues };
+}
+
+export function manualEntryDraft(entry: OnboardingEntry): { values: ReviewValues; errors: Record<string, string> } {
+  const values = Object.fromEntries(Object.entries(entry.values).map(([key, raw]) => [key,
+    typeof raw === "string" && entryFields[entry.section].some(field => field.key === key && field.kind === "list")
+      ? raw.split(",").map(item => item.trim()).filter(Boolean) : raw,
+  ])) as ReviewValues;
+  return { values, errors: reviewCollectionErrors(entry.section, values) };
+}
+
+function languageValues(values: ReviewValues): ReviewValues {
+  const name = typeof values.name === "string" ? values.name.trim() : "";
+  const match = /^(.*?)\s+(A1|A2|B1|B2|C1|C2|Native)$/i.exec(name);
+  if (!match || !match[1].trim()) return values;
+  const level = match[2].toUpperCase();
+  return { ...values, name: match[1].trim(), ...(level === "NATIVE" ? { native: true, cefr: "" } : { cefr: level, native: false }) };
+}
+
+/** Offer every new CV entry, including incomplete ones the student can correct or skip. */
 export function onboardingEntries(result: ParsingResult): OnboardingEntry[] {
-  return selectProposals(result).collections.flatMap(row => {
-    const candidate = result.proposed.collections.find(item => item.key === row.key);
-    if (!candidate || row.decision !== "add") return [];
-    const values = Object.fromEntries(Object.entries(row.fields).flatMap(([key, field]) => field.value === undefined ? [] : [[key, field.value]])) as ReviewValues;
-    return [{ key: row.key, section: candidate.section, include: true, values }];
-  });
+  return result.proposed.collections.filter(candidate => !alreadySaved(result, candidate)).map(candidate => ({
+    key: candidate.key, section: candidate.section, include: true,
+    values: candidate.section === "languages"
+      ? languageValues(Object.fromEntries(Object.entries(candidate.values).filter(([, value]) => value !== null && value !== undefined)) as ReviewValues)
+      : Object.fromEntries(Object.entries(candidate.values).filter(([, value]) => value !== null && value !== undefined)) as ReviewValues,
+  }));
 }
 
 /** "Frontend Developer · Acme", "Chess Engine", "English C2". */
@@ -34,7 +55,7 @@ export function entryLabel(entry: OnboardingEntry): string {
   const text = (key: string) => typeof entry.values[key] === "string" ? (entry.values[key] as string).trim() : "";
   const label = {
     experience: [text("role"), text("organization")].filter(Boolean).join(" · "),
-    projects: text("name"), languages: [text("name"), text("cefr")].filter(Boolean).join(" "),
+    projects: text("name"), languages: text("name"),
     certificates: [text("name"), text("organization")].filter(Boolean).join(" · "),
     honours: text("title"), publications: text("title"),
   }[entry.section];
