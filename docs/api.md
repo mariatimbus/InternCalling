@@ -209,6 +209,19 @@ text; it does not index translated display text.
 
 `degree_level` ∈ `bachelor | master | both`, nullable — eligibility, not the caller's own degree; `null` means not established (never "everyone"). `study_year` is a nullable array of eligible study years (e.g. `[2, 3]`); `null` means not established.
 
+### Filters on GET /api/v1/opportunities/recommended
+
+Besides `location`, `search` and the deadline bounds:
+
+- `degree_level`, `study_year`: hide only postings that state a *different* degree or year;
+  postings that do not state one stay listed (most do not).
+- `work_model` = `remote` | `hybrid` | `onsite` and `schedule` = `full_time` | `part_time`
+  (working student, Werkstudent, part-time, Teilzeit, hours per week): read from the posting's text.
+- `field` = `software` | `data` | `hardware` | `security` | `product` | `mechanical` | `business`:
+  the role's domain from its title (description when the title has none).
+- `posted_within` (days, 1–365): source publication date within that window.
+- `no_experience=true`: hide postings that ask for prior experience.
+
 ### GET /api/v1/opportunities/{id}
 
 `200` with the item shape above; `404 not_found` for a valid but unknown id;

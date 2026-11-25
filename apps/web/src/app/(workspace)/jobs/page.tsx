@@ -27,7 +27,7 @@ export const metadata = { title: "Jobs | InternCalling" };
 export default async function JobsPage({ searchParams }: { searchParams: Promise<JobsQuery> }) {
   const { api } = await requireCompletedAccount();
   const state = readJobsQuery(await searchParams);
-  const { view, search, location, degree, year, page } = state;
+  const { view, search, location, degree, year, workModel, schedule, field, postedWithin, noExperience, page } = state;
   const copilotEnabled = opportunityCopilotEnabled();
 
   function urlParams(target: JobsView, next: number) {
@@ -73,7 +73,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
       <Link href="/profile" className="text-sm text-accent underline underline-offset-4">Your profile</Link>
     </div>
     {view === "recommended" && <div className="mt-6">
-      <JobsSearch search={search} applied={{ location, degree_level: degree, study_year: year }} navigationKey={href(view)} />
+      <JobsSearch search={search} applied={{ location, degree_level: degree, study_year: year, work_model: workModel, schedule, field, posted_within: postedWithin, no_experience: noExperience }} navigationKey={href(view)} />
       <SavedSearches saved={saved} current={{ search, location, degree, year }} action={savedSearchAction} />
     </div>}
     <nav aria-label="Job lists" className={`segmented-track mb-5 ${view === "recommended" ? "" : "mt-6"}`}>

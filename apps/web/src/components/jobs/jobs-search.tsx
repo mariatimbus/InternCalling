@@ -8,7 +8,7 @@ import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 
-type Filters = { location: string; degree_level: string; study_year: string };
+type Filters = { location: string; degree_level: string; study_year: string; work_model: string; schedule: string; field: string; posted_within: string; no_experience: string };
 
 const suggestions = [
   { label: "Software Engineering", query: "software", aliases: ["swe", "software developer", "frontend", "backend"] },
@@ -34,12 +34,16 @@ const degreeOptions = [
   ["both:", "Both degree levels"],
 ] as const;
 const degreeLabels: Record<string, string> = { bachelor: "Undergraduate", master: "Master’s", both: "Both degree levels" };
-const emptyFilters: Filters = { location: "", degree_level: "", study_year: "" };
-const unavailableChoices = [
-  { label: "Schedule", options: ["Full-time", "Part-time"] },
-  { label: "Work Model", options: ["Remote", "Hybrid", "On-site"] },
-  { label: "Date Posted", options: ["Past 24 hours", "Past 3 days", "Past week", "Past month"] },
-];
+const emptyFilters: Filters = { location: "", degree_level: "", study_year: "", work_model: "", schedule: "", field: "", posted_within: "", no_experience: "" };
+// One choice per group; "" means any. Values match the API (see lib/jobs-url).
+const choiceGroups = [
+  { name: "schedule", label: "Schedule", options: [["full_time", "Full-time"], ["part_time", "Part-time / working student"]] },
+  { name: "work_model", label: "Work model", options: [["remote", "Remote"], ["hybrid", "Hybrid"], ["onsite", "On-site"]] },
+  { name: "posted_within", label: "Date posted", options: [["1", "Past 24 hours"], ["3", "Past 3 days"], ["7", "Past week"], ["30", "Past month"]] },
+] as const;
+const fieldOptions = [["software", "Software engineering"], ["data", "Data, AI & ML"], ["hardware", "Hardware & embedded"], ["security", "Security"], ["product", "Product & design"], ["mechanical", "Mechanical & aerospace"], ["business", "Business"]] as const;
+const optionLabel = (name: string, value: string) => (name === "field" ? fieldOptions : choiceGroups.find((group) => group.name === name)?.options ?? [])
+  .find(([option]) => option === value)?.[1] ?? value;
 
 export function JobsSearch({ search, applied, navigationKey }: { search: string; applied: Filters; navigationKey: string }) {
   const router = useRouter();
@@ -71,7 +75,10 @@ export function JobsSearch({ search, applied, navigationKey }: { search: string;
   const draftStudy = draft.degree_level + ":" + draft.study_year;
   const studyLabel = [...studyOptions, ...degreeOptions].find(([value]) => value === appliedStudy)?.[1]
     ?? [degreeLabels[applied.degree_level], applied.study_year && "Year " + applied.study_year].filter(Boolean).join(" · ");
-  const filterCount = Number(Boolean(applied.location)) + Number(Boolean(studyLabel));
+  const extraChips = (["work_model", "schedule", "field", "posted_within"] as const).filter((name) => applied[name])
+    .map((name) => ({ name, label: optionLabel(name, applied[name]) }));
+  if (applied.no_experience) extraChips.push({ name: "no_experience" as never, label: "No experience required" });
+  const filterCount = Number(Boolean(applied.location)) + Number(Boolean(studyLabel)) + extraChips.length;
 
   function navigate(query: string, filters: Filters) {
     const params = new URLSearchParams();
@@ -148,6 +155,10 @@ export function JobsSearch({ search, applied, navigationKey }: { search: string;
         onClick={() => navigate(search, { ...applied, degree_level: "", study_year: "" })}>
         <span className="min-w-0 [overflow-wrap:anywhere]">{studyLabel}</span><span aria-hidden="true">×</span>
       </Button>}
+      {extraChips.map(({ name, label }) => <Button key={name} variant="secondary" size="sm" className="max-w-full text-left"
+        aria-label={`Remove filter: ${label}`} onClick={() => navigate(search, { ...applied, [name]: "" })}>
+        <span className="min-w-0 [overflow-wrap:anywhere]">{label}</span><span aria-hidden="true">×</span>
+      </Button>)}
       <Button variant="ghost" size="sm" onClick={() => navigate(search, emptyFilters)}>Clear filters</Button>
     </div>}
     <Drawer id={drawerId} open={filtersOpen} onClose={() => setFiltersOpen(false)} title="Filters" size="skills"
@@ -173,24 +184,30 @@ export function JobsSearch({ search, applied, navigationKey }: { search: string;
             {degreeOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </optgroup>
         </Select>
-        {unavailableChoices.map(({ label, options }) => <fieldset key={label} disabled className="space-y-2 border-t border-border pt-3">
+        {choiceGroups.map(({ name, label, options }) => <fieldset key={name} className="space-y-2 border-t border-border pt-3">
           <legend className="text-sm font-medium">{label}</legend>
-          <p className="text-xs text-muted">Not available yet</p>
-          <div className="flex flex-wrap gap-x-4 gap-y-2">
-            {options.map((option) => <label key={option} className="inline-flex items-center gap-2 text-sm text-muted">
-              <input type="checkbox" className="accent-primary" />{option}
+          <div className="flex flex-wrap gap-2">
+            {([["", "Any"], ...options] as const).map(([value, text]) => <label key={value || "any"}
+              className={`inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full border px-3 text-sm has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-focus ${draft[name] === value ? "border-accent bg-primary/15 text-foreground" : "border-border text-muted hover:text-foreground"}`}>
+              <input type="radio" name={name} value={value} checked={draft[name] === value} className="sr-only"
+                onChange={() => setDraft({ ...draft, [name]: value })} />{text}
             </label>)}
           </div>
         </fieldset>)}
-        <fieldset disabled className="space-y-2 border-t border-border pt-3">
-          <legend className="text-sm font-medium">Industry</legend>
-          <p className="text-xs text-muted">Not available yet</p>
-          <Input label="Search industries" type="search" disabled />
+        <div className="border-t border-border pt-3">
+          <Select label="Industry" value={draft.field} onChange={(event) => setDraft({ ...draft, field: event.target.value })}>
+            <option value="">Any industry</option>
+            {fieldOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </Select>
+        </div>
+        <fieldset className="space-y-2 border-t border-border pt-3">
+          <legend className="text-sm font-medium">Required experience</legend>
+          <label className="inline-flex min-h-10 items-center gap-2 text-sm">
+            <input type="checkbox" className="size-4 accent-primary" checked={draft.no_experience === "true"}
+              onChange={(event) => setDraft({ ...draft, no_experience: event.target.checked ? "true" : "" })} />
+            Only postings that don&apos;t ask for prior experience
+          </label>
         </fieldset>
-        <section className="space-y-2 border-t border-border pt-3">
-          <h3 className="text-sm font-medium">Required Experience</h3>
-          <p className="text-xs text-muted">Not available yet</p>
-        </section>
       </form>
     </Drawer>
   </div>;
