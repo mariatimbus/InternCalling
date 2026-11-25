@@ -6,59 +6,19 @@ Run: python -m opportunity_api.ingestion.translate --api-url http://127.0.0.1:80
 import argparse
 import json
 import re
+import time
 
 import httpx
 
 from opportunity_api.catalog_presentation import (
+    cached_translation,
     clean_ats_markers,
     source_hash,
+    source_language,
     translation_directory,
 )
 
-WORDS = {
-    "English": set(
-        (
-            "the and you your with for our are will have from this that "
-            "we in to of a an is be on as at or by it"
-        ).split()
-    ),
-    "German": set(
-        (
-            "und der die das du deine dein wir mit für von auf eine ein einer einen im den dem "
-            "dich sich sie bei ist als wirst kannst unsere zum des nicht oder auch hast"
-        ).split()
-    ),
-    "French": set(
-        (
-            "et les des vous nous votre vos pour une dans est avec notre au aux du qui que sur "
-            "cette rejoindre le la un en ou ce nos sont plus"
-        ).split()
-    ),
-    "Dutch": set(
-        (
-            "en je jij jouw wij onze voor een het van met bij deze zijn als naar aan op om te "
-            "ook hebt ons wordt zoek werk dit kan wat niet de"
-        ).split()
-    ),
-}
 CODES = {"English": "en", "German": "de", "French": "fr", "Dutch": "nl"}
-
-
-def source_language(title: str, text: str) -> str:
-    words = re.findall(r"[^\W\d_]+", text.lower())
-    scores = {
-        language: sum(word in vocabulary for word in words)
-        for language, vocabulary in WORDS.items()
-    }
-    language = max(scores, key=scores.get)
-    if language == "English":
-        if re.search(r"Werkstudent|Praktik|Elektrotechnik", title, re.I):
-            return "German"
-        if re.search(r"stagiair|meewerk|afstudeer", title, re.I):
-            return "Dutch"
-        if re.search(r"\bstage\b|\bstagiaire\b|ingénieur|recherche|développeur", title, re.I):
-            return "French"
-    return language
 
 
 def translate(
@@ -71,7 +31,10 @@ def translate(
         f"You are a professional {language} ({CODES[language]}) to English (en) translator. "
         f"Accurately convey the meaning and nuances of the original {language} text "
         "while adhering to English grammar, vocabulary, and cultural sensitivities. "
-        "Produce only the English translation, without any additional explanations or commentary. "
+        "Produce only the English translation, with the title on the first line, "
+        "without commentary. "
+        "Preserve every URL, numeric value, qualification and contract type. "
+        "Keep numbers as digits rather than spelling them out. Do not summarize. "
         f"Please translate the following {language} text into English:\n\n\n{source}"
     )
     response = client.post(
@@ -101,6 +64,22 @@ def translate(
     translated_urls = {url.rstrip(".,;)") for url in re.findall(r"https?://[^\s<>]+", output)}
     if not urls.issubset(translated_urls):
         raise ValueError("Translation changed a source link")
+
+    def numbers(value: str) -> set[str]:
+        # Translators commonly render a numeric frequency (2 times) as "twice".
+        value = re.sub(r"\btwice\b", "2", value, flags=re.I)
+        return {
+            re.sub(r"[.,\s]", "", token)
+            for token in re.findall(
+                r"\d{1,3}(?:[ \u00a0\u202f]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)*",
+                value,
+            )
+        }
+
+    if not numbers(source).issubset(numbers(output)):
+        raise ValueError("Translation changed a source number")
+    if source_language(first, rest) != "English":
+        raise ValueError("Translation still contains non-English text")
     if source_language(title, title) == "English":
         first = title
     if re.search(r"Werkstudent", title, re.I) and not re.search(r"working student", first, re.I):
@@ -133,9 +112,44 @@ def main() -> None:
     parser.add_argument("--ollama-url", default="http://127.0.0.1:11434")
     parser.add_argument("--model", default="translategemma:4b")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--check", action="store_true", help="Check coverage without model calls or writes"
+    )
+    parser.add_argument(
+        "--watch", action="store_true", help="Continuously prepare new catalog text"
+    )
+    parser.add_argument(
+        "--interval", type=int, default=300, help="Poll seconds (30–86400; default 300)"
+    )
     args = parser.parse_args()
+    if not 30 <= args.interval <= 86400:
+        parser.error("--interval must be between 30 and 86400 seconds")
+    if args.watch and (args.check or args.dry_run):
+        parser.error("--watch cannot be combined with --check or --dry-run")
+    while True:
+        try:
+            failed = prepare_catalog(args)
+        except (httpx.HTTPError, ValueError, KeyError, TypeError, OSError) as exc:
+            if not args.watch:
+                raise
+            print(
+                f"Catalog preparation failed ({type(exc).__name__}); retrying next poll.",
+                flush=True,
+            )
+        else:
+            if not args.watch:
+                if failed:
+                    raise SystemExit(1)
+                return
+        time.sleep(args.interval)
+
+
+def prepare_catalog(args: argparse.Namespace) -> int:
+    """Prepare one complete catalog snapshot; failed entries remain retryable."""
+
     directory = translation_directory()
-    directory.mkdir(parents=True, exist_ok=True)
+    if not (args.dry_run or args.check):
+        directory.mkdir(parents=True, exist_ok=True)
     # Fetch the full catalog before writing translations.
     items = []
     with httpx.Client(base_url=args.api_url, timeout=30, trust_env=False) as api:
@@ -151,22 +165,29 @@ def main() -> None:
             if page * 100 >= data["total"]:
                 break
             page += 1
-    completed = skipped = failed = 0
+    pending_items = []
+    for item in items:
+        title, text = item["title"], item.get("description") or ""
+        cached = cached_translation(title, text)
+        display_title, display_text = cached or (title, text)
+        language = source_language(display_title, display_text)
+        if language != "English":
+            pending_items.append((title, text, language))
+    print(
+        f"Catalog: {len(items)}; English/cached: {len(items) - len(pending_items)}; "
+        f"missing: {len(pending_items)}",
+        flush=True,
+    )
+    if args.check or args.dry_run:
+        for title, _, language in pending_items:
+            print(f"{language}: {title}", flush=True)
+        return int(args.check and bool(pending_items))
+    completed = failed = 0
     with httpx.Client(base_url=args.ollama_url, timeout=900, trust_env=False) as model:
-        for item in items:
-            title, text = item["title"], item.get("description") or ""
-            language = source_language(title, text)
-            if language == "English":
-                skipped += 1
-                continue
+        for title, text, language in pending_items:
             digest = source_hash(title, text)
             target = directory / (digest + ".json")
-            if target.exists():
-                skipped += 1
-                continue
             print(f"{language}: {title}", flush=True)
-            if args.dry_run:
-                continue
             try:
                 translated_title, translated_text = translate(
                     model, args.model, title, text, language
@@ -186,10 +207,16 @@ def main() -> None:
             except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
                 failed += 1
                 reason = str(exc) if isinstance(exc, ValueError) else type(exc).__name__
-                print(f"  Failed ({reason}); original retained. Rerun to retry.", flush=True)
-    print(f"Translated: {completed}; unchanged/cached: {skipped}; failed: {failed}", flush=True)
-    if failed:
-        raise SystemExit(1)
+                print(
+                    f"  Failed ({reason}); original retained. Retry on next preparation.",
+                    flush=True,
+                )
+    print(
+        f"Translated: {completed}; unchanged/cached: {len(items) - len(pending_items)}; "
+        f"failed: {failed}",
+        flush=True,
+    )
+    return failed
 
 
 if __name__ == "__main__":

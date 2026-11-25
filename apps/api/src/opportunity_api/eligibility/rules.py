@@ -18,6 +18,26 @@ from opportunity_api.schemas.eligibility import (
 
 
 def check_degree_level(student: StudentInput, opportunity: OpportunityInput) -> RuleResult:
+    if opportunity.accepted_degree_levels:
+        accepted = opportunity.accepted_degree_levels
+        actual = student.degree_level
+        evidence = opportunity.requirement_evidence.get("degree_level", "the posting")
+        if actual is None:
+            return RuleResult(
+                rule="degree_level",
+                status=EligibilityStatus.unknown,
+                reason="Student has not declared a degree level",
+            )
+        return RuleResult(
+            rule="degree_level",
+            status=EligibilityStatus.eligible
+            if actual.value in accepted
+            else EligibilityStatus.not_eligible,
+            reason=(
+                f"Required degree: {' or '.join(accepted)}; student is {actual.value}. "
+                f"Source: {evidence}"
+            ),
+        )
     required = opportunity.degree_level
     actual = student.degree_level
     if required is None:
@@ -97,16 +117,43 @@ def check_graduation_year(student: StudentInput, opportunity: OpportunityInput) 
             reason=f"Graduation year {actual} is accepted",
         )
     years = ", ".join(str(year) for year in sorted(required))
+    evidence = opportunity.requirement_evidence.get("graduation_year")
     return RuleResult(
         rule="graduation_year",
         status=EligibilityStatus.not_eligible,
-        reason=f"Opportunity requires graduation in {years}; student graduates {actual}",
+        reason=(
+            f"Student graduates {actual}; required graduation: {evidence}"
+            if evidence
+            else f"Opportunity requires graduation in {years}; student graduates {actual}"
+        ),
     )
 
 
 def check_location(student: StudentInput, opportunity: OpportunityInput) -> RuleResult:
-    """Deterministic, conservative: free text can establish a match or
-    remote-friendly status, but never a hard rejection."""
+    """Only explicit current-residency requirements can reject a location;
+    an ordinary office address establishes matches or uncertainty."""
+    if opportunity.residency_locations:
+        actual = (student.location or "").strip().casefold()
+        if not actual:
+            return RuleResult(
+                rule="location",
+                status=EligibilityStatus.unknown,
+                reason="Student location is not known; cannot compare",
+            )
+        actual_parts = [p.strip() for p in actual.split(",")]
+        matches = any(
+            p.split(",")[0].strip().casefold() in actual_parts
+            for p in opportunity.residency_locations
+        )
+        evidence = opportunity.requirement_evidence.get("location", "the posting")
+        return RuleResult(
+            rule="location",
+            status=EligibilityStatus.eligible if matches else EligibilityStatus.not_eligible,
+            reason=(
+                f"Current residency required in {' or '.join(opportunity.residency_locations)}. "
+                f"Source: {evidence}"
+            ),
+        )
     location = opportunity.location
     if location is None:
         return RuleResult(

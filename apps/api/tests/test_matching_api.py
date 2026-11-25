@@ -30,6 +30,60 @@ def test_match_requires_auth(client):
     assert response.status_code == 401
 
 
+@pytest.mark.parametrize(
+    "title,description,failed_rule",
+    [
+        ("PhD Research Intern", "", "degree_level"),
+        ("Master's Research Intern", "", "degree_level"),
+        ("Software Intern", "You must graduate in 2029.", "graduation_year"),
+        ("Software Intern", "You must already live in Paris to apply.", "location"),
+    ],
+)
+def test_posting_constraints_agree_across_assessment_match_and_recommendations(
+    client, db_factory, headers, title, description, failed_rule
+):
+    opportunity = make_opportunity(title=title, description=description, location="Paris, France")
+    seed(db_factory, opportunity)
+    set_profile(
+        client,
+        headers,
+        degree_level="bachelor",
+        graduation_year=2027,
+        location="Bucharest, Romania",
+    )
+    assessment = client.get(f"{URL}/{opportunity.id}/eligibility", headers=headers).json()
+    assert assessment["status"] == "not_eligible"
+    assert (
+        next(r for r in assessment["reasons"] if r["rule"] == failed_rule)["status"]
+        == "not_eligible"
+    )
+    result = client.get(f"{URL}/{opportunity.id}/match", headers=headers).json()
+    assert result["eligibility"] == "not_eligible" and result["score"] == 0
+    recommended = client.get(f"{URL}/recommended", headers=headers).json()
+    assert not any(
+        item["opportunity"]["id"] == str(opportunity.id) for item in recommended["items"]
+    )
+
+
+def test_foreign_office_is_not_a_residency_failure_or_recommendation_filter(
+    client, db_factory, headers
+):
+    opportunity = make_opportunity(
+        title="Software Intern",
+        location="Paris, France",
+        description="Work in Paris; relocation is welcome.",
+    )
+    seed(db_factory, opportunity)
+    set_profile(client, headers, degree_level="bachelor", location="Bucharest, Romania")
+    result = client.get(f"{URL}/{opportunity.id}/match", headers=headers).json()
+    assert result["eligibility"] != "not_eligible"
+    assert not any(
+        r["key"] == "location" and r["status"] == "missing" for r in result["requirements"]
+    )
+    recommended = client.get(f"{URL}/recommended", headers=headers).json()
+    assert any(item["opportunity"]["id"] == str(opportunity.id) for item in recommended["items"])
+
+
 def test_eligibility_not_eligible_for_degree_mismatch(client, db_factory, headers):
     opportunity = make_opportunity(degree_level=OpportunityDegreeLevel.master)
     seed(db_factory, opportunity)

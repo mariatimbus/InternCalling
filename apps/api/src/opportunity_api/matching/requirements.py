@@ -29,6 +29,11 @@ What is read from the posting, and what is looked for in the profile:
 import re
 from dataclasses import dataclass, field
 
+from opportunity_api.eligibility.posting_requirements import (
+    graduation_requirement,
+    residency_requirement,
+    title_degrees,
+)
 from opportunity_api.schemas.eligibility import EligibilityStatus, RuleResult
 from opportunity_api.schemas.matching import MatchingOpportunity, MatchingProfile, Requirement
 
@@ -330,13 +335,19 @@ def check_experience(profile: MatchingProfile, opportunity: MatchingOpportunity)
 
 def check_eligibility(opportunity: MatchingOpportunity, rules: list[RuleResult]) -> Check | None:
     stated = {
-        "degree_level": opportunity.degree_level is not None,
+        "degree_level": opportunity.degree_level is not None
+        or bool(title_degrees(opportunity.title)),
         "study_year": bool(opportunity.study_year),
+        "graduation_year": graduation_requirement(_text(opportunity)) is not None,
     }
     relevant = [r for r in rules if stated.get(r.rule)]
     if not relevant:
         return None
-    labels = {"degree_level": "degree level", "study_year": "study year"}
+    labels = {
+        "degree_level": "degree level",
+        "study_year": "study year",
+        "graduation_year": "graduation year",
+    }
     met = [labels[r.rule] for r in relevant if r.status == EligibilityStatus.eligible]
     failed = [labels[r.rule] for r in relevant if r.status == EligibilityStatus.not_eligible]
     unknown = [labels[r.rule] for r in relevant if r.status == EligibilityStatus.unknown]
@@ -351,6 +362,27 @@ def check_eligibility(opportunity: MatchingOpportunity, rules: list[RuleResult])
 
 
 def check_location(profile: MatchingProfile, opportunity: MatchingOpportunity) -> Check | None:
+    residency = residency_requirement(opportunity.description or "")
+    if residency:
+        from opportunity_api.eligibility.rules import check_location as residency_check
+        from opportunity_api.schemas.eligibility import OpportunityInput, StudentInput
+
+        result = residency_check(
+            StudentInput(location=profile.location),
+            OpportunityInput(
+                residency_locations=residency[0], requirement_evidence={"location": residency[1]}
+            ),
+        )
+        share = 1.0 if result.status == EligibilityStatus.eligible else 0.0
+        return Check(
+            "location",
+            "Current residency",
+            _status(share),
+            result.reason,
+            residency[0] if share else [],
+            [] if share else residency[0],
+            share,
+        )
     place = (opportunity.location or "").strip()
     if not place:
         return None
@@ -365,8 +397,8 @@ def check_location(profile: MatchingProfile, opportunity: MatchingOpportunity) -
     country = _country(lowered)
     if country and any(country == (_country(w.lower()) or w.lower()) for w in wanted):
         return Check("location", "Location", "partial", "In your country", [place], [], 0.5)
-    summary = "Not where you are" if wanted else "Add your city to compare"
-    return Check("location", "Location", "missing", summary, [], [place], 0.0)
+    # The office address is not evidence that applicants must already live there.
+    return None
 
 
 def evaluate_requirements(

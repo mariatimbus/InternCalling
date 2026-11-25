@@ -187,10 +187,12 @@ def test_field_and_location_tiers():
         ("Bucharest", "met"),
         ("Remote (EU)", "met"),
         ("Cluj, Romania", "partial"),
-        ("Berlin, Germany", "missing"),
     ]:
         opportunity = MatchingOpportunity(title="Intern", location=place)
         assert requirements(score_match(cs, opportunity))["location"].status == status, place
+    abroad = score_match(cs, MatchingOpportunity(title="Intern", location="Berlin, Germany"))
+    assert "location" not in requirements(abroad)
+    assert abroad.eligibility != "not_eligible"
 
 
 def test_reasons_mirror_requirements_for_older_clients():

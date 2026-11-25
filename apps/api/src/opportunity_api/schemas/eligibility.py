@@ -1,6 +1,7 @@
 """Eligibility API schemas: statuses, per-rule results, engine inputs/outputs."""
 
 import enum
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -48,8 +49,9 @@ class StudentInput(BaseModel):
 class OpportunityInput(BaseModel):
     """Structured requirements of one opportunity.
 
-    ``graduation_years`` is reserved for future structured data; no source
-    provides it today, so the graduation rule currently reports ``unknown``.
+    Explicit title/description constraints are normalized before evaluation,
+    with their original text in ``requirement_evidence``. Missing or ambiguous
+    requirements remain unknown; the persisted employer record is unchanged.
     """
 
     model_config = ConfigDict(str_strip_whitespace=True)
@@ -58,3 +60,6 @@ class OpportunityInput(BaseModel):
     study_year: list[int] | None = None
     location: str | None = Field(default=None, max_length=255)
     graduation_years: list[int] | None = None
+    accepted_degree_levels: list[Literal["bachelor", "master", "phd"]] | None = None
+    residency_locations: list[str] | None = None
+    requirement_evidence: dict[str, str] = Field(default_factory=dict)

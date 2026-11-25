@@ -15,18 +15,22 @@ The A9 eligibility engine is the gate:
   as an eligibility requirement only when the posting states them.
 - ``eligible`` → the full score.
 
-Only eligibility rules backed by real data gate the score (degree level,
-study year, location). Graduation currently has no structured source
-anywhere in the pipeline, so — per „unknown must remain unknown" — it
-cannot block matching either; it stays out of the gate until a source
-exists.
+Only source-backed restrictions gate the score: degree level (including an
+explicit title), study year, graduation years and required current residency.
+The office address alone is never a current-residency restriction.
 """
 
 from collections.abc import Sequence
 
 from opportunity_api.eligibility.engine import evaluate
+from opportunity_api.eligibility.posting_requirements import (
+    degree_requirement,
+    graduation_requirement,
+    residency_requirement,
+)
 from opportunity_api.eligibility.rules import (
     check_degree_level,
+    check_graduation_year,
     check_location,
     check_study_year,
 )
@@ -59,10 +63,24 @@ def to_student_input(profile: MatchingProfile) -> StudentInput:
 
 
 def to_opportunity_input(opportunity: MatchingOpportunity) -> OpportunityInput:
+    graduation = graduation_requirement(opportunity.title + "\n" + (opportunity.description or ""))
+    residency = residency_requirement(opportunity.description or "")
+    degrees = degree_requirement(opportunity.title, opportunity.description or "")
+    evidence = {}
+    if degrees:
+        evidence["degree_level"] = degrees[1]
+    if graduation:
+        evidence["graduation_year"] = graduation[1]
+    if residency:
+        evidence["location"] = residency[1]
     return OpportunityInput(
         degree_level=opportunity.degree_level,
         study_year=opportunity.study_year,
         location=opportunity.location,
+        accepted_degree_levels=degrees[0] if degrees else None,
+        graduation_years=graduation[0] if graduation else None,
+        residency_locations=residency[0] if residency else None,
+        requirement_evidence=evidence,
     )
 
 
@@ -78,10 +96,11 @@ def score_match(
     profile. ``ai`` is an optional bonus on top, capped at 100.
     """
     if eligibility is None:
+        inputs = to_opportunity_input(opportunity)
         eligibility = evaluate(
             to_student_input(profile),
-            to_opportunity_input(opportunity),
-            rules=GATE_RULES,
+            inputs,
+            rules=GATE_RULES + ((check_graduation_year,) if inputs.graduation_years else ()),
         )
     checks = evaluate_requirements(profile, opportunity, eligibility.reasons)
     requirements = [check.to_requirement() for check in checks]
