@@ -9,6 +9,7 @@ import re
 from collections.abc import Iterable
 
 from .schemas import CVExtraction
+from .sections import skill_terms, split_sections
 
 RULES_MODEL = "rules-v1"
 _MAX_EVIDENCE = 500
@@ -279,8 +280,12 @@ def _skill_pattern(name: str) -> re.Pattern:
     return re.compile(rf"(?<![\w+#.]){body}(?![\w+#]|\.\w)", re.IGNORECASE)
 
 
-def _skills(lines: list[str], catalog: Iterable[str]) -> list[dict]:
+def _skills(lines: list[str], catalog: Iterable[str], text: str) -> list[dict]:
+    explicit = skill_terms(split_sections(text).get("skills", []))
     names = sorted({n.strip() for n in catalog if 1 < len(n.strip()) <= 40}, key=len, reverse=True)
+    names += [
+        name for name in explicit if name.casefold() not in {known.casefold() for known in names}
+    ]
     # Courses taken ("Relevant Coursework: Statistics") are not skills the student claims.
     lines = [line for line in lines if not _COURSEWORK.search(line)]
     found, seen = [], set()
@@ -310,7 +315,7 @@ def extract(text: str, skill_catalog: Iterable[str]) -> CVExtraction:
             "field_of_study": _field(lines),
             "university": _university(lines),
             "graduation_year": _graduation_year(lines),
-            "skills": _skills(lines, skill_catalog),
+            "skills": _skills(lines, skill_catalog, text),
             "interests": [],
         }
     )
