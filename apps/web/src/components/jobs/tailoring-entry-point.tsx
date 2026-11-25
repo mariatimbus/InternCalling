@@ -14,8 +14,9 @@ export function TailoringEntryPoint({ jobId, title, organization, embedded = fal
     <p className="mt-3 break-words text-sm">{title} · {organization || "Organization not specified"}</p>
     {(embedded || opened) && jobId
       ? <div className="mt-3 space-y-6"><AtsPanel jobId={jobId} />
-        <div className="border-t border-line pt-5"><h3 className="card-title">Review each item yourself</h3>
-          <ResumeTailoringFlow jobId={jobId} service={services.tailoring} /></div></div>
+        <details className="rounded-panel border border-border p-4">
+          <summary className="cursor-pointer text-sm font-medium">Review each CV item yourself</summary>
+          <ResumeTailoringFlow jobId={jobId} service={services.tailoring} /></details></div>
       : !jobId && <p role="status" className="mt-3 text-sm">Choose an opportunity to prepare your resume.</p>}
   </>;
   return embedded ? content : <details className="rounded-panel border border-border p-4"

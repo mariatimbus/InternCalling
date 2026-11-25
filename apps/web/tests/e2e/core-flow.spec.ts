@@ -123,7 +123,10 @@ test("confirmed signup, profile, ranking, filters, save/apply/status/notes and r
   await expect(tailor).toBeInViewport();
   await tailor.focus();
   await page.keyboard.press("Enter");
+  await expect(detail.getByRole("heading", { name: /Your profile|ATS check/ })).toBeVisible();
+  await detail.getByText("Review each CV item yourself", { exact: true }).click();
   await expect(detail.getByRole("button", { name: "Request tailored draft", exact: true })).toBeVisible();
+  await tailor.focus();
   await page.keyboard.press("Enter");
   await expect(detail.getByRole("heading", { name: "Match Score", exact: true })).toBeVisible();
   await expect(detail.getByRole("heading", { name: "Eligibility", exact: true })).toBeVisible();

@@ -75,18 +75,64 @@ def test_text_is_escaped_so_no_input_runs_latex():
     assert "\\item{} [label]" in source  # a leading "[" is never an \item option
 
 
-def test_ats_report_rows_and_added_keywords():
+def test_ats_report_rows_and_added_keywords(monkeypatch):
+    monkeypatch.setattr(content, "_writer", lambda: None)
     candidate, profile = student()
-    report = content.ats_report(candidate, profile, POSTING, ["Kubernetes", "python"])
+    report = content.ats_report(candidate, profile, POSTING, [])
     rows = {r.key: r for r in report.rows}
-    assert rows["keywords"].matched == ["python"]
-    assert rows["keywords"].missing == ["docker", "Kubernetes"]  # added once, not twice
-    assert rows["keywords"].label == "ATS keywords (1/3)"
+    assert (rows["keywords"].matched, rows["keywords"].missing) == (["Python"], ["Docker"])
     assert (rows["experience"].job, rows["experience"].you) == ("2+ years", "1 years")
     assert rows["experience"].status == "partial"
-    assert rows["education"].status == "met"
-    assert rows["title"].status == "met"
-    assert 0 < report.score < 10
+    assert rows["education"].status == rows["title"].status == "met"
+    # Adding a keyword puts it in the CV, so it counts and the score goes up.
+    more = content.ats_report(candidate, profile, POSTING, ["docker", "Kubernetes"])
+    keywords = next(r for r in more.rows if r.key == "keywords")
+    assert keywords.label == "ATS keywords (3/3)" and keywords.missing == []
+    assert more.score > report.score
+
+
+def test_phrases_match_by_their_words():
+    corpus = "Built Python APIs\nFluent in English (C1)"
+    assert content.has_keyword("REST APIs", set(), corpus + " REST")
+    assert content.has_keyword("Fluent English", set(), corpus)
+    assert not content.has_keyword("GraphQL APIs", set(), corpus)
+    assert content.has_keyword("back end", set(), "Backend developer")
+
+
+def test_employer_and_place_are_not_keywords(monkeypatch):
+    class Writer:
+        def generate_json(self, model, system, prompt, schema, temperature=0):
+            return schema(keywords=["NXP", "Sibiu", "Angular"])
+
+    monkeypatch.setattr(content, "_writer", lambda: Writer())
+    content._model_keywords.cache_clear()
+    posting = MatchingOpportunity(
+        title="Web Intern",
+        description="Join NXP in Sibiu to build Angular apps.",
+        location="Sibiu, Romania",
+    )
+    assert content.posting_keywords(posting, "NXP Semiconductors") == ["Angular"]
+    content._model_keywords.cache_clear()
+
+
+def test_model_keywords_must_appear_in_the_posting(monkeypatch):
+    class Writer:
+        def generate_json(self, model, system, prompt, schema, temperature=0):
+            return schema(keywords=["Kubernetes", "teamwork", "Rust", "models", "Backend"])
+
+    monkeypatch.setattr(content, "_writer", lambda: Writer())
+    content._model_keywords.cache_clear()
+    posting = MatchingOpportunity(
+        title="Backend Intern", description="Kubernetes, Python, teamwork and ML models."
+    )
+    # Not in the text (Rust), generic (models) or the job title (Backend) are dropped.
+    assert content.posting_keywords(posting) == [
+        "Kubernetes",
+        "Machine learning",
+        "Python",
+        "Teamwork",
+    ]
+    content._model_keywords.cache_clear()
 
 
 def test_resume_without_a_model_uses_saved_facts(monkeypatch):
@@ -152,13 +198,13 @@ def test_endpoints_need_a_user_and_return_report_and_pdf(client, db_factory, mon
         },
     )
     assert added.status_code == 201, added.text
+    monkeypatch.setattr(content, "_writer", lambda: None)
     report = client.post(url, headers=headers, json={"keywords": ["Excel"]}).json()
     keywords = next(r for r in report["rows"] if r["key"] == "keywords")
-    assert keywords["matched"] == ["python", "sql"] and keywords["missing"] == ["Excel"]
+    assert keywords["matched"] == ["Python", "SQL", "Excel"] and keywords["missing"] == []
     assert client.post(url, headers=headers, json={"keywords": ["x" * 61]}).status_code == 422
 
     sources = []
-    monkeypatch.setattr(content, "_writer", lambda: None)
     monkeypatch.setattr(latex, "compile_pdf", lambda s: sources.append(s) or b"%PDF-1.7 test")
     for kind in ("resume", "cover-letter"):
         response = client.post(f"{BASE}/documents/{job.id}/{kind}", headers=headers, json={})

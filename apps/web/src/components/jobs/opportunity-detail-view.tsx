@@ -276,13 +276,13 @@ export function OpportunityDetailView({ opportunity: job, assessment, status, co
       className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain p-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus sm:p-4">
       <header className="border-b border-line pb-6">
         {(tracking || listing || saveControl) && <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-          {(tracking || listing) && <div className="min-w-0 flex-1">
+          {(tracking || listing) && <div className="min-w-0 flex-1 max-sm:basis-full">
           <ApplicationControls key={`${job.id}:${tracking?.application?.updated_at ?? "new"}`}
             opportunityId={job.id} application={tracking?.application} showSave={tracking?.showSave}
             inline allowTracking={!!tracking}
             tailoring={listing ? <TailoringEntryPoint jobId={job.id} title={job.title} organization={job.organization ?? ""} embedded /> : undefined} />
           </div>}
-          {saveControl && <div className="ml-auto shrink-0">{saveControl}</div>}
+          {saveControl && <div className="ml-auto shrink-0 max-sm:order-first">{saveControl}</div>}
         </div>}
         <div className="grid items-start gap-5 @lg:grid-cols-[minmax(0,1fr)_11rem]">
         <div className="min-w-0">

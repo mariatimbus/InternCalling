@@ -46,3 +46,31 @@ export function documentError(code: string): string {
     : code === "unauthorized" ? "Sign in again to download your documents."
       : "The PDF could not be created. Please try again.";
 }
+
+/** The panel's title and next step for a report. */
+export function atsHeadline(report: AtsReport | null): { title: string; hint: string } {
+  if (!report || report.score === null) return { title: "ATS check", hint: "How an applicant tracking system reads your profile against this job." };
+  const missing = report.rows.find(row => row.key === "keywords")?.missing.length ?? 0;
+  const hint = missing ? "Add the missing keywords you really have to raise your score." : "Your tailored CV covers every keyword this job lists.";
+  const title = report.score >= 8 ? "Your profile is a strong match"
+    : report.score >= 6.5 ? "Your profile is a good match — almost there"
+      : report.score >= 4.5 ? "Your profile is a fair match" : "Your profile is missing key requirements";
+  return { title, hint };
+}
+
+const storageKey = (jobId: string) => `ats-keywords:${jobId}`;
+
+/** Keywords the student added for this job, kept in this browser only. */
+export function loadKeywords(jobId: string): string[] {
+  try {
+    const value = JSON.parse(globalThis.localStorage?.getItem(storageKey(jobId)) ?? "[]");
+    return Array.isArray(value) ? value.filter((k): k is string => typeof k === "string").reduce(addKeyword, [] as string[]) : [];
+  } catch { return []; }
+}
+
+export function saveKeywords(jobId: string, keywords: string[]) {
+  try {
+    if (keywords.length) globalThis.localStorage?.setItem(storageKey(jobId), JSON.stringify(keywords));
+    else globalThis.localStorage?.removeItem(storageKey(jobId));
+  } catch { /* storage blocked: keywords last for this visit */ }
+}
