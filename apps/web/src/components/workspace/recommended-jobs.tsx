@@ -24,7 +24,7 @@ export type RankedOpportunity = {
 function summary({ opportunity: job, match, companyLogoUrl }: RankedOpportunity): JobSummary {
   const card = opportunitySummary(job);
   return { ...card, initials: job.organization?.trim() ? card.initials : "–",
-    companyLogoUrl: companyLogoUrl ?? logoFor("url" in job ? job.company_domain : null),
+    companyLogoUrl: companyLogoUrl ?? logoFor("url" in job ? job.company_domain : null, "source" in job ? job.source : null),
     matchScore: match?.score ?? null, eligibility: match?.eligibility ?? "unknown", matchReason: topReason(match?.reasons) };
 }
 function cardMetadata(job: RankedOpportunity["opportunity"]) {

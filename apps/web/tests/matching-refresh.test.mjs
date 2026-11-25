@@ -6,6 +6,7 @@ import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
+const employers = JSON.parse(await readFile(new URL("../../api/src/opportunity_api/ingestion/sources/employers.json", import.meta.url), "utf8"));
 
 async function load(file, dependencies = {}) {
   const { outputText } = ts.transpileModule(await readFile(new URL(file, import.meta.url), "utf8"), {
@@ -13,6 +14,7 @@ async function load(file, dependencies = {}) {
   });
   const exports = {};
   new Function("require", "exports", outputText)((name) => {
+    if (name.endsWith("/employers.json")) return { default: employers };
     assert.ok(name in dependencies, "Unexpected dependency " + name);
     return dependencies[name];
   }, exports);

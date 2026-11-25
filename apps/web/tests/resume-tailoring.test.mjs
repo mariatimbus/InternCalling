@@ -2,7 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import ts from "typescript";
-async function load(file,deps={}){const {outputText}=ts.transpileModule(await readFile(new URL(file,import.meta.url),"utf8"),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}});const exports={};new Function("require","exports",outputText)(name=>{assert.ok(name in deps,name);return deps[name];},exports);return exports;}
+const employers=JSON.parse(await readFile(new URL("../../api/src/opportunity_api/ingestion/sources/employers.json",import.meta.url),"utf8"));
+async function load(file,deps={}){const {outputText}=ts.transpileModule(await readFile(new URL(file,import.meta.url),"utf8"),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}});const exports={};new Function("require","exports",outputText)(name=>{if(name.endsWith("/employers.json"))return{default:employers};assert.ok(name in deps,name);return deps[name];},exports);return exports;}
 const pdf=await load("../src/lib/resume-pdf.ts"),model=await load("../src/lib/resume-tailoring.ts",{"./resume-pdf":pdf}),preview=await load("../src/lib/resume-tailoring-preview-service.ts",{"./resume-tailoring":model}),controller=await load("../src/lib/resume-tailoring-controller.ts",{"./resume-tailoring":model});
 const {ResumeTailoringController}=controller,signal=()=>new AbortController().signal;
 async function fixture(overrides={}){const service=preview.createTailoringPreviewService({delayMs:0}),c=new ResumeTailoringController("sample-job",{...service,...overrides},true,0);await c.load();await c.generate();assert.equal(c.state.phase,"review");return{service,c};}
