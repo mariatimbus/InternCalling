@@ -127,11 +127,10 @@ test("confirmed signup, profile, ranking, filters, save/apply/status/notes and r
   await page.keyboard.press("Enter");
   await expect(detail.getByRole("heading", { name: "Match Score", exact: true })).toBeVisible();
   await expect(detail.getByRole("heading", { name: "Eligibility", exact: true })).toBeVisible();
-  const scoreBreakdown = detail.locator("details").filter({
-    has: page.getByText("Score breakdown", { exact: true }),
-  });
-  await scoreBreakdown.locator("summary").click();
-  await expect(scoreBreakdown.locator("dd").first()).toContainText(/\d+ points?$/);
+  // The match is explained requirement by requirement: "N of M requirements met",
+  // then one box per requirement with its points.
+  await expect(detail.getByText(/of \d+ requirements met|requirements met/).first()).toBeVisible();
+  await expect(detail.getByText(/^\d+ \/ \d+ pts$/).first()).toBeVisible();
   const eligibilityDetails = detail.locator("details").filter({
     has: page.getByText("Eligibility details", { exact: true }),
   });

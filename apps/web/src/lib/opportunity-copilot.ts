@@ -5,16 +5,17 @@ import { discountNote, isFitReason, isGapReason } from "./match-reasons";
 const scoreComponents = [
   ["skills", "Skills"],
   ["field_fit", "Role fit"],
-  ["interests", "Interests"],
+  ["languages", "Languages"],
+  ["experience", "Experience"],
+  ["eligibility", "Eligibility"],
   ["location", "Location"],
-  ["recency", "Recently posted"],
   ["ai", "AI similarity"],
 ] as const;
 const aiEvaluation = /^AI similarity: (?:0\.\d{2}|1\.00) \(embeddings\)$/;
 
 function explainMatch(match: Match) {
   const reasons = match.reasons ?? [];
-  const aiPoints = match.components?.ai;
+  const aiPoints = match.components?.ai ?? 0;
   const aiEvaluated = aiPoints > 0 || reasons.some((reason) => aiEvaluation.test(reason));
   return {
     score: match.score,
@@ -22,6 +23,7 @@ function explainMatch(match: Match) {
       isFitReason(reason) || (aiPoints > 0 && aiEvaluation.test(reason))),
     gaps: reasons.filter(isGapReason),
     note: discountNote(reasons),
+    requirements: match.requirements ?? [],
     components: scoreComponents.flatMap(([key, label]) => {
       const points = match.components?.[key];
       return Number.isFinite(points) && (key !== "ai" || aiEvaluated) ? [{ label, points }] : [];

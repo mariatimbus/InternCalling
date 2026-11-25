@@ -21,8 +21,15 @@ export type OpportunityPage = { items: Opportunity[]; page: number; page_size: n
 export type Match = {
   score: number;
   eligibility: "eligible" | "possibly_eligible" | "not_eligible" | "unknown";
-  components: { skills: number; field_fit: number; interests: number; location: number; recency?: number; ai: number };
+  components: Partial<Record<"skills" | "field_fit" | "languages" | "experience" | "eligibility" | "location" | "interests" | "recency" | "ai", number>>;
   reasons: string[];
+  requirements?: MatchRequirement[];
+};
+/** One thing the posting asks for, checked against the profile (see the API's matching docs). */
+export type MatchRequirement = {
+  key: "skills" | "field_fit" | "languages" | "experience" | "eligibility" | "location";
+  label: string; status: "met" | "partial" | "missing"; summary: string;
+  matched: string[]; missing: string[]; weight: number; earned: number;
 };
 export type Application = {
   id: string; opportunity_id: string; status: "saved" | "applied" | "interview" | "offer" | "rejected";

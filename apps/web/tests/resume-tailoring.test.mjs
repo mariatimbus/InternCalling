@@ -51,6 +51,7 @@ test("Jobs briefs keep source and detail links independent and place tailoring i
     "@/lib/opportunity-copilot": await load("../src/lib/opportunity-copilot.ts", { "./match-reasons": await load("../src/lib/match-reasons.ts") }),
     "@/components/jobs/tailoring-entry-point": { TailoringEntryPoint: "Entry" },
     "@/components/jobs/opportunity-details": detailUi,
+    "@/components/jobs/match-requirements": { RequirementList: "RequirementList", MatchChips: "MatchChips" },
     "@/lib/job-description": await load("../src/lib/job-description.ts"),
   };
   const detail = await load("../src/components/jobs/opportunity-detail-view.tsx", dependencies);
