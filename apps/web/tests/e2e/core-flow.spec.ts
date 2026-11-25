@@ -118,7 +118,7 @@ test("confirmed signup, profile, ranking, filters, save/apply/status/notes and r
   await page.screenshot({ path: info.outputPath("opportunity-body.png"), style: "nextjs-portal { visibility: hidden }" });
   await detail.getByRole("region", { name: "Opportunity information", exact: true }).evaluate(el => el.scrollTo(0, 0));
   await expect(detail.getByRole("link", { name: /Check the official listing/ })).toHaveCount(0);
-  const tailor = detail.getByRole("button", { name: "Tailor resume", exact: true });
+  const tailor = detail.getByRole("button", { name: "Tailor CV & cover letter", exact: true });
   await expect(detail.getByRole("button", { name: "Status · Not tracked", exact: true })).toBeInViewport();
   await expect(tailor).toBeInViewport();
   await tailor.focus();

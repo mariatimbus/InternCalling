@@ -403,6 +403,28 @@ that is not pending (already decided, or taken off the queue by ingestion) retur
 `409 conflict`. Later ingestion runs keep the decision while the posting's values
 stay the same; a changed posting that still needs review returns to the queue.
 
+## ATS check, tailored CV and cover letter 🔒
+
+Both take `{"keywords": ["Kubernetes", ...]}`: up to 30 extra keywords (1–60 characters each) the
+student wants an ATS to find. They are checked like the posting's own keywords and, in the CV, listed
+under Skills.
+
+### POST /api/v1/workspace/ats/{job_id}
+
+`{score, label, rows}`. `score` is 0–10 (null when the posting states nothing checkable). One row
+each for `title`, `experience`, `education`, `keywords` and `industry`, with `status`
+(`met | partial | missing | not_stated`), what the job asks (`job`), what the profile has (`you`),
+and `matched` / `missing` items. Rows the posting does not state are not scored.
+
+### POST /api/v1/workspace/documents/{job_id}/{kind}
+
+`kind` is `resume` or `cover-letter`. Returns `application/pdf` (attachment) compiled from LaTeX
+with Tectonic. Content comes only from the student's saved profile; when `OLLAMA_API_URL` (with
+`OLLAMA_API_KEY` and `OLLAMA_MODEL`) is set, that model rewrites the summary, bullets and letter
+from those facts, and the API drops any entry or skill it invents. Without a model the saved
+wording and a template letter are used. `503 pdf_renderer_unavailable` when Tectonic cannot be
+fetched or run; `502 pdf_render_failed` when compilation fails.
+
 ## Frozen upcoming contracts
 
 Implemented in a later phase; the shapes below are frozen so B and C can build

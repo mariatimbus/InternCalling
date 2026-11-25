@@ -35,4 +35,7 @@ jobs:
         run: uv run ruff check .
       - name: Pytest
         if: steps.backend.outputs.exists == 'true'
+        # Also compiles the CV and cover letter templates with the pinned Tectonic release.
+        env:
+          APP_TECTONIC_TEST: "1"
         run: uv run pytest

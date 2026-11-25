@@ -56,6 +56,19 @@ class Settings(BaseSettings):
     ollama_timeout: float = Field(
         default=30, ge=1, le=120, validation_alias=AliasChoices("APP_OLLAMA_TIMEOUT")
     )
+    # Model that writes tailored CVs and cover letters (Ollama-compatible API, e.g. Ollama
+    # Cloud with a key). Separate from ollama_url so matching never waits on it.
+    writer_url: str = Field(
+        default="", validation_alias=AliasChoices("OLLAMA_API_URL", "APP_WRITER_URL")
+    )
+    writer_api_key: str = Field(
+        default="", validation_alias=AliasChoices("OLLAMA_API_KEY", "APP_WRITER_API_KEY")
+    )
+    writer_model: str = Field(
+        default="qwen3.5", validation_alias=AliasChoices("OLLAMA_MODEL", "APP_WRITER_MODEL")
+    )
+    # Empty: download the pinned Tectonic release on first use (see documents/latex.py).
+    tectonic_path: str = Field(default="", validation_alias=AliasChoices("APP_TECTONIC_PATH"))
     supabase_publishable_key: str = Field(
         default="", validation_alias=AliasChoices("APP_SUPABASE_PUBLISHABLE_KEY")
     )

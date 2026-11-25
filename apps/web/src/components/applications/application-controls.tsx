@@ -41,7 +41,7 @@ export function ApplicationControls({ opportunityId, application = null, showSav
       {allowTracking && current && <Button variant="secondary" size="sm" aria-expanded={open === "notes"} aria-controls={notesPanelId}
         onClick={() => toggle("notes")}>{current.notes && <Icon name="pencil" className="size-4" />}{current.notes ? "Edit notes" : "Notes"}</Button>}
       {tailoring && <Button variant="secondary" size="sm" aria-expanded={open === "tailor"} aria-controls={tailorPanelId}
-        onClick={() => toggle("tailor")}>Tailor resume</Button>}
+        onClick={() => toggle("tailor")}>Tailor CV & cover letter</Button>}
     </div>}
     {inline && tailoring && <div id={tailorPanelId} hidden={open !== "tailor"} className="mt-3">{tailorOpened && tailoring}</div>}
     {allowTracking && <form action={action} hidden={inline && open !== "status" && open !== "notes"}
