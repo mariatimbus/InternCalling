@@ -266,16 +266,19 @@ export function OpportunityDetailView({ opportunity: job, assessment, status, co
     <div role="region" aria-label="Opportunity information" tabIndex={0}
       className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain p-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus sm:p-4">
       <header className="border-b border-line pb-6">
-        {(tracking || listing) && <div className="mb-4">
+        {(tracking || listing || saveControl) && <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          {(tracking || listing) && <div className="min-w-0 flex-1">
           <ApplicationControls key={`${job.id}:${tracking?.application?.updated_at ?? "new"}`}
             opportunityId={job.id} application={tracking?.application} showSave={tracking?.showSave}
             inline allowTracking={!!tracking}
             tailoring={listing ? <TailoringEntryPoint jobId={job.id} title={job.title} organization={job.organization ?? ""} embedded /> : undefined} />
+          </div>}
+          {saveControl && <div className="ml-auto shrink-0">{saveControl}</div>}
         </div>}
         <div className="grid items-start gap-5 @lg:grid-cols-[minmax(0,1fr)_11rem]">
         <div className="min-w-0">
         <div className="flex items-center gap-3">
-          <CompanyAvatar companyName={company} initials={monogram} logoUrl={companyLogoUrl ?? logoFor(listing?.company_domain)} />
+          <CompanyAvatar companyName={company} initials={monogram} logoUrl={companyLogoUrl ?? logoFor(listing?.company_domain, listing?.source)} />
           <p className="min-w-0 text-sm font-medium text-foreground/90 [overflow-wrap:anywhere]">{company || "Organization not specified"}</p>
         </div>
         <div className="mt-4 flex flex-wrap items-start gap-x-5 gap-y-3">
@@ -340,12 +343,11 @@ export function OpportunityDetailView({ opportunity: job, assessment, status, co
       </aside>
       </div>
     </div>
-    {(officialUrl || saveControl || sourceNotice) && <footer aria-label="Opportunity actions" className="flex shrink-0 flex-wrap items-center gap-2 border-t border-line bg-surface p-3">
+    {(officialUrl || sourceNotice) && <footer aria-label="Opportunity actions" className="flex shrink-0 flex-wrap items-center gap-2 border-t border-line bg-surface p-3">
       {officialUrl && <a href={officialUrl} target="_blank" rel="noopener noreferrer"
         className="inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">
         {listing?.is_active ? "Apply on official site" : "View official listing"} <Icon name="external-link" className="size-4" /><span className="sr-only"> (opens in a new tab)</span>
       </a>}
-      {saveControl}
       {sourceNotice && <p role="status" className="metadata-text">{sourceNotice}</p>}
     </footer>}
   </article>;

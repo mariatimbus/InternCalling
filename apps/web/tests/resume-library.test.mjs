@@ -20,11 +20,11 @@ async function fixture({ state = initial, capabilities = { upload: true, parsing
   const controller = Object.fromEntries(["load", "open", "select", "upload", "clearSelection", "requestDelete", "keepResume", "remove", "cancelUpload"].map(name => [name, (...args) => { calls.push([name, ...args]); return Promise.resolve(); }]));
   const { ResumeLibrary } = await load("../src/components/resumes/resume-library.tsx", {
     react: { useState: () => { const index = slot++; return [values[index], value => { values[index] = typeof value === "function" ? value(values[index]) : value; }]; }, useRef: () => ({ current: ref++ === 0 ? controller : null }), useMemo: fn => fn(), useEffect() {}, useCallback: fn => fn },
-    "react/jsx-runtime": runtime, "next/navigation": { useRouter: () => ({ refresh() {} }) },
-    "@/lib/profile-services": { createProfileServices: () => ({ pdf: {}, review: {} }) },
+    "react/jsx-runtime": runtime,
+    "@/lib/profile-services": { createProfileServices: () => ({ pdf: {} }) },
     "@/lib/resume-pdf-controller": { ResumePdfController: class {}, initialResumePdfState: () => initial },
     "@/lib/resume-pdf": model, "@/components/ui/button": { Button: "Button" }, "@/components/ui/icon": { Icon: "Icon" },
-    "@/components/ui/badge": { Badge: "Badge" }, "@/components/profile/resume-review-flow": { ResumeReviewFlow: "ReviewFlow" },
+    "@/components/ui/badge": { Badge: "Badge" },
   });
   const render = () => { slot = 0; ref = 0; return ResumeLibrary({}); };
   const button = (tree, name) => nodes(tree).find(n => n.type === "Button" && text(n) === name);
@@ -48,6 +48,13 @@ test("saved library renders actual metadata and delegates private file actions",
   assert.equal(nodes(tree).some(n => n.type === "input" && n.props.type === "file"), false);
   f.button(tree, "View PDF").props.onClick(); f.button(tree, "Download PDF").props.onClick();
   assert.deepEqual(f.calls, [["open", "view"], ["open", "download"]]);
+});
+
+test("Resumes omits the profile import card even when parsing is available", async () => {
+  const f = await fixture({ state: { ...initial, confirmed: metadata }, capabilities: { upload: true, parsing: true } });
+  const tree = f.render();
+  assert.doesNotMatch(text(tree), /Import details into your profile|Review proposed profile information|Start review/);
+  assert.ok(!nodes(tree).some(n => n.type === "ReviewFlow"));
 });
 
 test("Add resume opens the inline PDF picker; unavailable status never becomes an empty library", async () => {

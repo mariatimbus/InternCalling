@@ -6,6 +6,7 @@ import { JobCard, type JobSummary } from "@/components/jobs/job-card";
 import { Badge } from "@/components/ui/badge";
 import { Drawer } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icon";
 import { opportunitySummary } from "@/lib/opportunities";
 import { degreeLabels, safeJobSource, studyYears } from "@/components/jobs/opportunity-details";
 import { OpportunityDetailView, opportunityDisplayDate } from "@/components/jobs/opportunity-detail-view";
@@ -23,7 +24,7 @@ export type RankedOpportunity = {
 function summary({ opportunity: job, match, companyLogoUrl }: RankedOpportunity): JobSummary {
   const card = opportunitySummary(job);
   return { ...card, initials: job.organization?.trim() ? card.initials : "–",
-    companyLogoUrl: companyLogoUrl ?? logoFor("url" in job ? job.company_domain : null),
+    companyLogoUrl: companyLogoUrl ?? logoFor("url" in job ? job.company_domain : null, "source" in job ? job.source : null),
     matchScore: match?.score ?? null, eligibility: match?.eligibility ?? "unknown", matchReason: topReason(match?.reasons) };
 }
 function cardMetadata(job: RankedOpportunity["opportunity"]) {
@@ -70,21 +71,23 @@ function useOpportunitySave(saveAction?: SaveAction, applications?: Application[
   return { stateFor, submit };
 }
 
-function SaveControl({ title, status, state, onSave }: {
+function SaveControl({ title, status, state, onSave, prominent = false }: {
   title: string;
   status?: Application["status"];
   state?: SaveState;
   onSave?: () => void;
+  prominent?: boolean;
 }) {
   const pending = state === "pending";
   const result = pending ? undefined : state;
   const tracked = status ?? (result && "status" in result ? result.status : undefined);
-  if (tracked) return <span role="status"><Badge className="capitalize">{tracked}</Badge></span>;
+  if (tracked) return <span role="status"><Badge className={prominent ? "min-h-11 gap-2 px-3 text-sm capitalize" : "capitalize"}>{prominent && tracked === "saved" ? <><Icon name="bookmark" className="size-5 fill-current stroke-0" />{tracked}</> : tracked}</Badge></span>;
   if (!onSave) return null;
   const error = result && "error" in result ? result.error : undefined;
 
   return <div className="relative z-10 flex flex-col items-end gap-1 text-right">
-    <Button variant="secondary" size="sm" disabled={pending} onClick={onSave} aria-label={`${pending ? "Saving" : error ? "Retry save for" : "Save"} ${title}`}>
+    <Button variant="secondary" size={prominent ? "md" : "sm"} className={prominent ? "min-h-12 gap-2 px-4 text-base" : undefined} disabled={pending} onClick={onSave} aria-label={`${pending ? "Saving" : error ? "Retry save for" : "Save"} ${title}`}>
+      {prominent && <Icon name="bookmark" className="size-5 fill-current stroke-0" />}
       {pending ? "Saving…" : error ? "Retry save" : "Save"}
     </Button>
     {error && <p role="alert" className="max-w-48 text-xs text-muted">{error}</p>}
@@ -98,7 +101,7 @@ export function StandaloneOpportunitySave({ id, title, status, saveAction }: {
   saveAction?: SaveAction;
 }) {
   const { stateFor, submit } = useOpportunitySave(saveAction);
-  return <SaveControl title={title} status={status} state={stateFor(id)} onSave={saveAction ? () => submit(id) : undefined} />;
+  return <SaveControl title={title} status={status} state={stateFor(id)} onSave={saveAction ? () => submit(id) : undefined} prominent />;
 }
 
 const subscribeHydration = () => () => {};
@@ -166,10 +169,10 @@ export function RecommendedJobs({ items, applications = emptyApplications, label
   }, [currentId, loadAssessment]);
 
   if (!current) return null;
-  function saveControl(item: RankedOpportunity) {
+  function saveControl(item: RankedOpportunity, prominent = false) {
     const { id, title } = item.opportunity;
     const onSave = saveAction ? () => submit(id) : undefined;
-    return item.status || onSave ? <SaveControl title={title} status={item.status} state={stateFor(id)} onSave={onSave} /> : undefined;
+    return item.status || onSave ? <SaveControl title={title} status={item.status} state={stateFor(id)} onSave={onSave} prominent={prominent} /> : undefined;
   }
   const assessment = resolved?.id === current.opportunity.id ? resolved.value : null;
   const application = applications.find((item) => item.opportunity_id === current.opportunity.id);
@@ -178,7 +181,7 @@ export function RecommendedJobs({ items, applications = emptyApplications, label
     catalogStatus={summaryId ? selectedCatalog ? selectedCatalog.opportunity ? "loaded" : "failed" : "loading" : undefined}
     status={current.status} copilotEnabled={copilotEnabled}
     profileSkills={profileSkills}
-    companyLogoUrl={current.companyLogoUrl} detailContext={detailContext} assessment={assessment} saveControl={saveControl(current)}
+    companyLogoUrl={current.companyLogoUrl} detailContext={detailContext} assessment={assessment} saveControl={saveControl(current, true)}
     tracking={{ application: application ?? null, showSave: !saveAction }} />;
   return <>
     <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">

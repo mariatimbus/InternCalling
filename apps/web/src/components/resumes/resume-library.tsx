@@ -1,11 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { createProfileServices, type WorkspaceCapabilities } from "@/lib/profile-services";
 import { ResumePdfController, initialResumePdfState } from "@/lib/resume-pdf-controller";
 import { resumeFileSize } from "@/lib/resume-pdf";
-import { ResumeReviewFlow } from "@/components/profile/resume-review-flow";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Icon } from "@/components/ui/icon";
@@ -16,7 +14,6 @@ function resumeDate(value: string) {
 
 /** Manages the existing private PDF; the controller owns mutations and access lifetimes. */
 export function ResumeLibrary() {
-  const router = useRouter();
   const services = useMemo(() => createProfileServices(), []);
   const [state, setState] = useState(() => initialResumePdfState(true));
   const [capabilities, setCapabilities] = useState<WorkspaceCapabilities | null>();
@@ -48,7 +45,6 @@ export function ResumeLibrary() {
   const mutationDisabled = !known || busy || state.deleting;
   function openUpload() { menu.current?.removeAttribute("open"); setUploadOpen(true); }
   function act(action: () => void) { menu.current?.removeAttribute("open"); action(); }
-  const source = known && saved && !state.selected && !busy && !state.deleting ? { id: saved.id, revision: saved.revision } : null;
 
   return <>
     <header className="mb-7 flex flex-wrap items-start justify-between gap-4">
@@ -127,9 +123,5 @@ export function ResumeLibrary() {
     {state.error && <p role="alert" className="mt-4 rounded-control border border-danger-border bg-danger-surface p-4 text-sm text-danger-foreground">{state.error}</p>}
     {state.notice && <p role="status" className="mt-4 text-sm">{state.notice}</p>}
     {known && capabilities !== undefined && !capabilities?.upload && <p className="mt-4 text-sm text-muted">PDF uploads are currently unavailable.</p>}
-    {source && capabilities?.parsing && <details className="mt-6 border-t border-line pt-3">
-      <summary className="inline-flex min-h-11 cursor-pointer items-center rounded-control text-sm font-medium text-accent">Import details into your profile</summary>
-      <ResumeReviewFlow key={`${source.id}:${source.revision}`} service={services.review} source={source} onConfirmed={() => router.refresh()} />
-    </details>}
   </>;
 }

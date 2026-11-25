@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 import ts from "typescript";
+const employers = JSON.parse(await readFile(new URL("../../api/src/opportunity_api/ingestion/sources/employers.json", import.meta.url), "utf8"));
 
 async function load(file, dependencies = {}) {
   const { outputText } = ts.transpileModule(await readFile(new URL(file, import.meta.url), "utf8"), {
@@ -9,6 +10,7 @@ async function load(file, dependencies = {}) {
   });
   const exports = {};
   new Function("require", "exports", outputText)((name) => {
+    if (name.endsWith("/employers.json")) return { default: employers };
     assert.ok(name in dependencies, "Unexpected dependency " + name);
     return dependencies[name];
   }, exports);
@@ -444,6 +446,8 @@ test("the card shows pending, blocks repeated clicks, and only displays the conf
       : tree.find((node) => node.type === "JobCard").props.action;
     return nodes(control.type(control.props));
   };
+  assert.equal(render(true).find((node) => node.type === "Button").props.size, "md");
+  assert.equal(render(true).find((node) => node.type === "Icon").props.name, "bookmark");
   const firstClick = render().find((node) => node.type === "Button").props.onClick;
   transition = firstClick();
   await render(true).find((node) => node.type === "Button").props.onClick();
@@ -705,6 +709,12 @@ test("the footer is the only official link with Copilot on or off, including ful
   assert.equal(queryOf(tab(full, "Back to Jobs").props.href).view, "saved");
 });
 
+test("detail Save appears in the header while the official link stays in the footer", () => {
+  const tree = nodes(detailView.OpportunityDetailView({ opportunity, assessment: null, saveControl: jsx("SaveMarker", {}) }));
+  assert.ok(nodes(tree.find((node) => node.type === "header")).some((node) => node.type === "SaveMarker"));
+  assert.ok(!nodes(tree.find((node) => node.type === "footer")).some((node) => node.type === "SaveMarker"));
+});
+
 test("the detail overview preserves a zero match and distinguishes unavailable from loading", () => {
   const overview = (assessment) => {
     const tree = nodes(detailView.OpportunityDetailView({ opportunity: { ...opportunity, skills: [] }, assessment, standalone: true }));
@@ -768,7 +778,7 @@ test("a late catalog response never replaces the selected Saved or Applied listi
     "@/lib/company-logo": await load("../src/lib/company-logo.ts"), "@/lib/match-reasons": await load("../src/lib/match-reasons.ts"),
     "react/jsx-runtime": runtime, "@/lib/opportunities": { opportunitySummary: (job) => ({ id: job.id }) },
     "@/components/jobs/job-card": { JobCard: "JobCard" }, "@/components/ui/badge": { Badge: "Badge" },
-    "@/components/ui/drawer": { Drawer: "Drawer" }, "@/components/ui/button": { Button: "Button" },
+    "@/components/ui/drawer": { Drawer: "Drawer" }, "@/components/ui/button": { Button: "Button" }, "@/components/ui/icon": { Icon: "Icon" },
     "@/components/jobs/opportunity-details": detailUi, "@/components/jobs/opportunity-detail-view": detailView,
   });
   const second = { ...opportunity, id: "00000000-0000-4000-8000-000000000002", url: "https://example.invalid/second" };
@@ -1046,7 +1056,7 @@ test("switching cards scopes both Copilot surfaces and ignores the earlier in-fl
     "@/lib/company-logo": await load("../src/lib/company-logo.ts"), "@/lib/match-reasons": await load("../src/lib/match-reasons.ts"), "react/jsx-runtime": runtime, "@/lib/opportunities": { opportunitySummary: (job) => ({ id: job.id }) },
     "@/components/applications/application-controls": { ApplicationControls: "ApplicationControls" },
     "@/components/jobs/job-card": { JobCard: "JobCard" }, "@/components/ui/badge": { Badge: "Badge" },
-    "@/components/ui/drawer": { Drawer: "Drawer" }, "@/components/ui/button": { Button: "Button" },
+    "@/components/ui/drawer": { Drawer: "Drawer" }, "@/components/ui/button": { Button: "Button" }, "@/components/ui/icon": { Icon: "Icon" },
     "@/components/jobs/opportunity-details": detailUi, "@/components/jobs/opportunity-detail-view": detailView,
   });
   const second = { ...opportunity, id: "00000000-0000-4000-8000-000000000002", title: "Second role" };
