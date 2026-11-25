@@ -84,3 +84,30 @@ test("proxy bounds upstream responses before returning a private body",async()=>
   const result = await workspaceProxy(proxyRequest("workspace/snapshot"),["workspace","snapshot"],deps(async()=>new Response("private",{headers:{"Content-Type":"application/json","Content-Length":String(16*1024*1024+1)}})));
   assert.equal(result.status,502);assert.doesNotMatch(await result.text(),/private/);
 });
+
+test("ATS check and tailored PDFs go through the proxy; other document kinds do not", async () => {
+  const { addKeyword, checkAts, tailoredPdf, documentError } = load(new URL("../src/lib/ats.ts", import.meta.url));
+  assert.deepEqual(addKeyword(["Python"], "  python "), ["Python"]);
+  assert.deepEqual(addKeyword(["Python"], " Kubernetes  Engine "), ["Python", "Kubernetes Engine"]);
+  assert.deepEqual(addKeyword([], "x".repeat(61)), []);
+  assert.deepEqual(addKeyword(Array.from({ length: 30 }, (_, i) => "k" + i), "one more").length, 30);
+  let sent;
+  const report = await checkAts(uuid, ["Excel"], async (url, init) => { sent = { url, init }; return response({ score: 5, label: "Fair match", rows: [] }); });
+  assert.equal(sent.url, `/api/backend/workspace/ats/${uuid}`);
+  assert.deepEqual(JSON.parse(sent.init.body), { keywords: ["Excel"] });
+  assert.equal(report.score, 5);
+  await assert.rejects(tailoredPdf(uuid, "resume", [], async () => Response.json({ error: { code: "pdf_renderer_unavailable" } }, { status: 503 })), /pdf_renderer_unavailable/);
+  assert.match(documentError("pdf_renderer_unavailable"), /starting up/);
+
+  let upstream;
+  const pdf = async (url) => { upstream = url; return new Response("%PDF-1.7", { headers: { "Content-Type": "application/pdf" } }); };
+  for (const kind of ["resume", "cover-letter"]) {
+    const path = ["workspace", "documents", uuid, kind];
+    const result = await workspaceProxy(proxyRequest(path.join("/"), "POST", { Origin: origin, "Content-Type": "application/json" }, "{}"), path, deps(pdf));
+    assert.equal(result.status, 200);
+    assert.equal(upstream.href, `https://api.example/api/v1/${path.join("/")}`);
+    assert.equal(result.headers.get("content-disposition"), `inline; filename="${kind}.pdf"`);
+  }
+  const essay = ["workspace", "documents", uuid, "essay"];
+  assert.equal((await workspaceProxy(proxyRequest(essay.join("/"), "POST", { Origin: origin, "Content-Type": "application/json" }, "{}"), essay, deps(pdf))).status, 404);
+});
