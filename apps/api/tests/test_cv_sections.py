@@ -159,3 +159,54 @@ def test_project_subtitles_single_dates_and_unknown_headings():
         {"name": "Romanian", "cefr": "", "native": True},
         {"name": "English", "cefr": "C2", "native": False},
     ]
+
+
+def test_split_experience_lines_keep_role_company_and_dates_together():
+    text = "Experience\nSoftware Engineer Intern\nAcme Labs\nJun 2025 - Sep 2025\n"
+    assert by_section(text)["experience"] == [
+        {
+            "role": "Software Engineer Intern",
+            "organization": "Acme Labs",
+            "location": "",
+            "startDate": "2025-06",
+            "endDate": "2025-09",
+            "current": False,
+            "achievements": "",
+        }
+    ]
+
+
+def test_project_label_does_not_become_part_of_title():
+    assert (
+        by_section("Projects\nProject: Chess Engine\n- Built in C++\n")["projects"][0]["name"]
+        == "Chess Engine"
+    )
+
+
+def test_certificate_issuer_on_next_line_is_retained():
+    text = "Certifications\nCertificate: Cloud Practitioner\nIssuer: Acme Academy\nIssued: 2024\n"
+    assert by_section(text)["certificates"] == [
+        {
+            "name": "Cloud Practitioner",
+            "organization": "Acme Academy",
+            "issueDate": "2024",
+        }
+    ]
+
+
+def test_native_before_language_is_not_lost():
+    assert by_section("Languages\nNative Romanian, English C2\n")["languages"] == [
+        {"name": "Romanian", "cefr": "", "native": True},
+        {"name": "English", "cefr": "C2", "native": False},
+    ]
+
+
+def test_publication_venue_on_next_line_is_not_a_second_paper():
+    text = "Publications\nReliable Robots\nJournal of Robotics | 2024\n"
+    assert by_section(text)["publications"] == [
+        {
+            "title": "Reliable Robots",
+            "publisher": "Journal of Robotics",
+            "publicationDate": "2024",
+        }
+    ]

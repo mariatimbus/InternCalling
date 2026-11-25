@@ -62,6 +62,13 @@ def test_ordinary_lowercase_mentions_still_count():
     assert rules.extract(text, CATALOG).values_for("skills") == ["docker", "python"]
 
 
+def test_explicit_skill_list_is_recognized_without_catalog_entries():
+    text = "Fixture University\nBachelor student\nSkills\nKubernetes, Terraform\n"
+    result = rules.extract(text, [])
+    assert result.values_for("skills") == ["Kubernetes", "Terraform"]
+    quoted_in(result, text)
+
+
 def test_romanian_cv_prefers_master_and_explicit_graduation():
     result = rules.extract(ROMANIAN, CATALOG)
     assert result.degree_level.value == "master"
