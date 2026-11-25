@@ -199,7 +199,25 @@ def _range(dates) -> tuple[str, str, bool]:
 
 def experience(lines: list[str]) -> list[dict]:
     found = []
-    for block in _blocks(lines):
+    joined = []
+    index = 0
+    while index < len(lines):
+        if (
+            index + 2 < len(lines)
+            and ROLE_WORDS.search(lines[index])
+            and re.search(
+                r"\b(?:labs?|inc|ltd|srl|university|corp|company|studio|group)\b",
+                lines[index + 1],
+                re.I,
+            )
+            and DATE_RANGE.fullmatch(lines[index + 2])
+        ):
+            joined.append(f"{lines[index]} | {lines[index + 1]} {lines[index + 2]}")
+            index += 3
+        else:
+            joined.append(lines[index])
+            index += 1
+    for block in _blocks(joined):
         parts = _parts(block["head"], STRONG_SEPARATOR)
         if len(parts) < 2:
             parts = _parts(block["head"])
@@ -271,9 +289,10 @@ def projects(lines: list[str], skills: list[str] = ()) -> list[dict]:
                 body.append(line)
         # Only skills the CV itself lists, when the project text names them.
         tech += _mentioned(list(skills), " ".join([parts[0], *body]))
+        name = re.sub(r"^(?:project|proiect):\s*", "", parts[0], flags=re.I)
         found.append(
             {
-                "name": parts[0][:255],
+                "name": name[:255],
                 "role": role[:255],
                 "description": "\n".join(body)[:5000],
                 "technologies": list(dict.fromkeys(t[:100] for t in tech))[:30],
@@ -291,6 +310,8 @@ def languages(lines: list[str]) -> list[dict]:
         # "Romanian: Native English: C2": each language owns the text up to the next one.
         starts = [m.start() for m in LANGUAGE.finditer(line)] or [0]
         pieces = [line[a:b] for a, b in zip(starts, starts[1:] + [len(line)], strict=True)]
+        if starts[0] and NATIVE.search(line[: starts[0]]):
+            pieces[0] = line[: starts[0]] + pieces[0]
         for chunk in (c for piece in pieces for c in re.split(r"[,;•|]|\s{2,}", piece)):
             match = LANGUAGE.search(chunk)
             if not match or match[1].casefold() in seen:
@@ -337,7 +358,28 @@ def _when(text: str) -> tuple[str, str]:
 
 def certificates(lines: list[str], *, labelled_only: bool = False) -> list[dict]:
     found = []
-    for label, item in _items(lines):
+    joined = []
+    index = 0
+    while index < len(lines):
+        title = re.match(r"^Certificate:\s*(.+)$", lines[index], re.I)
+        issuer = (
+            re.match(r"^(?:Issuer|Issued by):\s*(.+)$", lines[index + 1], re.I)
+            if index + 1 < len(lines)
+            else None
+        )
+        if title and issuer:
+            issued = (
+                re.match(r"^(?:Issued|Date):\s*(.+)$", lines[index + 2], re.I)
+                if index + 2 < len(lines)
+                else None
+            )
+            date = f" ({issued[1]})" if issued else ""
+            joined.append(f"Certificate: {title[1]} | {issuer[1]}{date}")
+            index += 3 if issued else 2
+        else:
+            joined.append(lines[index])
+            index += 1
+    for label, item in _items(joined):
         if (label or labelled_only) and "cert" not in label:
             continue
         item = IN_PROGRESS.sub("", item)  # still in progress: no issue date yet
@@ -373,7 +415,24 @@ def honours(lines: list[str]) -> list[dict]:
 
 def publications(lines: list[str]) -> list[dict]:
     found = []
-    for _, item in _items(lines):
+    joined = []
+    index = 0
+    while index < len(lines):
+        if (
+            index + 1 < len(lines)
+            and not YEAR.search(lines[index])
+            and re.match(
+                r"^(?:Journal|Proceedings|Conference|Transactions)\s+(?:of|on|in)\b",
+                lines[index + 1],
+                re.I,
+            )
+        ):
+            joined.append(lines[index] + " | " + lines[index + 1])
+            index += 2
+        else:
+            joined.append(lines[index])
+            index += 1
+    for _, item in _items(joined):
         title, when = _when(item)
         parts = _parts(title, STRONG_SEPARATOR)
         if parts:

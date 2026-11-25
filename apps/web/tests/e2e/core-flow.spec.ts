@@ -19,10 +19,20 @@ async function signUp(page: Page, email: string) {
 }
 async function onboard(page: Page) {
   await expect(page).toHaveURL(/\/onboarding/);
+  await page.getByRole("button", { name: "Continue without CV", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Studies", exact: true })).toBeVisible();
   await page.getByLabel("Bachelor's", { exact: true }).check();
   for (const [label, value] of [["University", "Fixture University"], ["Field of study", "Computer Science"],
-    ["Graduation year", "2027"], ["City", "Berlin, Germany"]]) await page.getByLabel(label, { exact: true }).fill(value);
-  await page.getByRole("button", { name: "Show my internships", exact: true }).click();
+    ["Graduation year", "2027"], ["City (optional)", "Berlin, Germany"]]) await page.getByLabel(label, { exact: true }).fill(value);
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Skills", exact: true })).toBeVisible();
+  await page.getByLabel("Skills", { exact: true }).fill("Python");
+  await page.getByRole("button", { name: "Add skill", exact: true }).click();
+  for (const title of ["Experience", "Personal projects", "Certifications", "Awards", "Languages", "Publications"]) {
+    await page.getByRole("button", { name: "Next", exact: true }).click();
+    await expect(page.getByRole("heading", { name: title, exact: true })).toBeVisible();
+  }
+  await page.getByRole("button", { name: "Finish and see jobs", exact: true }).click();
   await expect(page).toHaveURL(/\/jobs/);
 }
 
