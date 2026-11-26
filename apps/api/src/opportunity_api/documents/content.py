@@ -424,6 +424,22 @@ def _plural(count: float, word: str) -> str:
     return f"{count:g} {word}{'' if count == 1 else 's'}"
 
 
+_GENERIC_TITLE = {
+    "intern",
+    "internship",
+    "student",
+    "working",
+    "trainee",
+    "junior",
+    "m/f/d",
+    "f/m/d",
+}
+
+
+def _title_words(title: str) -> set[str]:
+    return {w for w in _words(title) - _FILLER - _GENERIC_TITLE if not w.isdigit()}
+
+
 def _years_text(years: float, work: list[Entry], activities: list[Entry]) -> str:
     """Industry years only; research and activities are named, not counted."""
     roles = sum(1 for e in work if _month(e.start) is not None)
@@ -449,14 +465,16 @@ def ats_report(
     rows: list[AtsRow] = []
 
     field_fit = checks.get("field_fit")
-    # The saved role closest to this job, else the headline.
-    title_words = _words(opportunity.title) - _FILLER
+    title_words = _title_words(opportunity.title)
+    # An ATS compares job titles: the student's role whose title shares words with this
+    # one (not words like "intern" or a year), else their headline or what they study.
     roles = [e for e in candidate.experience + candidate.activities + candidate.projects if e.title]
-    best = max(roles, key=lambda e: len(_words(e.text()) & title_words), default=None)
-    if best and _words(best.text()) & title_words:
+    best = max(roles, key=lambda e: len(_title_words(e.title) & title_words), default=None)
+    if best and _title_words(best.title) & title_words:
         you_title = f"{best.title} · {best.subtitle}" if best.subtitle else best.title
     else:
-        you_title = candidate.headline or (roles[0].title if roles else "Not in profile")
+        study = candidate.education.split(" · ")[-1] if candidate.education else ""
+        you_title = candidate.headline or (f"{study} student" if study else "Not in profile")
     rows.append(
         AtsRow(
             key="title",
