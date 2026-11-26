@@ -6,6 +6,7 @@ itself lives in ``requirements.py``.
 """
 
 import re
+from functools import lru_cache
 
 from opportunity_api.schemas.matching import MatchingOpportunity, MatchingProfile
 
@@ -80,6 +81,7 @@ def canonical(skill: str) -> str:
     return SYNONYMS.get(key, key)
 
 
+@lru_cache(maxsize=4096)
 def _pattern(term: str) -> re.Pattern[str]:
     if term in CASE_SENSITIVE:
         # "C-level", "R&D" and "Go-to-market" are not skills.
@@ -95,20 +97,36 @@ def _text(opportunity: MatchingOpportunity) -> str:
     return "\n".join([opportunity.title, opportunity.description or ""])
 
 
+@lru_cache(maxsize=4096)
+def _needles(term: str) -> tuple[str, ...]:
+    """Lower-case first word of every spelling: a term whose needles are all absent
+    from a text cannot match it, so its regex is skipped."""
+    if term in CASE_SENSITIVE:
+        return (CASE_SENSITIVE[term].lower(),)
+    spellings = [term, *(alias for alias, name in SYNONYMS.items() if name == term)]
+    return tuple({s.split()[0].lower() for s in spellings if s.split()})
+
+
 def posting_skills(opportunity: MatchingOpportunity, extra: set[str] = frozenset()) -> list[str]:
     """Skills the posting asks for: its structured skills, then technologies its text names."""
-    text = _text(opportunity)
-    found = [canonical(s) for s in opportunity.skills]
+    # Cached: every recommendation request scores the same postings again.
+    return list(_posting_skills(_text(opportunity), tuple(opportunity.skills), frozenset(extra)))
+
+
+@lru_cache(maxsize=8192)
+def _posting_skills(text: str, skills: tuple[str, ...], extra: frozenset[str]) -> tuple[str, ...]:
+    found = [canonical(s) for s in skills]
+    lowered = text.lower()
     covered: list[tuple[int, int]] = []  # "Tailwind CSS" is one skill, not also "CSS"
     for term in sorted(set(VOCABULARY) | extra, key=lambda t: (-len(t), t)):
+        if not any(needle in lowered for needle in _needles(term)):
+            continue
         spans = [m.span() for m in _pattern(term).finditer(text)]
         free = [(a, b) for a, b in spans if not any(c <= a and b <= d for c, d in covered)]
         covered += spans
         if free and term not in found:
             found.append(term)
-    return list(
-        dict.fromkeys(found[: len(opportunity.skills)] + sorted(found[len(opportunity.skills) :]))
-    )
+    return tuple(dict.fromkeys(found[: len(skills)] + sorted(found[len(skills) :])))
 
 
 def _domains(text: str) -> set[str]:

@@ -123,6 +123,7 @@ export function RecommendedJobs({ items, applications = emptyApplications, label
   const hydrated = useSyncExternalStore(subscribeHydration, () => true, () => false);
   const [selected, setSelected] = useState(items[0]?.opportunity.id);
   const [open, setOpen] = useState(false);
+  const [panelClosed, setPanelClosed] = useState(false);
   const { stateFor, submit } = useOpportunitySave(saveAction, applications);
   const current = items.find((item) => item.opportunity.id === selected) ?? items[0];
   const currentId = current?.opportunity.id;
@@ -178,14 +179,14 @@ export function RecommendedJobs({ items, applications = emptyApplications, label
   const assessment = resolved?.id === current.opportunity.id ? resolved.value : null;
   const application = applications.find((item) => item.opportunity_id === current.opportunity.id);
   const selectedCatalog = summaryId && catalog?.id === summaryId ? catalog : undefined;
-  const detail = <OpportunityDetailView opportunity={selectedCatalog?.opportunity ?? current.opportunity}
+  const detail = (onClose?: () => void) => <OpportunityDetailView onClose={onClose} opportunity={selectedCatalog?.opportunity ?? current.opportunity}
     catalogStatus={summaryId ? selectedCatalog ? selectedCatalog.opportunity ? "loaded" : "failed" : "loading" : undefined}
     status={current.status} copilotEnabled={copilotEnabled}
     profileSkills={profileSkills}
     companyLogoUrl={current.companyLogoUrl} detailContext={detailContext} assessment={assessment} saveControl={saveControl(current, true)}
     tracking={{ application: application ?? null, showSave: !saveAction }} />;
   return <>
-    <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+    <div className={`grid items-start gap-6 ${panelClosed ? "" : "xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]"}`}>
       <div className="min-w-0 space-y-3" aria-label={label}>
         {children}
         <h2 className="sr-only">{label}</h2>
@@ -194,21 +195,21 @@ export function RecommendedJobs({ items, applications = emptyApplications, label
           job={summary(item)}
           density="compact"
           disabled={!hydrated}
-          selected={current.opportunity.id === item.opportunity.id}
+          selected={!panelClosed && current.opportunity.id === item.opportunity.id}
           showMatch={"url" in item.opportunity}
           metadata={cardMetadata(item.opportunity)}
           officialUrl={"url" in item.opportunity ? safeJobSource(item.opportunity.url) : null}
-          onSelect={() => { setSelected(item.opportunity.id); setOpen(true); }}
+          onSelect={() => { setSelected(item.opportunity.id); setOpen(true); setPanelClosed(false); }}
           action={saveControl(item)}
         />)}
         {listFooter}
       </div>
-      <div ref={desktopPanel} className="sticky top-6 hidden h-[calc(100dvh-10rem)] flex-col overflow-hidden rounded-panel border border-line bg-surface xl:flex" aria-label="Selected opportunity">
-        {detail}
+      <div ref={desktopPanel} className={`sticky top-6 hidden h-[calc(100dvh-10rem)] flex-col overflow-hidden rounded-panel border border-line bg-surface ${panelClosed ? "" : "xl:flex"}`} aria-label="Selected opportunity">
+        {!panelClosed && detail(() => setPanelClosed(true))}
       </div>
     </div>
     <Drawer open={open} onClose={() => setOpen(false)} title="Opportunity details" size="detail" closeAt="(min-width: 1280px)">
-      {detail}
+      {detail()}
     </Drawer>
   </>;
 }

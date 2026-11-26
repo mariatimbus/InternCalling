@@ -28,6 +28,7 @@ What is read from the posting, and what is looked for in the profile:
 
 import re
 from dataclasses import dataclass, field
+from functools import lru_cache
 
 from opportunity_api.eligibility.text import graduation_years
 from opportunity_api.schemas.eligibility import EligibilityStatus, RuleResult
@@ -227,7 +228,11 @@ def posting_language(text: str) -> str | None:
 
 def required_languages(opportunity: MatchingOpportunity) -> dict[str, tuple[str, bool]]:
     """{language: (minimum CEFR, stated explicitly)} the posting requires."""
-    text = _text(opportunity)
+    return dict(_required_languages(_text(opportunity), opportunity.description or ""))
+
+
+@lru_cache(maxsize=4096)
+def _required_languages(text: str, description: str) -> tuple[tuple[str, tuple[str, bool]], ...]:
     found: dict[str, tuple[str, bool]] = {}
     for match in _LANG.finditer(text):
         # Only the sentence that names the language: "French is a plus." must not make
@@ -260,10 +265,10 @@ def required_languages(opportunity: MatchingOpportunity) -> dict[str, tuple[str,
         level = level or "B2"
         if name not in found or CEFR.index(level) > CEFR.index(found[name][0]):
             found[name] = (level, True)
-    written = posting_language(opportunity.description or "")
+    written = posting_language(description)
     if written and written not in found:
         found[written] = ("B2", False)  # you will work in the language the posting uses
-    return found
+    return tuple(found.items())
 
 
 def _level(skill) -> int:
