@@ -310,3 +310,22 @@ def test_research_and_activities_are_not_industry_years(monkeypatch):
     assert doc["activities"][0]["bullets"] == ["Led 15 students"]
     source = latex.resume_source(doc)
     assert "Research}" in source and "Leadership \\& Activities" in source
+
+
+def test_title_row_never_shows_an_unrelated_activity(monkeypatch):
+    monkeypatch.setattr(content, "_writer", lambda: None)
+    candidate, profile = student()
+    candidate.experience = []
+    candidate.activities = [
+        Entry(
+            id="a",
+            kind="extracurricular",
+            title="Web & Communications Member",
+            lines=["Engineering team website"],
+        )
+    ]
+    job = MatchingOpportunity(title="ICEYE Engineering Intern Lab 2027")
+    title = next(
+        r for r in content.ats_report(candidate, profile, job, []).rows if r.key == "title"
+    )
+    assert title.you == "Computer Science student"  # "intern" and "2027" are not shared words

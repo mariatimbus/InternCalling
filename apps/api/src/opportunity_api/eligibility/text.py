@@ -7,6 +7,7 @@
 
 import re
 from datetime import date
+from functools import lru_cache
 
 _YEAR = r"(20[2-4]\d)"
 _RANGE = rf"{_YEAR}(?:\s*(?:and|or|to|-|–|et|ou|bis|und|oder)\s*{_YEAR})?"
@@ -39,6 +40,12 @@ def academic_end(today: date | None = None) -> int:
 
 def graduation_years(text: str, today: date | None = None) -> list[int] | None:
     """Accepted graduation years, or ``None`` when the posting states none."""
+    found = _graduation_years(text, academic_end(today))
+    return list(found) if found is not None else None
+
+
+@lru_cache(maxsize=4096)
+def _graduation_years(text: str, end: int) -> tuple[int, ...] | None:
     years: set[int] = set()
     for pattern in _EXPLICIT:
         for first, last in pattern.findall(text or ""):
@@ -46,14 +53,13 @@ def graduation_years(text: str, today: date | None = None) -> list[int] | None:
             if high - low <= 4:
                 years.update(range(low, high + 1))
     if years:
-        return sorted(years)
-    end = academic_end(today)
+        return tuple(sorted(years))
     # Internships run in the coming summer, so "final year" covers both graduating
     # at the end of this academic year and at the end of the next one.
     if _FINAL.search(text or ""):
-        return [end, end + 1]
+        return (end, end + 1)
     if _PENULTIMATE.search(text or ""):
-        return [end + 1, end + 2]
+        return (end + 1, end + 2)
     return None
 
 

@@ -46,7 +46,7 @@ const detailView = await load("../src/components/jobs/opportunity-detail-view.ts
   "@/components/jobs/match-score": { MatchScore: "MatchScore" },
   "@/components/jobs/tailoring-entry-point": { TailoringEntryPoint: "TailoringEntryPoint" },
   "@/components/applications/application-controls": { ApplicationControls: "ApplicationControls" },
-  "@/components/ui/badge": { Badge: "Badge" }, "@/components/ui/icon": { Icon: "Icon" },
+  "@/components/ui/badge": { Badge: "Badge" }, "@/components/ui/icon": { Icon: "Icon" }, "@/components/ui/button": { Button: "Button" },
   "@/lib/company-logo": await load("../src/lib/company-logo.ts"), "@/lib/organization-logo": { organizationLogo: () => null }, "@/lib/match-reasons": await load("../src/lib/match-reasons.ts"), "@/lib/opportunities": { opportunityTypeLabel: (type) => type },
   "@/lib/profile-skills": profileSkillsApi,
   "@/lib/opportunity-copilot": copilotModel,
@@ -599,7 +599,7 @@ test("company avatars keep a fixed frame, reject unsupported URLs and recover wh
 test("compact cards retain long metadata, meaningful eligibility and top-row actions", async () => {
   const { OpportunityCardContent, opportunityCardClasses } = await load("../src/components/jobs/opportunity-card-content.tsx", {
     "./match-requirements": { MatchChips: "MatchChips" },
-    "react/jsx-runtime": runtime, "@/components/ui/badge": { Badge: "Badge" }, "@/components/ui/icon": { Icon: "Icon" },
+    "react/jsx-runtime": runtime, "@/components/ui/badge": { Badge: "Badge" }, "@/components/ui/icon": { Icon: "Icon" }, "@/components/ui/button": { Button: "Button" },
     "./company-mark": { CompanyMark: "CompanyMark" }, "./company-avatar": { CompanyAvatar: "CompanyAvatar" },
     "./eligibility-badge": { EligibilityBadge: "EligibilityBadge" }, "./match-score": { MatchScore: "MatchScore" },
     "@/lib/job-description": await load("../src/lib/job-description.ts"),

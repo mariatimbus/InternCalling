@@ -6,6 +6,7 @@ import { CompanyAvatar } from "@/components/jobs/company-avatar";
 import { TailoringEntryPoint } from "@/components/jobs/tailoring-entry-point";
 import { ApplicationControls } from "@/components/applications/application-controls";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Icon, type IconName } from "@/components/ui/icon";
 import { opportunityTypeLabel } from "@/lib/opportunities";
 import { companyLogoUrl as logoFor } from "@/lib/company-logo";
@@ -237,7 +238,7 @@ function opportunityDecision(copilot: OpportunityCopilotData, standalone: boolea
       </section> : assessmentCards;
 }
 
-export function OpportunityDetailView({ opportunity: job, assessment, status, companyLogoUrl, detailContext = "", standalone = false, saveControl, tracking, copilotEnabled = false, profileSkills = null, catalogStatus }: {
+export function OpportunityDetailView({ opportunity: job, assessment, status, companyLogoUrl, detailContext = "", standalone = false, saveControl, tracking, copilotEnabled = false, profileSkills = null, catalogStatus, onClose }: {
   opportunity: Opportunity | Application["opportunity"];
   assessment: OpportunityAssessment | null;
   status?: Application["status"];
@@ -249,6 +250,8 @@ export function OpportunityDetailView({ opportunity: job, assessment, status, co
   copilotEnabled?: boolean;
   profileSkills?: Skill[] | null;
   catalogStatus?: "loading" | "loaded" | "failed";
+  /** Shows an X that closes this panel. */
+  onClose?: () => void;
 }) {
   const Heading = standalone ? "h1" : "h2";
   const SectionHeading = standalone ? "h2" : "h3";
@@ -275,14 +278,15 @@ export function OpportunityDetailView({ opportunity: job, assessment, status, co
     <div role="region" aria-label="Opportunity information" tabIndex={0}
       className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain p-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus sm:p-4">
       <header className="border-b border-line pb-6">
-        {(tracking || listing || saveControl) && <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        {(tracking || listing || saveControl || onClose) && <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
           {(tracking || listing) && <div className="min-w-0 flex-1 max-sm:basis-full">
           <ApplicationControls key={`${job.id}:${tracking?.application?.updated_at ?? "new"}`}
             opportunityId={job.id} application={tracking?.application} showSave={tracking?.showSave}
             inline allowTracking={!!tracking}
             tailoring={listing ? <TailoringEntryPoint jobId={job.id} title={job.title} organization={job.organization ?? ""} embedded /> : undefined} />
           </div>}
-          {saveControl && <div className="ml-auto shrink-0 max-sm:order-first">{saveControl}</div>}
+          {(saveControl || onClose) && <div className="ml-auto flex shrink-0 items-start gap-2 max-sm:order-first">{saveControl}
+            {onClose && <Button variant="ghost" size="sm" className="px-2" aria-label="Close opportunity" onClick={onClose}><Icon name="x" className="size-5" /></Button>}</div>}
         </div>}
         <div className="grid items-start gap-5 @lg:grid-cols-[minmax(0,1fr)_11rem]">
         <div className="min-w-0">

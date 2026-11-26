@@ -42,7 +42,7 @@ class PublicJSONClient:
         self._last: dict[str, float] = {}
         self._robots: dict[str, RobotFileParser] = {}
 
-    def _read(self, url: str, interval: float) -> bytes:
+    def _read(self, url: str, interval: float, accept: str = "application/json") -> bytes:
         host = urlsplit(url).netloc
         for attempt in range(3):
             delay = interval - (self.clock() - self._last.get(host, float("-inf")))
@@ -51,7 +51,7 @@ class PublicJSONClient:
             self._last[host] = self.clock()
             try:
                 request = Request(
-                    url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"}
+                    url, headers={"User-Agent": USER_AGENT, "Accept": accept}
                 )
                 with self.open_url(request, timeout=self.timeout) as response:
                     data = response.read(MAX_BYTES + 1)
@@ -71,6 +71,14 @@ class PublicJSONClient:
         raise AssertionError("unreachable")
 
     def get(self, url: str):
+        return json.loads(self._read(url, self._allowed(url)))
+
+    def get_text(self, url: str) -> str:
+        """A public HTML page, under the same robots, rate and size rules as ``get``."""
+        return self._read(url, self._allowed(url), accept="text/html").decode("utf-8", "replace")
+
+    def _allowed(self, url: str) -> float:
+        """Check scheme and robots; return the per-host interval to respect."""
         parts = urlsplit(url)
         if parts.scheme != "https" or parts.username or parts.password:
             raise ValueError("only credential-free HTTPS is supported")
@@ -92,4 +100,4 @@ class PublicJSONClient:
         rate = rules.request_rate(USER_AGENT)
         if rate:
             interval = max(interval, rate.seconds / rate.requests)
-        return json.loads(self._read(url, interval))
+        return interval
