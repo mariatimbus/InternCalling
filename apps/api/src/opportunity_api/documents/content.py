@@ -126,8 +126,44 @@ ACRONYMS = {
 }
 
 
+# How these are written; anything else: acronyms in capitals, other words capitalised.
+DISPLAY = {
+    "javascript": "JavaScript",
+    "typescript": "TypeScript",
+    "tensorflow": "TensorFlow",
+    "pytorch": "PyTorch",
+    "github": "GitHub",
+    "github actions": "GitHub Actions",
+    "gitlab": "GitLab",
+    "node.js": "Node.js",
+    "postgresql": "PostgreSQL",
+    "mysql": "MySQL",
+    "mongodb": "MongoDB",
+    "graphql": "GraphQL",
+    "fastapi": "FastAPI",
+    "numpy": "NumPy",
+    "scipy": "SciPy",
+    "scikit-learn": "scikit-learn",
+    "opencv": "OpenCV",
+    "macos": "macOS",
+    "ios": "iOS",
+    "latex": "LaTeX",
+    "next.js": "Next.js",
+    "vue.js": "Vue.js",
+    "tailwind css": "Tailwind CSS",
+    "openai": "OpenAI",
+    "llm": "LLM",
+    "devops": "DevOps",
+    "kubernetes": "Kubernetes",
+    "c#": "C#",
+    "c++": "C++",
+}
+
+
 def _shown(name: str) -> str:
-    """Stored skills are lowercase; print "SQL" and "Python", keep "PostgreSQL"."""
+    """Stored skills are lowercase; print "SQL", "Python" and "JavaScript"."""
+    if name.casefold() in DISPLAY:
+        return DISPLAY[name.casefold()]
     if not name.islower():
         return name
     return name.upper() if name in ACRONYMS else name[0].upper() + name[1:]
