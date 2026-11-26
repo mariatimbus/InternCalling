@@ -71,8 +71,8 @@ def test_text_is_escaped_so_no_input_runs_latex():
             "extras": [("Awards", [hostile])],
         }
     )
-    assert "\\input{" not in source
-    assert "\\item{} [label]" in source  # a leading "[" is never an \item option
+    assert "\\input{/etc" not in source and "\\textbackslash{}input" in source
+    assert "\\resumeItem{[label]" in source  # inside braces, "[" is never an \item option
 
 
 def test_ats_report_rows_and_added_keywords(monkeypatch):
@@ -309,7 +309,7 @@ def test_research_and_activities_are_not_industry_years(monkeypatch):
     assert doc["experience"] == [] and doc["research"][0]["title"] == "Research Assistant"
     assert doc["activities"][0]["bullets"] == ["Led 15 students"]
     source = latex.resume_source(doc)
-    assert "Research}" in source and "Leadership \\& Activities" in source
+    assert "\\section{Research}" in source and "\\section{Leadership}" in source
 
 
 def test_title_row_never_shows_an_unrelated_activity(monkeypatch):
@@ -329,3 +329,36 @@ def test_title_row_never_shows_an_unrelated_activity(monkeypatch):
         r for r in content.ats_report(candidate, profile, job, []).rows if r.key == "title"
     )
     assert title.you == "Computer Science student"  # "intern" and "2027" are not shared words
+
+
+def test_cv_uses_the_team_template_and_bolds_metrics():
+    doc = {
+        "name": "Ana Pop",
+        "contact": ["ana@example.invalid", "Bucharest"],
+        "education": [{"school": "Unibuc", "degree": "Bachelor's", "when": "Expected 2029"}],
+        "experience": [],
+        "research": [],
+        "projects": [
+            {
+                "title": "Docs",
+                "subtitle": "",
+                "where": "Python",
+                "when": "2026",
+                "bullets": ["48 automated tests, 90%+ accuracy, 236K views"],
+            }
+        ],
+        "activities": [],
+        "skills": ["Python", "React"],
+        "extras": [("Awards", ["NASA contest 2nd place"]), ("Languages", ["English (C1)"])],
+    }
+    source = latex.resume_source(doc)
+    assert "\\resumeSubheading" in source and "\\section{Technical Skills}" in source
+    assert "\\textbf{Languages}: Python" in source and "\\textbf{Technologies}: React" in source
+    assert "\\textbf{Honors}: NASA contest 2nd place" in source
+    assert "\\textbf{48} automated tests, \\textbf{90\\%+} accuracy, \\textbf{236K} views" in source
+    assert "\\href{mailto:ana@example.invalid}" in source
+    assert content._unique(["javascript", "Github actions", "sql"]) == [
+        "JavaScript",
+        "GitHub Actions",
+        "SQL",
+    ]

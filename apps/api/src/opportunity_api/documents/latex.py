@@ -132,33 +132,231 @@ def _entry(title: str, when: str, subtitle: str = "", where: str = "") -> str:
     return line + r"\vspace{1pt}"
 
 
+# The team's CV template (Latex_CS_Resume.tex). Two changes so it compiles with Tectonic
+# (XeTeX): pdfTeX-only unicode mapping is guarded, and fontspec gives Latin Modern with
+# Romanian diacritics. Everything else is the template as written.
+RESUME_PREAMBLE = r"""\documentclass[letterpaper,11pt]{article}
+
+\usepackage{latexsym}
+\usepackage[empty]{fullpage}
+\usepackage{titlesec}
+\usepackage{marvosym}
+\usepackage[usenames,dvipsnames]{color}
+\usepackage{verbatim}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage{fancyhdr}
+\usepackage[english]{babel}
+\usepackage{tabularx}
+\ifdefined\XeTeXversion\usepackage{fontspec}\else\input{glyphtounicode}\fi
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyfoot{}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+
+\addtolength{\oddsidemargin}{-0.5in}
+\addtolength{\evensidemargin}{-0.5in}
+\addtolength{\textwidth}{1in}
+\addtolength{\topmargin}{-.5in}
+\addtolength{\textheight}{1.0in}
+
+\urlstyle{same}
+
+\raggedbottom
+\raggedright
+\setlength{\tabcolsep}{0in}
+
+\titleformat{\section}{
+  \vspace{-4pt}\scshape\raggedright\large
+}{}{0em}{}[\color{black}\titlerule \vspace{-5pt}]
+
+% Machine readable / ATS parsable (pdfTeX; XeTeX writes unicode text natively).
+\ifdefined\pdfgentounicode\pdfgentounicode=1\fi
+
+\newcommand{\resumeItem}[1]{
+  \item\small{
+    {#1 \vspace{-2pt}}
+  }
+}
+
+\newcommand{\resumeSubheading}[4]{
+  \vspace{-2pt}\item
+    \begin{tabular*}{0.97\textwidth}[t]{l@{\extracolsep{\fill}}r}
+      \textbf{#1} & #2 \\
+      \textit{\small#3} & \textit{\small #4} \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeProjectHeading}[2]{
+    \item
+    \begin{tabular*}{0.97\textwidth}{l@{\extracolsep{\fill}}r}
+      \small#1 & #2 \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\renewcommand\labelitemii{$\vcenter{\hbox{\tiny$\bullet$}}$}
+
+\newcommand{\resumeSubHeadingListStart}{\begin{itemize}[leftmargin=0.15in, label={}]}
+\newcommand{\resumeSubHeadingListEnd}{\end{itemize}}
+\newcommand{\resumeItemListStart}{\begin{itemize}}
+\newcommand{\resumeItemListEnd}{\end{itemize}\vspace{-5pt}}
+"""
+
+PROGRAMMING = {
+    "python",
+    "java",
+    "c",
+    "c++",
+    "c#",
+    "javascript",
+    "typescript",
+    "go",
+    "rust",
+    "kotlin",
+    "swift",
+    "scala",
+    "r",
+    "matlab",
+    "sql",
+    "php",
+    "ruby",
+    "dart",
+    "haskell",
+    "julia",
+    "bash",
+    "html",
+    "css",
+    "assembly",
+    "fortran",
+    "perl",
+    "lua",
+    "elixir",
+    "ocaml",
+    "verilog",
+    "vhdl",
+}
+_NUMBER = re.compile(r"(?<![\w.])(\d[\d,.]*[KkMm]?\+?(?:\\%|x)?\+?)(?![\w])")
+_EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
+
+
+def _bold_numbers(text: str) -> str:
+    """Bold metrics in already-escaped text, as the template does ("over 275", "400%")."""
+    return _NUMBER.sub(r"\\textbf{\1}", text)
+
+
+def _bullets(lines: list[str]) -> list[str]:
+    if not lines:
+        return []
+    items = [r"      \resumeItem{" + _bold_numbers(tex(line)) + "}" for line in lines]
+    return [r"      \resumeItemListStart", *items, r"      \resumeItemListEnd"]
+
+
+def _subheading(entries: list[dict]) -> list[str]:
+    out = [r"  \resumeSubHeadingListStart"]
+    for e in entries:
+        out.append(
+            r"    \resumeSubheading"
+            + "\n      "
+            + "".join(
+                "{" + part + "}"
+                for part in (
+                    r"\textbf{" + tex(e["title"]) + "}",
+                    e["when"],
+                    tex(e["subtitle"]),
+                    tex(e["where"]),
+                )
+            )
+        )
+        out += _bullets(e["bullets"])
+    return [*out, r"  \resumeSubHeadingListEnd"]
+
+
 def resume_source(doc: dict) -> str:
-    """``doc``: name, contact, summary, education, experience, projects, skills, extras."""
-    parts = [PREAMBLE, r"\begin{document}\color{ink}", _header(doc["name"], doc["contact"])]
-    if doc.get("summary"):
-        parts += [r"\vspace{6pt}", tex(doc["summary"]) + r"\par"]
+    """``doc``: name, contact, education, experience, research, projects, activities,
+    skills, extras (title, values). Laid out with the team's CV template."""
+    contact = []
+    for value in doc["contact"]:
+        if not value:
+            continue
+        if _EMAIL.fullmatch(value):
+            contact.append(r"\href{mailto:" + value + r"}{\underline{" + tex(value) + "}}")
+        else:
+            contact.append(tex(value))
+    parts = [
+        RESUME_PREAMBLE,
+        r"\begin{document}",
+        r"\begin{center}",
+        r"    \textbf{\Huge \scshape " + tex(doc["name"]) + r"} \\ \vspace{1pt}",
+        r"    \small " + r" $|$ ".join(contact),
+        r"\end{center}",
+    ]
+    extras = {title: values for title, values in doc.get("extras", []) if values}
     if doc.get("education"):
-        parts.append(r"\cvsection{Education}")
+        parts.append(r"\section{Education}")
+        parts.append(r"  \resumeSubHeadingListStart")
         for e in doc["education"]:
-            parts.append(_entry(e["school"], tex(e["when"]), e["degree"]))
-    sections = (
-        ("Experience", "experience"),
-        ("Research", "research"),
-        ("Projects", "projects"),
-        ("Leadership & Activities", "activities"),
-    )
-    for title, key in sections:
+            parts.append(
+                r"    \resumeSubheading"
+                + "\n      "
+                + "".join(
+                    "{" + tex(part) + "}" for part in (e["school"], e["when"], e["degree"], "")
+                )
+            )
+            honours = extras.pop("Awards", [])
+            if honours:
+                parts += [
+                    r"      \resumeItemListStart",
+                    r"        \resumeItem{\textbf{Honors}: " + tex("; ".join(honours)) + "}",
+                    r"      \resumeItemListEnd",
+                ]
+        parts.append(r"  \resumeSubHeadingListEnd")
+    skills = doc.get("skills") or []
+    coding = [s for s in skills if s.casefold() in PROGRAMMING]
+    other = [s for s in skills if s.casefold() not in PROGRAMMING]
+    lines = [
+        (label, values)
+        for label, values in (
+            ("Languages", coding),
+            ("Technologies", other),
+            ("Spoken languages", extras.pop("Languages", [])),
+            ("Certificates", extras.pop("Certificates", [])),
+        )
+        if values
+    ]
+    if lines:
+        parts += [
+            r"\section{Technical Skills}",
+            r" \begin{itemize}[leftmargin=0.15in, label={}]",
+            r"    \small{\item{",
+        ]
+        parts.append(
+            r"\\" "\n".join(
+                "    {" + r"\textbf{" + tex(label) + "}: " + tex(", ".join(values)) + "}"
+                for label, values in lines
+            )
+            + "}}"
+        )
+        parts.append(r" \end{itemize}")
+    for title, key in (("Experience", "experience"), ("Research", "research")):
         if doc.get(key):
-            parts.append(_cmd("cvsection", tex(title)))
-            for e in doc[key]:
-                parts.append(_entry(e["title"], e["when"], e["subtitle"], e["where"]))
-                parts.append(_items(e["bullets"]))
-                parts.append(r"\vspace{3pt}")
-    if doc.get("skills"):
-        parts += [r"\cvsection{Skills}", tex(", ".join(doc["skills"])) + r"\par"]
-    for title, values in doc.get("extras", []):
-        if values:
-            parts += [_cmd("cvsection", tex(title)), tex(" · ".join(values)) + r"\par"]
+            parts.append(r"\section{" + title + "}")
+            parts += _subheading(doc[key])
+    if doc.get("projects"):
+        parts += [r"\section{Projects}", r"    \resumeSubHeadingListStart"]
+        for e in doc["projects"]:
+            head = r"\textbf{" + tex(e["title"]) + "}"
+            if e["where"]:
+                head += r" $|$ \emph{" + tex(e["where"]) + "}"
+            parts.append(r"    \resumeProjectHeading" + "\n      {" + head + "}{" + e["when"] + "}")
+            parts += _bullets(e["bullets"])
+        parts.append(r"    \resumeSubHeadingListEnd")
+    if doc.get("activities"):
+        parts.append(r"\section{Leadership}")
+        parts += _subheading(doc["activities"])
+    for title, values in extras.items():  # anything left, e.g. awards without education
+        parts += [r"\section{" + tex(title) + "}", r"\small " + tex("; ".join(values))]
     parts.append(r"\end{document}")
     return "\n".join(parts) + "\n"
 
