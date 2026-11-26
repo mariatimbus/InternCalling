@@ -231,6 +231,15 @@ def test_templates_compile_to_pdf(monkeypatch):
         Entry(id="r", kind="research", title="Research Assistant", lines=["Built a 1D-CNN"]),
         Entry(id="t", kind="extracurricular", title="Team Leader", subtitle="Robotics & Co"),
     ]
+    candidate.links = [("GitHub", "https://github.com/ana?tab=repos&x=1#top")]
+    candidate.projects = [
+        Entry(
+            id="p",
+            title="Solver",
+            where="Python",
+            links=[("Code", "https://github.com/ana/solver")],
+        )
+    ]
     resume, _ = content.resume_document(candidate, POSTING, "Acme", [], profile)
     letter, _ = content.letter_document(candidate, POSTING, "Acme", [], profile)
     for source in (latex.resume_source(resume), latex.letter_source(letter)):
@@ -362,3 +371,69 @@ def test_cv_uses_the_team_template_and_bolds_metrics():
         "GitHub Actions",
         "SQL",
     ]
+
+
+def test_cv_links_profiles_projects_and_credentials():
+    assert content.https_url("https://github.com/ana") == "https://github.com/ana"
+    for bad in (
+        "http://github.com/ana",
+        "javascript:alert(1)",
+        "https://u:p@x.com",
+        "https://x/{a}",
+    ):
+        assert content.https_url(bad) == ""
+    doc = {
+        "name": "Ana",
+        "contact": ["ana@example.invalid"],
+        "links": [
+            ("LinkedIn", "https://www.linkedin.com/in/ana/"),
+            ("GitHub", "https://github.com/ana"),
+        ],
+        "urls": {"AWS Practitioner, Amazon": "https://aws.example/cert?id=1&x=2"},
+        "education": [],
+        "experience": [],
+        "research": [],
+        "activities": [],
+        "skills": [],
+        "projects": [
+            {
+                "title": "Solver",
+                "subtitle": "",
+                "where": "Python",
+                "when": "2026",
+                "bullets": [],
+                "links": [("Code", "https://github.com/ana/solver")],
+            }
+        ],
+        "extras": [("Certificates", ["AWS Practitioner, Amazon"])],
+    }
+    source = latex.resume_source(doc)
+    assert "\\href{https://www.linkedin.com/in/ana/}{\\underline{linkedin.com/in/ana}}" in source
+    assert "\\href{https://github.com/ana/solver}{\\underline{Code}}" in source
+    assert (
+        "\\href{https://aws.example/cert?id=1\\&x=2}{\\underline{AWS Practitioner, Amazon}}"
+        in source
+    )
+
+
+def test_profile_links_come_from_the_verified_token(client, db_factory, monkeypatch):
+    from tests.conftest import mint_token
+
+    job = make_opportunity(title="Python Intern", description="Python.")
+    seed(db_factory, job)
+    token = mint_token(
+        email="links@example.invalid",
+        user_metadata={
+            "full_name": "Ana Pop",
+            "profile_linkedin_url": "https://www.linkedin.com/in/ana",
+            "profile_github_url": "https://evil.example/ana",  # not GitHub: never printed
+        },
+    )
+    sources = []
+    monkeypatch.setattr(content, "_writer", lambda: None)
+    monkeypatch.setattr(latex, "compile_pdf", lambda s: sources.append(s) or b"%PDF-1.7")
+    response = client.post(
+        f"{BASE}/documents/{job.id}/resume", headers={"Authorization": f"Bearer {token}"}, json={}
+    )
+    assert response.status_code == 200, response.text
+    assert "linkedin.com/in/ana" in sources[0] and "evil.example" not in sources[0]

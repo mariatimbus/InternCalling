@@ -67,7 +67,7 @@ async function fixture(request) {
   const continuation = await load(jobs + "load-more-action.ts", {
     "@/lib/auth/account": account, "@/lib/jobs-url": jobsUrl,
   });
-  const { default: page } = await load(jobs + "page.tsx", {
+  const { JobsListing } = await load(jobs + "jobs-listing.tsx", {
     "react/jsx-runtime": runtime, "next/link": { default: "Link" }, "@/lib/auth/account": account,
     "@/components/workspace/recommended-feed": { RecommendedFeed: "JobsList" },
     "@/components/jobs/jobs-search": { JobsSearch: "JobsSearch" },
@@ -81,6 +81,7 @@ async function fixture(request) {
     "@/lib/profile-skills": profileSkillsApi,
     "@/lib/jobs-url": jobsUrl,
   });
+  const page = props => JobsListing({ ...props, kind: "internship" });
   return { calls, invalidated, save: action.saveOpportunity, visit: async (query = {}) => nodes(await page({ searchParams: Promise.resolve(query) })) };
 }
 

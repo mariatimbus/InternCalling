@@ -8,6 +8,7 @@ import type { NavigationItem } from "@/components/navigation/sidebar";
 
 const navigation: NavigationItem[] = [
   { href: "/jobs", label: "Jobs", icon: "jobs" },
+  { href: "/early-careers", label: "Early careers", icon: "award" },
   { href: "/profile", label: "Profile", icon: "profile" },
   { href: "/resumes", label: "Resumes", icon: "resume" },
   { href: "/applications", label: "Applications", icon: "applications" },

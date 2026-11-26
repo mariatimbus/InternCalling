@@ -62,7 +62,7 @@ test("confirmed profile/skill writes feed fresh Jobs requests and the real score
     const { saveProfile } = await load("../src/app/(workspace)/profile/actions.ts", { ...common, "@/lib/api/types": types, "@/lib/profile-edit": profileHelper });
     const skillActions = await load("../src/app/(workspace)/profile/skills-actions.ts", { ...common, "@/lib/profile-skills": skillsHelper });
     const opportunityHelpers = await load("../src/lib/opportunities.ts");
-    const { default: JobsPage } = await load("../src/app/(workspace)/jobs/page.tsx", {
+    const { JobsListing } = await load("../src/app/(workspace)/jobs/jobs-listing.tsx", {
       "react/jsx-runtime": runtime, "next/link": "Link", "@/lib/auth/account": { requireCompletedAccount: account },
       "@/components/workspace/recommended-feed": { RecommendedFeed: "RecommendedJobs" },
       "@/components/jobs/jobs-search": { JobsSearch: "JobsSearch" }, "@/components/ui/button": { Button: "Button" },
@@ -75,6 +75,7 @@ test("confirmed profile/skill writes feed fresh Jobs requests and the real score
       "@/lib/profile-skills": skillsHelper,
       "@/lib/jobs-url": await load("../src/lib/jobs-url.ts"),
     });
+    const JobsPage = props => JobsListing({ ...props, kind: "internship" });
     const searchParams = Promise.resolve({ q: "Python", type: "internship", page: "1" });
     const visit = async () => nodes(await JobsPage({ searchParams })).find(n => n.type === "RecommendedJobs").props.items;
     const before = await visit();
