@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from functools import lru_cache
 from typing import Literal
+from urllib.parse import urlsplit
 
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -46,6 +47,7 @@ class Entry:
     id: str
     title: str
     kind: str = ""
+    links: list[tuple[str, str]] = field(default_factory=list)  # (label, https URL)
     subtitle: str = ""
     where: str = ""
     when: str = ""  # LaTeX, see latex.span
@@ -62,6 +64,8 @@ class Candidate:
     name: str
     email: str
     location: str = ""
+    links: list[tuple[str, str]] = field(default_factory=list)  # LinkedIn, GitHub
+    urls: dict[str, str] = field(default_factory=dict)  # certificate or award text -> link
     headline: str = ""
     bio: str = ""
     education: str = ""
@@ -169,6 +173,15 @@ def _shown(name: str) -> str:
     return name.upper() if name in ACRONYMS else name[0].upper() + name[1:]
 
 
+def https_url(value: str) -> str:
+    """A credential-free https URL safe to print as a link, else ""."""
+    value = (value or "").strip()
+    if not re.fullmatch(r"https://[A-Za-z0-9._~:/?#\[\]@!$&'()*+,;=%-]{4,500}", value):
+        return ""
+    parts = urlsplit(value)
+    return value if parts.hostname and not parts.username and not parts.password else ""
+
+
 def _unique(names) -> list[str]:
     """One name per skill ("docker" and "Docker" are one); a capitalised spelling wins."""
     seen: dict[str, str] = {}
@@ -193,6 +206,15 @@ def load_candidate(db: Session, user: User) -> Candidate:
         graduation=f"Expected {profile.graduation_year}" if profile.graduation_year else "",
         skills=[skill.name for skill in user.skills],
     )
+    # LinkedIn and GitHub are saved in Supabase user metadata, which the verified token carries.
+    metadata = getattr(user, "token_metadata", None) or {}
+    for label, key, host in (
+        ("LinkedIn", "profile_linkedin_url", "linkedin.com"),
+        ("GitHub", "profile_github_url", "github.com"),
+    ):
+        url = https_url(metadata.get(key) if isinstance(metadata.get(key), str) else "")
+        if url and (urlsplit(url).hostname or "").removeprefix("www.").endswith(host):
+            candidate.links.append((label, url))
     rows = db.scalars(
         select(ProfileEntry)
         .where(ProfileEntry.user_id == user.id)
@@ -232,23 +254,30 @@ def load_candidate(db: Session, user: User) -> Candidate:
                     finish=""
                     if v.get("ongoing") is True
                     else _s(v, "endDate") or _s(v, "startDate"),
+                    links=[
+                        (label, url)
+                        for label, key in (("Code", "repositoryUrl"), ("Demo", "demoUrl"))
+                        if (url := https_url(_s(v, key)))
+                    ],
                 )
             )
             candidate.skills += tech
         elif row.section == "certificates" and _s(v, "name"):
             issued = month_year(_s(v, "issueDate"))
-            candidate.certificates.append(
-                ", ".join(filter(None, [_s(v, "name"), _s(v, "organization"), issued]))
-            )
+            text = ", ".join(filter(None, [_s(v, "name"), _s(v, "organization"), issued]))
+            candidate.certificates.append(text)
+            if url := https_url(_s(v, "credentialUrl")):
+                candidate.urls[text] = url
         elif row.section == "languages" and _s(v, "name"):
             level = "Native" if v.get("native") is True else _s(v, "cefr")
             candidate.languages.append(
                 " ".join(filter(None, [_s(v, "name"), level and f"({level})"]))
             )
         elif row.section == "honours" and _s(v, "title"):
-            candidate.honours.append(
-                ", ".join(filter(None, [_s(v, "title"), _s(v, "organization")]))
-            )
+            text = ", ".join(filter(None, [_s(v, "title"), _s(v, "organization")]))
+            candidate.honours.append(text)
+            if url := https_url(_s(v, "referenceUrl")):
+                candidate.urls[text] = url
     candidate.skills = _unique(s.strip() for s in candidate.skills if s.strip())
     for entries in (candidate.experience, candidate.projects, candidate.activities):
         entries.sort(key=lambda e: e.finish or "9999", reverse=True)
@@ -769,11 +798,14 @@ def resume_document(
             "where": e.where,
             "when": e.when,
             "bullets": bullets[e.id],
+            "links": e.links,
         }
 
     return {
         "name": candidate.name,
         "contact": [candidate.email, candidate.location],
+        "links": candidate.links,
+        "urls": candidate.urls,
         "summary": summary,
         "education": [
             {

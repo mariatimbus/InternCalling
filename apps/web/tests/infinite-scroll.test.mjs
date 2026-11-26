@@ -144,9 +144,12 @@ test("recommendation continuation verifies identity and retains the same filters
     "@/lib/api/types": {},
     "@/lib/jobs-url": await load("../src/lib/jobs-url.ts"),
   });
-  await loadMoreRecommended({ q: " Python ", location: " Berlin ", degree_level: "master", study_year: "1", type: "job", page: "8" }, 2);
+  await loadMoreRecommended({ q: " Python ", location: " Berlin ", degree_level: "master", study_year: "1", type: "job", page: "8" }, "internship", 2);
   assert.equal(verified, 1);
   assert.deepEqual(Object.fromEntries(new URL(calls[0], "http://fixture.test").searchParams), {
     search: "Python", location: "Berlin", degree_level: "master", study_year: "1", page: "2", page_size: "12", opportunity_type: "internship", is_active: "true",
   });
+  await loadMoreRecommended({ q: "insight" }, "early_career", 3);
+  assert.equal(new URL(calls[1], "http://fixture.test").searchParams.get("opportunity_type"), "early_career");
+  await assert.rejects(loadMoreRecommended({}, "job", 2), /Invalid kind/);
 });
