@@ -75,7 +75,9 @@ export function AtsPanel({ jobId, transport }: { jobId: string; transport?: type
   }
 
   const keywordRow = report?.rows.find(row => row.key === "keywords");
-  const otherRows = report?.rows.filter(row => row.key !== "keywords") ?? [];
+  // Rows the posting does not ask about are not scored, so they are not shown either.
+  const otherRows = report?.rows.filter(row => row.key !== "keywords" && row.status !== "not_stated") ?? [];
+  const notAsked = report?.rows.filter(row => row.key !== "keywords" && row.status === "not_stated").map(row => row.label.toLowerCase()) ?? [];
   const own = new Set(keywords.map(k => k.toLowerCase()));
   const headline = atsHeadline(report);
   const total = keywordRow ? keywordRow.matched.length + keywordRow.missing.length : 0;
@@ -102,6 +104,7 @@ export function AtsPanel({ jobId, transport }: { jobId: string; transport?: type
               <dd className="min-w-0 break-words text-foreground"><span className="text-muted sm:hidden">You: </span>{row.you}</dd>
             </div>)}
           </dl>
+          {notAsked.length > 0 && <p className="mt-2 text-xs text-muted">Not required by this posting, so not scored: {notAsked.join(", ")}.</p>}
 
           {keywordRow && <div className="mt-5 space-y-4">
             <div className="flex items-center gap-3">
