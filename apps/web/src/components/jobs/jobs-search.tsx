@@ -45,7 +45,7 @@ const fieldOptions = [["software", "Software engineering"], ["data", "Data, AI &
 const optionLabel = (name: string, value: string) => (name === "field" ? fieldOptions : choiceGroups.find((group) => group.name === name)?.options ?? [])
   .find(([option]) => option === value)?.[1] ?? value;
 
-export function JobsSearch({ search, applied, navigationKey }: { search: string; applied: Filters; navigationKey: string }) {
+export function JobsSearch({ search, applied, navigationKey, basePath = "/jobs" }: { search: string; applied: Filters; navigationKey: string; basePath?: string }) {
   const router = useRouter();
   const listId = useId();
   const drawerId = useId();
@@ -86,7 +86,7 @@ export function JobsSearch({ search, applied, navigationKey }: { search: string;
     for (const [name, value] of Object.entries(filters)) {
       if (value.trim()) params.set(name, value.trim());
     }
-    router.push("/jobs" + (params.size ? "?" + params : ""));
+    router.push(basePath + (params.size ? "?" + params : ""));
   }
 
   function searchFor(query: string) {
@@ -119,7 +119,7 @@ export function JobsSearch({ search, applied, navigationKey }: { search: string;
 
   return <div className="mb-7 space-y-3">
     <div className="flex flex-wrap items-end gap-2.5">
-      <form action="/jobs" className="flex min-w-0 flex-[1_1_17rem] flex-wrap items-end gap-2.5"
+      <form action={basePath} className="flex min-w-0 flex-[1_1_17rem] flex-wrap items-end gap-2.5"
         onSubmit={(event) => { event.preventDefault(); searchFor(keyword); }}>
         <div className="relative min-w-0 flex-[1_1_9rem]">
           <Input label="Search opportunities" name="q" role="combobox" autoComplete="off" maxLength={200}

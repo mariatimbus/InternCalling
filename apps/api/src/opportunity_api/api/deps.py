@@ -53,6 +53,8 @@ def get_current_user(
             user = db.get(User, user_id)
             if user is None:
                 raise
+    # Not stored: profile links live in Supabase user metadata (see documents.content).
+    user.token_metadata = claims.get("user_metadata") or {}
     if not user.is_active:
         raise APIError(
             "Account is deactivated",

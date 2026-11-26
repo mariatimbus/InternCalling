@@ -241,6 +241,27 @@ _NUMBER = re.compile(r"(?<![\w.])(\d[\d,.]*[KkMm]?\+?(?:\\%|x)?\+?)(?![\w])")
 _EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 
 
+_URL = re.compile(r"https://[A-Za-z0-9._~:/?#\[\]@!$&'()*+,;=%-]+")
+
+
+def href(url: str, label: str) -> str:
+    """A clickable link; ``label`` is plain text. Unsafe URLs print as the label only."""
+    if not _URL.fullmatch(url or ""):
+        return tex(label)
+    # %, # and & are special inside macro arguments and tabular cells; hyperref unescapes them.
+    target = url.replace("%", "\\%").replace("#", "\\#").replace("&", "\\&")
+    return "\\href{" + target + "}{\\underline{" + tex(label) + "}}"
+
+
+def _short(url: str) -> str:
+    """linkedin.com/in/ana from https://www.linkedin.com/in/ana/"""
+    return re.sub(r"^https://(www\.)?", "", url).rstrip("/")
+
+
+def _linked(items: list[str], urls: dict[str, str], sep: str = ", ") -> str:
+    return sep.join(href(urls[i], i) if i in urls else tex(i) for i in items)
+
+
 def _bold_numbers(text: str) -> str:
     """Bold metrics in already-escaped text, as the template does ("over 275", "400%")."""
     return _NUMBER.sub(r"\\textbf{\1}", text)
@@ -284,6 +305,8 @@ def resume_source(doc: dict) -> str:
             contact.append(r"\href{mailto:" + value + r"}{\underline{" + tex(value) + "}}")
         else:
             contact.append(tex(value))
+    contact += [href(url, _short(url)) for _, url in doc.get("links", [])]
+    urls = doc.get("urls", {})
     parts = [
         RESUME_PREAMBLE,
         r"\begin{document}",
@@ -308,7 +331,7 @@ def resume_source(doc: dict) -> str:
             if honours:
                 parts += [
                     r"      \resumeItemListStart",
-                    r"        \resumeItem{\textbf{Honors}: " + tex("; ".join(honours)) + "}",
+                    r"        \resumeItem{\textbf{Honors}: " + _linked(honours, urls, "; ") + "}",
                     r"      \resumeItemListEnd",
                 ]
         parts.append(r"  \resumeSubHeadingListEnd")
@@ -333,7 +356,7 @@ def resume_source(doc: dict) -> str:
         ]
         parts.append(
             r"\\" "\n".join(
-                "    {" + r"\textbf{" + tex(label) + "}: " + tex(", ".join(values)) + "}"
+                "    {" + r"\textbf{" + tex(label) + "}: " + _linked(values, urls) + "}"
                 for label, values in lines
             )
             + "}}"
@@ -349,6 +372,8 @@ def resume_source(doc: dict) -> str:
             head = r"\textbf{" + tex(e["title"]) + "}"
             if e["where"]:
                 head += r" $|$ \emph{" + tex(e["where"]) + "}"
+            for label, url in e.get("links", []):
+                head += r" $|$ " + href(url, label)
             parts.append(r"    \resumeProjectHeading" + "\n      {" + head + "}{" + e["when"] + "}")
             parts += _bullets(e["bullets"])
         parts.append(r"    \resumeSubHeadingListEnd")
@@ -356,7 +381,7 @@ def resume_source(doc: dict) -> str:
         parts.append(r"\section{Leadership}")
         parts += _subheading(doc["activities"])
     for title, values in extras.items():  # anything left, e.g. awards without education
-        parts += [r"\section{" + tex(title) + "}", r"\small " + tex("; ".join(values))]
+        parts += [r"\section{" + tex(title) + "}", r"\small " + _linked(values, urls, "; ")]
     parts.append(r"\end{document}")
     return "\n".join(parts) + "\n"
 

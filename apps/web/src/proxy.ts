@@ -36,4 +36,4 @@ export async function proxy(request: NextRequest) {
   return applyHeaders(response);
 }
 
-export const config = { matcher: ["/jobs/:path*", "/opportunities/:path*", "/profile/:path*", "/resumes/:path*", "/applications/:path*", "/settings/:path*", "/onboarding/:path*", "/sign-in", "/sign-up", "/forgot-password", "/reset-password", "/auth/:path*"] };
+export const config = { matcher: ["/jobs/:path*", "/early-careers/:path*", "/opportunities/:path*", "/profile/:path*", "/resumes/:path*", "/applications/:path*", "/settings/:path*", "/onboarding/:path*", "/sign-in", "/sign-up", "/forgot-password", "/reset-password", "/auth/:path*"] };

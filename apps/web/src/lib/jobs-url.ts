@@ -39,9 +39,13 @@ export function jobsParams({ view, search, page, filters }: ReturnType<typeof re
   return new URLSearchParams({ view, q: search, page: String(page), ...Object.fromEntries(filters) });
 }
 
-export function recommendationParams(state: ReturnType<typeof readJobsQuery>, page = state.page) {
+/** Internships on /jobs, early-career programmes (insight weeks, discovery days, ambassadors) on /early-careers. */
+export type JobsKind = "internship" | "early_career";
+export const jobsPath = (kind: JobsKind) => kind === "early_career" ? "/early-careers" : "/jobs";
+
+export function recommendationParams(state: ReturnType<typeof readJobsQuery>, page = state.page, kind: JobsKind = "internship") {
   const params = new URLSearchParams(state.filters);
-  params.set("opportunity_type", "internship");
+  params.set("opportunity_type", kind);
   params.set("is_active", "true");
   params.set("page", String(page));
   params.set("page_size", "12");
