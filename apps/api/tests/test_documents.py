@@ -437,3 +437,42 @@ def test_profile_links_come_from_the_verified_token(client, db_factory, monkeypa
     )
     assert response.status_code == 200, response.text
     assert "linkedin.com/in/ana" in sources[0] and "evil.example" not in sources[0]
+
+
+def test_model_bullets_must_restate_the_entrys_own_facts(monkeypatch):
+    class Writer:
+        def generate_json(self, model, system, prompt, schema, temperature=0):
+            return schema(
+                summary="",
+                skills=[],
+                entries=[
+                    {
+                        "id": "e1",
+                        "bullets": [
+                            "Built Python APIs and ran their tests in CI",  # restates the facts
+                            "Managed data storage and retrieval with SQL databases",  # invented
+                            "Shipped 12 releases to production",  # invented number
+                        ],
+                    }
+                ],
+            )
+
+    monkeypatch.setattr(content, "_writer", lambda: Writer())
+    candidate, profile = student()
+    doc, _ = content.resume_document(candidate, POSTING, "Acme", [], profile)
+    assert doc["experience"][0]["bullets"] == ["Built Python APIs and ran their tests in CI"]
+
+    class Inventor(Writer):
+        def generate_json(self, model, system, prompt, schema, temperature=0):
+            return schema(
+                summary="",
+                skills=[],
+                entries=[{"id": "e1", "bullets": ["Demonstrated strong leadership capabilities"]}],
+            )
+
+    monkeypatch.setattr(content, "_writer", lambda: Inventor())
+    doc, _ = content.resume_document(candidate, POSTING, "Acme", [], profile)
+    assert doc["experience"][0]["bullets"] == [
+        "Built Python APIs",
+        "Ran tests in CI",
+    ]  # saved wording
