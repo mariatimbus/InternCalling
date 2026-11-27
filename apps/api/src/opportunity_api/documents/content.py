@@ -736,6 +736,43 @@ SYSTEM = (
 )
 
 
+_PLAIN = {
+    "the",
+    "and",
+    "for",
+    "with",
+    "using",
+    "use",
+    "used",
+    "from",
+    "into",
+    "through",
+    "across",
+    "over",
+    "that",
+    "this",
+    "their",
+    "its",
+    "our",
+    "your",
+    "while",
+    "within",
+    "via",
+    "per",
+}
+_NUMBERS = re.compile(r"\d[\d,.]*")
+
+
+def grounded(bullet: str, entry: Entry) -> bool:
+    """A model bullet restates this entry's own facts: at least half of its meaningful
+    words occur there, and every number it states is one the student wrote."""
+    facts = "\n".join([entry.title, entry.subtitle, entry.where, *entry.lines])
+    if not set(_NUMBERS.findall(bullet)) <= set(_NUMBERS.findall(facts)):
+        return False
+    words = {w for w in _words(bullet) if len(w) >= 3 and w not in _PLAIN} - _FILLER
+    return bool(words) and len(words & _words(facts)) >= len(words) / 2
+
+
 def _relevance(entry: Entry, wanted: list[str]) -> int:
     body = entry.text()
     return sum(1 for k in wanted if _pattern(canonical(k)).search(body))
@@ -781,9 +818,13 @@ def resume_document(
             allowed = {canonical(s): s for s in skills}
             ordered = [allowed[canonical(s)] for s in draft.skills if canonical(s) in allowed]
             skills = _unique(ordered + skills)
+            by_id = {e.id: e for e in entries}
             for item in draft.entries:
+                if item.id not in by_id:
+                    continue
                 lines = [" ".join(b.split())[:300] for b in item.bullets if b.strip()]
-                if item.id in bullets and lines:
+                lines = [line for line in lines if grounded(line, by_id[item.id])]
+                if lines:
                     bullets[item.id] = lines[:4]
             if 20 <= len(draft.summary) <= 700:
                 summary = " ".join(draft.summary.split())
